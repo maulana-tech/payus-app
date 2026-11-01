@@ -1,0 +1,994 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Self-hosted Aileron (free/public-domain grotesque) — single typeface for the whole app. */
+@font-face {
+  font-family: "Aileron";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/aileron/aileron-latin-300-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Aileron";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/aileron/aileron-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Aileron";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/aileron/aileron-latin-400-italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Aileron";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/aileron/aileron-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Aileron";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/aileron/aileron-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Aileron";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/aileron/aileron-latin-800-normal.woff2") format("woff2");
+}
+
+@theme {
+  --font-sans: "Aileron", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-heading:
+    "Aileron", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-brand-obsidian: #1a1f12;
+  --color-brand-linen: #f5f3ea;
+  --color-brand-obsidian-secondary: #20261a;
+
+  --color-paper: #f0eeea;
+  --color-paper-2: #eeeee4;
+  --color-panel: #fbfaf5;
+  --color-ink: #20261a;
+  --color-olive: #4c5d34;
+  --color-olive-deep: #333e22;
+  --color-gold: #9c7420;
+  --color-sage: #e8e9dd;
+  --color-line: #d6d6c8;
+  --color-line-soft: #e2e2d6;
+  --color-muted-text: #6b6e5d;
+  --color-ok: #16784c;
+  --color-warn: #9c7420;
+  --color-err: #9a3b2a;
+
+  --color-ed-dark: #262b1c;
+  --color-ed-dark-2: #20261a;
+  --color-ed-cream: #f5f3ea;
+  --color-ed-cream-2: #efece0;
+  --color-ed-mid: #8f9280;
+  --color-ed-line: rgba(245, 243, 234, 0.16);
+  --color-ed-gold: #b78a34;
+
+  /* Landing page palette. */
+  --color-void: #050507;
+  --color-void-2: #0c0b14;
+  --color-starlight: #f4f2ff;
+  --color-violet: #836ef9;
+  --color-indigo-glow: #3d2bff;
+  --color-magenta: #e24c9b;
+  --color-mist: #f4f4f6;
+  --color-graphite: #0d0c14;
+}
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+  }
+
+  body {
+    overflow-x: clip;
+  }
+
+  a {
+    color: var(--color-olive);
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--color-olive-deep);
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@keyframes step-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes mock-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@layer utilities {
+  /* Film grain over the landing gradients (Galxe-style nebula). */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.38;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .text-nebula {
+    background: linear-gradient(
+      100deg,
+      var(--color-violet) 0%,
+      #6f8cff 45%,
+      #5fd1c5 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+@theme inline {
+  --font-landing:
+    var(--font-urbanist), "Aileron", ui-sans-serif, system-ui, sans-serif;
+  --font-landing-mono:
+    var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+  --font-heading:
+    "Aileron", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-surface-canvas: var(--surface-canvas);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-glass: var(--surface-glass);
+  --color-surface-inset: var(--surface-inset);
+  --color-surface-popover: var(--surface-popover);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+  --color-focus-ring: var(--focus-ring);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-border: var(--warning-border);
+  --color-warning-text: var(--warning-text);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --card: var(--color-panel);
+  --card-foreground: var(--color-ink);
+  --popover: var(--color-panel);
+  --popover-foreground: var(--color-ink);
+  --primary: var(--color-olive);
+  --primary-foreground: var(--color-paper);
+  --secondary: var(--color-sage);
+  --secondary-foreground: var(--color-olive-deep);
+  --muted: var(--color-sage);
+  --muted-foreground: var(--color-muted-text);
+  --accent: var(--color-sage);
+  --accent-foreground: var(--color-olive-deep);
+  --destructive: var(--color-err);
+  --border: var(--color-line);
+  --input: var(--color-line);
+  --ring: var(--color-gold);
+  --radius: 0.75rem;
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: var(--color-panel);
+  --sidebar-foreground: var(--color-ink);
+  --sidebar-primary: var(--color-olive);
+  --sidebar-primary-foreground: var(--color-paper);
+  --sidebar-accent: var(--color-sage);
+  --sidebar-accent-foreground: var(--color-olive-deep);
+  --sidebar-border: var(--color-line);
+  --sidebar-ring: var(--color-gold);
+
+  /* Semantic foundation shared by editorial and product modes. */
+  --surface-canvas: var(--color-paper);
+  --surface-elevated: var(--color-panel);
+  --surface-glass: rgb(255 255 255 / 0.08);
+  --surface-inset: rgb(255 255 255 / 0.07);
+  --surface-popover: rgb(32 38 26 / 0.92);
+  --text-primary: var(--color-ink);
+  --text-secondary: rgb(32 38 26 / 0.76);
+  --text-muted: var(--color-muted-text);
+  --border-subtle: rgb(32 38 26 / 0.08);
+  --border-default: var(--color-line);
+  --border-strong: rgb(32 38 26 / 0.28);
+  --focus-ring: var(--color-gold);
+  --warning-surface: rgb(156 116 32 / 0.14);
+  --warning-border: rgb(183 138 52 / 0.38);
+  --warning-text: #fff7dc;
+  --shadow-sm: 0 4px 16px rgb(32 38 26 / 0.04);
+  --shadow-md: 0 16px 40px rgb(32 38 26 / 0.06);
+  --shadow-lg: 0 24px 64px rgb(16 20 9 / 0.12);
+  --radius-control: var(--radius-lg);
+  --radius-card: var(--radius-2xl);
+  --radius-modal: var(--radius-xl);
+  --page-gutter: clamp(1.25rem, 5vw, 4.5rem);
+  --dashboard-gutter: clamp(1rem, 3vw, 2rem);
+  --dash-radius: 10px;
+  --dash-radius-sm: 6px;
+  /* Signal accent (toMaker): #5EA6E5 marks, #1C5F94 when it must be a word. */
+  --signal: rgb(94 166 229);
+  --signal-ink: rgb(28 95 148);
+  --section-space: clamp(5rem, 9vw, 7rem);
+  --section-space-compact: clamp(3.5rem, 7vw, 6rem);
+  --motion-product: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+:where(.theme-product, body:has(.theme-product)) {
+  color-scheme: dark;
+  --background: var(--color-brand-obsidian);
+  --foreground: var(--color-brand-linen);
+  --card: var(--color-brand-obsidian-secondary);
+  --card-foreground: var(--color-brand-linen);
+  --popover: var(--color-brand-obsidian-secondary);
+  --popover-foreground: var(--color-brand-linen);
+  --primary: var(--color-brand-linen);
+  --primary-foreground: var(--color-brand-obsidian);
+  --secondary: rgb(245 243 234 / 0.12);
+  --secondary-foreground: var(--color-brand-linen);
+  --muted: rgb(245 243 234 / 0.1);
+  --muted-foreground: rgb(245 243 234 / 0.7);
+  --accent: rgb(245 243 234 / 0.14);
+  --accent-foreground: var(--color-brand-linen);
+  --border: rgb(245 243 234 / 0.16);
+  --input: rgb(245 243 234 / 0.2);
+  --ring: var(--color-brand-linen);
+  --sidebar: var(--color-brand-obsidian-secondary);
+  --sidebar-foreground: var(--color-brand-linen);
+  --sidebar-primary: var(--color-brand-linen);
+  --sidebar-primary-foreground: var(--color-brand-obsidian);
+  --sidebar-accent: rgb(245 243 234 / 0.14);
+  --sidebar-accent-foreground: var(--color-brand-linen);
+  --sidebar-border: rgb(245 243 234 / 0.16);
+  --sidebar-ring: var(--color-brand-linen);
+  --surface-canvas: var(--color-brand-obsidian);
+  --surface-elevated: var(--color-brand-obsidian-secondary);
+  --surface-glass: rgb(245 243 234 / 0.08);
+  --surface-inset: rgb(245 243 234 / 0.07);
+  --surface-popover: rgb(245 243 234 / 0.14);
+  --text-primary: var(--color-brand-linen);
+  --text-secondary: rgb(245 243 234 / 0.76);
+  --text-muted: rgb(245 243 234 / 0.66);
+  --border-subtle: rgb(245 243 234 / 0.12);
+  --border-default: rgb(245 243 234 / 0.18);
+  --border-strong: rgb(245 243 234 / 0.3);
+  --focus-ring: var(--color-brand-linen);
+  --shadow-sm: 0 4px 16px rgb(26 31 18 / 0.2);
+  --shadow-md: 0 16px 40px rgb(26 31 18 / 0.3);
+  --shadow-lg: 0 24px 64px rgb(26 31 18 / 0.42);
+
+  /* Shared primitives still use these aliases on landing. Scope their product
+     values here so their existing landing appearance does not move. */
+  --color-white: var(--color-brand-linen);
+  --color-black: var(--color-brand-obsidian);
+  --color-paper: var(--color-brand-linen);
+  --color-panel: var(--color-brand-linen);
+  --color-ink: var(--color-brand-obsidian);
+  --color-olive: var(--color-brand-obsidian);
+  --color-olive-deep: var(--color-brand-obsidian-secondary);
+  --color-gold: var(--color-brand-linen);
+  --color-sage: rgb(245 243 234 / 0.12);
+  --color-line: rgb(245 243 234 / 0.18);
+  --color-line-soft: rgb(245 243 234 / 0.12);
+  --color-muted-text: rgb(245 243 234 / 0.66);
+}
+
+body:has(.theme-product) {
+  background: var(--color-brand-obsidian);
+  color: var(--color-brand-linen);
+}
+
+/* In the base layer so text-* utilities on links still apply. */
+@layer base {
+  :where(body:has(.theme-product)) a,
+  :where(body:has(.theme-product)) a:hover {
+    color: inherit;
+  }
+}
+
+/* From the tokens, not fixed linen: the dashboard remaps them to ink on paper,
+   where a fixed linen description was white on white. */
+body:has(.theme-product) [data-sonner-toast] {
+  border-color: color-mix(
+    in srgb,
+    var(--color-brand-linen) 18%,
+    transparent
+  ) !important;
+  background: var(--color-brand-obsidian-secondary) !important;
+  color: var(--color-brand-linen) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+body:has(.theme-product) [data-sonner-toast] [data-description] {
+  color: color-mix(
+    in srgb,
+    var(--color-brand-linen) 70%,
+    transparent
+  ) !important;
+}
+
+body:has(.theme-product) [data-sonner-toast] [data-button] {
+  background: var(--color-brand-linen) !important;
+  color: var(--color-brand-obsidian) !important;
+}
+
+body:has(.theme-product) [data-slot="dialog-overlay"] {
+  transition-timing-function: var(--motion-product);
+}
+
+body:has(.theme-product) [data-slot="dialog-content"] {
+  animation-timing-function: var(--motion-product);
+  box-shadow: 0 24px 64px rgb(8 10 8 / 0.12);
+}
+
+body:has(.theme-product) [data-slot="dialog-content"][data-appearance="glass"] {
+  box-shadow:
+    inset 0 1px 0 var(--glass-edge),
+    inset 1px 0 0 var(--glass-edge-soft),
+    0 24px 64px rgb(8 10 8 / 0.12);
+}
+
+.theme-glass {
+  color-scheme: dark;
+  --glass-highlight-rgb: 255 255 255;
+  --glass-shadow-rgb: 10 17 6;
+  --glass-fallback-panel: rgb(48 48 46 / 0.94);
+  --glass-fallback-panel-opaque: rgb(48 48 46 / 0.96);
+  --glass-fallback-popover: rgb(31 31 30 / 0.98);
+  --glass-fallback-popover-opaque: rgb(31 31 30 / 0.99);
+  --glass-edge: rgb(255 255 255 / 0.42);
+  --glass-edge-soft: rgb(255 255 255 / 0.16);
+  --glass-glow: rgb(255 255 255 / 0.22);
+  --glass-shadow: rgb(8 10 8 / 0.28);
+  --background: var(--surface-glass);
+  --foreground: #fff;
+  --card: var(--surface-glass);
+  --card-foreground: #fff;
+  --popover: var(--surface-popover);
+  --popover-foreground: #fff;
+  --primary: var(--color-paper);
+  --primary-foreground: var(--color-ink);
+  --secondary: rgb(255 255 255 / 0.12);
+  --secondary-foreground: #fff;
+  --muted: rgb(255 255 255 / 0.12);
+  --muted-foreground: rgb(255 255 255 / 0.68);
+  --accent: rgb(255 255 255 / 0.14);
+  --accent-foreground: #fff;
+  --border: rgb(255 255 255 / 0.14);
+  --input: rgb(255 255 255 / 0.18);
+  --ring: rgb(255 255 255 / 0.7);
+  --surface-elevated: rgb(255 255 255 / 0.1);
+  --text-primary: #fff;
+  --text-secondary: rgb(255 255 255 / 0.76);
+  --text-muted: rgb(255 255 255 / 0.68);
+  --border-subtle: rgb(255 255 255 / 0.12);
+  --border-default: rgb(255 255 255 / 0.18);
+  --border-strong: rgb(255 255 255 / 0.3);
+  --focus-ring: rgb(255 255 255 / 0.7);
+}
+
+.theme-linen {
+  color-scheme: light;
+  --background: var(--color-brand-linen);
+  --foreground: var(--color-brand-obsidian);
+  --card: var(--color-brand-linen);
+  --card-foreground: var(--color-brand-obsidian);
+  --popover: var(--color-brand-linen);
+  --popover-foreground: var(--color-brand-obsidian);
+  --primary: var(--color-brand-obsidian);
+  --primary-foreground: var(--color-brand-linen);
+  --secondary: rgb(26 31 18 / 0.08);
+  --secondary-foreground: var(--color-brand-obsidian);
+  --muted: rgb(26 31 18 / 0.07);
+  --muted-foreground: rgb(26 31 18 / 0.68);
+  --accent: rgb(26 31 18 / 0.1);
+  --accent-foreground: var(--color-brand-obsidian);
+  --border: rgb(26 31 18 / 0.14);
+  --input: rgb(26 31 18 / 0.16);
+  --ring: var(--color-brand-obsidian);
+  --surface-elevated: rgb(255 255 255 / 0.4);
+  --surface-inset: rgb(26 31 18 / 0.06);
+  --text-primary: var(--color-brand-obsidian);
+  --text-secondary: rgb(26 31 18 / 0.74);
+  --text-muted: rgb(26 31 18 / 0.62);
+  --border-subtle: rgb(26 31 18 / 0.1);
+  --border-default: rgb(26 31 18 / 0.16);
+  --border-strong: rgb(26 31 18 / 0.28);
+  --focus-ring: var(--color-brand-obsidian);
+}
+
+@layer components {
+  .surface-glass-control,
+  .surface-glass-panel,
+  .surface-glass-inset,
+  .surface-glass-field,
+  .surface-glass-popover {
+    -webkit-backdrop-filter: blur(24px) saturate(145%);
+    backdrop-filter: blur(24px) saturate(145%);
+  }
+
+  .surface-glass-control {
+    border-color: transparent;
+    background:
+      radial-gradient(circle at 18% 0%, var(--glass-glow), transparent 48%),
+      linear-gradient(
+        135deg,
+        rgb(var(--glass-highlight-rgb) / 0.2),
+        rgb(var(--glass-highlight-rgb) / 0.09)
+      );
+    background-position: 0% 0%;
+    background-size: 160% 160%;
+    box-shadow:
+      inset 0 1px 0 var(--glass-edge),
+      inset 0 -1px 0 rgb(var(--glass-highlight-rgb) / 0.08),
+      0 10px 28px rgb(var(--glass-shadow-rgb) / 0.16);
+    transition:
+      background-position 220ms var(--motion-product),
+      box-shadow 220ms var(--motion-product),
+      color 160ms var(--motion-product);
+  }
+
+  .surface-glass-control:hover,
+  .surface-glass-control[aria-expanded="true"],
+  .surface-glass-control[data-popup-open] {
+    background-position: 100% 100%;
+    box-shadow:
+      inset 0 1px 0 rgb(var(--glass-highlight-rgb) / 0.58),
+      inset 0 -1px 0 rgb(var(--glass-highlight-rgb) / 0.12),
+      0 14px 34px rgb(var(--glass-shadow-rgb) / 0.22);
+  }
+
+  .surface-glass-control:active {
+    box-shadow:
+      inset 0 1px 0 rgb(var(--glass-highlight-rgb) / 0.32),
+      inset 0 2px 8px rgb(var(--glass-shadow-rgb) / 0.16),
+      0 6px 18px rgb(var(--glass-shadow-rgb) / 0.14);
+  }
+
+  .surface-glass-panel {
+    background: rgb(var(--glass-highlight-rgb) / 0.12);
+    box-shadow:
+      inset 0 1px 0 var(--glass-edge-soft),
+      0 18px 48px rgb(var(--glass-shadow-rgb) / 0.08);
+    -webkit-backdrop-filter: blur(14px) saturate(115%);
+    backdrop-filter: blur(14px) saturate(115%);
+  }
+
+  .surface-glass-inset {
+    background:
+      radial-gradient(
+        circle at 15% 0%,
+        rgb(var(--glass-highlight-rgb) / 0.11),
+        transparent 45%
+      ),
+      linear-gradient(
+        145deg,
+        rgb(var(--glass-highlight-rgb) / 0.09),
+        rgb(var(--glass-highlight-rgb) / 0.045)
+      );
+    box-shadow:
+      inset 0 1px 0 var(--glass-edge-soft),
+      inset 0 0 0 1px rgb(var(--glass-highlight-rgb) / 0.08);
+    -webkit-backdrop-filter: blur(14px) saturate(135%);
+    backdrop-filter: blur(14px) saturate(135%);
+  }
+
+  .surface-glass-field {
+    border-color: var(--border-default);
+    background: linear-gradient(
+      110deg,
+      rgb(var(--glass-highlight-rgb) / 0.14),
+      rgb(var(--glass-highlight-rgb) / 0.07)
+    );
+    box-shadow:
+      inset 0 1px 0 rgb(var(--glass-highlight-rgb) / 0.16),
+      inset 0 0 0 1px rgb(var(--glass-highlight-rgb) / 0.03);
+    -webkit-backdrop-filter: blur(16px) saturate(135%);
+    backdrop-filter: blur(16px) saturate(135%);
+  }
+
+  .surface-glass-field:focus-visible {
+    background: linear-gradient(
+      110deg,
+      rgb(var(--glass-highlight-rgb) / 0.18),
+      rgb(var(--glass-highlight-rgb) / 0.09)
+    );
+    box-shadow:
+      inset 0 1px 0 rgb(var(--glass-highlight-rgb) / 0.24),
+      0 0 0 1px rgb(var(--glass-highlight-rgb) / 0.12);
+  }
+
+  .surface-glass-popover {
+    border-color: var(--border-default);
+    background:
+      radial-gradient(
+        circle at 16% 0%,
+        rgb(var(--glass-highlight-rgb) / 0.2),
+        transparent 42%
+      ),
+      linear-gradient(
+        145deg,
+        rgb(var(--glass-highlight-rgb) / 0.14),
+        rgb(var(--glass-highlight-rgb) / 0.08)
+      );
+    box-shadow:
+      inset 0 1px 0 var(--glass-edge),
+      inset 1px 0 0 var(--glass-edge-soft),
+      0 28px 72px rgb(var(--glass-shadow-rgb) / 0.34);
+    -webkit-backdrop-filter: blur(32px) saturate(150%);
+    backdrop-filter: blur(32px) saturate(150%);
+  }
+
+  .surface-linen-panel {
+    border-color: rgb(26 31 18 / 0.1);
+    background:
+      radial-gradient(circle at 8% 0%, rgb(255 255 255 / 0.7), transparent 34%),
+      var(--color-brand-linen);
+    color: var(--color-brand-obsidian);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.8),
+      0 18px 48px rgb(26 31 18 / 0.06);
+  }
+
+  /* Section label: toMaker's "label-data" voice (uppercase, tracked, ash). */
+  .dashboard-tile-title {
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--dash-ash, currentColor);
+  }
+
+  .type-landing-display {
+    font-family: var(--font-heading);
+    font-size: clamp(2.5rem, 7.5vw, 6rem);
+    font-weight: 600;
+    line-height: 0.9;
+    letter-spacing: -0.055em;
+  }
+
+  .type-landing-section-title {
+    font-family: var(--font-heading);
+    font-size: clamp(2.3rem, 5vw, 4.8rem);
+    font-weight: 600;
+    line-height: 0.95;
+    letter-spacing: -0.045em;
+  }
+
+  .type-product-page-title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.9rem, 4vw, 2.6rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.025em;
+  }
+
+  .type-product-panel-title {
+    font-family: var(--font-heading);
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.012em;
+  }
+
+  .type-body {
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .type-supporting {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  .type-caption {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.05em;
+  }
+}
+
+[data-dashboard-theme="dark"] .theme-linen {
+  color-scheme: dark;
+  --background: var(--color-brand-obsidian-secondary);
+  --foreground: var(--color-brand-linen);
+  --card: var(--color-brand-obsidian);
+  --card-foreground: var(--color-brand-linen);
+  --primary: var(--color-brand-linen);
+  --primary-foreground: var(--color-brand-obsidian);
+  --secondary: rgb(244 242 255 / 0.1);
+  --secondary-foreground: var(--color-brand-linen);
+  --muted: rgb(244 242 255 / 0.08);
+  --muted-foreground: rgb(244 242 255 / 0.68);
+  --accent: rgb(244 242 255 / 0.14);
+  --accent-foreground: var(--color-brand-linen);
+  --border: rgb(244 242 255 / 0.16);
+  --input: rgb(244 242 255 / 0.2);
+  --ring: var(--color-brand-linen);
+}
+
+[data-dashboard-theme="dark"] .surface-linen-panel {
+  border-color: rgb(244 242 255 / 0.12);
+  background: var(--color-brand-obsidian-secondary);
+  color: var(--color-brand-linen);
+  box-shadow:
+    inset 0 1px 0 rgb(244 242 255 / 0.08),
+    0 18px 48px rgb(8 10 8 / 0.12);
+}
+
+/* Dashboard "daylight paper" (style adapted from toMaker): ink on warm paper,
+   one accent (signal blue) for marks only, binary shape (sharp panels, pill
+   controls), no shadows. Light by default; html[data-dash-mode="dark"] flips to
+   paper on ink. Tokens live on <body> so dialogs and menus, which portal
+   outside the wrapper, follow too. */
+body:has(.dashboard-app) {
+  --dash-bg: rgb(250 247 240);
+  --dash-surface: rgb(255 253 248);
+  --dash-fg: rgb(21 19 16);
+  --dash-ash: rgb(107 101 90);
+  --dash-line: rgb(21 19 16 / 0.1);
+  /* The same hairline flattened onto the surface, for edges that sit over the
+     dither field, where a translucent line would show the pattern through. */
+  --dash-line-solid: rgb(232 230 225);
+  --dash-line-strong: rgb(21 19 16 / 0.2);
+  --dash-tint: rgb(21 19 16 / 0.04);
+  /* #5EA6E5 is 2.5:1 on paper: right for a dot or rule, wrong for a word. */
+  /* No blue in the dashboard: marks (dots, active rail, chart bars) are ink. */
+  --dash-accent: var(--dash-fg);
+  --dash-accent-ink: var(--dash-fg);
+  --dash-radius: 0px;
+  /* Panels stay square; controls and their hover fills keep a small radius
+     so they match the rounded fields beside them. */
+  --dash-radius-sm: 6px;
+  color-scheme: light;
+}
+
+html[data-dash-mode="dark"] body:has(.dashboard-app) {
+  --dash-bg: rgb(21 19 16);
+  --dash-surface: rgb(29 27 22);
+  --dash-fg: rgb(250 247 240);
+  --dash-ash: rgb(168 160 146);
+  --dash-line: rgb(250 247 240 / 0.1);
+  --dash-line-solid: rgb(51 49 44);
+  --dash-line-strong: rgb(250 247 240 / 0.2);
+  --dash-tint: rgb(250 247 240 / 0.05);
+  color-scheme: dark;
+}
+
+body:has(.dashboard-app),
+body:has(.dashboard-app) :is(.theme-product, .theme-linen, .theme-glass) {
+  --color-brand-linen: var(--dash-fg);
+  --color-brand-obsidian: var(--dash-bg);
+  --color-brand-obsidian-secondary: var(--dash-surface);
+  --dash-panel: var(--dash-surface);
+  --dash-positive: var(--dash-fg);
+  --background: var(--dash-bg);
+  --foreground: var(--dash-fg);
+  --card: var(--dash-surface);
+  --card-foreground: var(--dash-fg);
+  --popover: var(--dash-surface);
+  --popover-foreground: var(--dash-fg);
+  --primary: var(--dash-fg);
+  --primary-foreground: var(--dash-surface);
+  --secondary: var(--dash-tint);
+  --secondary-foreground: var(--dash-fg);
+  --muted: var(--dash-tint);
+  --muted-foreground: color-mix(in srgb, var(--dash-fg) 62%, transparent);
+  --accent: var(--dash-tint);
+  --accent-foreground: var(--dash-fg);
+  --border: var(--dash-line);
+  --input: var(--dash-line-strong);
+  --ring: var(--dash-fg);
+  --surface-elevated: var(--dash-surface);
+  --text-primary: var(--dash-fg);
+  --text-secondary: color-mix(in srgb, var(--dash-fg) 76%, transparent);
+  --text-muted: color-mix(in srgb, var(--dash-fg) 62%, transparent);
+  --border-subtle: var(--dash-line);
+  --border-default: var(--dash-line);
+  --border-strong: var(--dash-line-strong);
+  --focus-ring: var(--dash-fg);
+  --font-heading: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+  color-scheme: inherit;
+}
+
+body:has(.dashboard-app) {
+  background: var(--dash-bg);
+  color: var(--dash-fg);
+  font-family: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+}
+
+.dashboard-app {
+  background: var(--dash-bg);
+  color: var(--dash-fg);
+}
+
+body:has(.dashboard-app) :is(.surface-glass-panel, .surface-linen-panel),
+body:has(.dashboard-app) .surface-glass-popover {
+  border-radius: var(--dash-radius);
+  background: var(--dash-surface);
+  color: var(--dash-fg);
+  box-shadow: 0 0 0 1px var(--dash-line-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body:has(.dashboard-app) .surface-glass-popover {
+  box-shadow: 0 0 0 1px var(--dash-line-strong);
+}
+
+body:has(.dashboard-app) :is(.surface-glass-inset, .surface-glass-field) {
+  border-radius: var(--dash-radius-sm);
+  background: var(--dash-tint);
+  box-shadow: inset 0 0 0 1px var(--dash-line);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body:has(.dashboard-app) .surface-glass-control {
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dash-fg);
+  box-shadow: inset 0 0 0 1px var(--dash-line-strong);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body:has(.dashboard-app)
+  :is(
+    .surface-glass-control:hover,
+    .surface-glass-control[aria-expanded="true"],
+    .surface-glass-control[data-popup-open]
+  ) {
+  background: var(--dash-tint);
+  box-shadow: inset 0 0 0 1px var(--dash-line-strong);
+}
+
+/* Native checkboxes and radios in ink instead of the browser's blue. */
+body:has(.dashboard-app) :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--dash-fg);
+}
+
+/* Cards placed in a ledger become flat cells; the frame draws the lines. */
+body:has(.dashboard-app) .dash-ledger [data-slot="card"] {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body:has(.dashboard-app) :is([data-slot="button"], [data-slot="badge"]) {
+  border-radius: 999px;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* Logo variant per dashboard mode. */
+.dash-logo-dark {
+  display: none;
+}
+html[data-dash-mode="dark"] .dash-logo-light {
+  display: none;
+}
+html[data-dash-mode="dark"] .dash-logo-dark {
+  display: block;
+}
+
+/* Dialogs portal outside the dashboard; give them the same surface. */
+body:has(.dashboard-app) [data-slot="dialog-content"] {
+  border-radius: 0;
+  background: var(--dash-surface);
+  color: var(--dash-fg);
+  box-shadow: 0 0 0 1px var(--dash-line-strong);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Landing "daylight paper" (same system as the dashboard, adapted from
+   toMaker): the landing's own colour names are remapped onto ink on warm
+   paper, with the signal accent: `violet` now marks in signal blue, and the
+   few places it was a word use --signal-ink instead. No gradients. */
+body:has(.landing-paper) {
+  --color-void: rgb(250 247 240);
+  --color-void-2: rgb(255 253 248);
+  --color-mist: rgb(250 247 240);
+  --color-starlight: rgb(21 19 16);
+  --color-graphite: rgb(21 19 16);
+  --color-violet: var(--signal);
+  --color-magenta: var(--signal);
+  --color-indigo-glow: rgb(21 19 16);
+  --color-white: rgb(255 253 248);
+  color-scheme: light;
+  background: rgb(250 247 240);
+}
+
+/* Hairline figures on the landing paper. */
+.landing-paper .hairline-figure {
+  --hairline-plate: rgb(250 247 240);
+  --hairline-hi: rgb(21 19 16);
+  --hairline-edge: rgb(21 19 16 / 0.45);
+  --hairline-mid: rgb(21 19 16 / 0.28);
+  --hairline-lo: rgb(21 19 16 / 0.12);
+  --hairline-stroke: 1;
+}
+
+/* Payus mascot. steps() keeps the motion as chunky as the pixels. */
+.mascot .mascot-cat {
+  transform-origin: 50% 100%;
+}
+.mascot[data-mood="idle"] .mascot-cat {
+  animation: mascot-breathe 2.4s steps(1) infinite;
+}
+.mascot[data-mood="loading"] .mascot-cat {
+  animation: mascot-hop 0.7s steps(1) infinite;
+}
+.mascot[data-mood="success"] .mascot-cat {
+  animation:
+    mascot-gulp 0.5s steps(1) 0.75s 2,
+    mascot-breathe 2.4s steps(1) 1.8s infinite;
+}
+.mascot .mascot-coin {
+  translate: -50% 0;
+  opacity: 0;
+  animation: mascot-coin-drop 0.9s cubic-bezier(0.5, 0, 0.9, 0.6) 0.1s forwards;
+}
+@keyframes mascot-breathe {
+  50% {
+    transform: scaleY(1.04);
+  }
+}
+@keyframes mascot-hop {
+  50% {
+    transform: translateY(-10%);
+  }
+}
+@keyframes mascot-gulp {
+  50% {
+    transform: scale(1.08, 0.94);
+  }
+}
+@keyframes mascot-coin-drop {
+  0% {
+    opacity: 1;
+    transform: translateY(-140%) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(150%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(190%) scale(0.2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mascot .mascot-cat,
+  .mascot .mascot-coin {
+    animation: none;
+  }
+}

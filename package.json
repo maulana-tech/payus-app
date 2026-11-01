@@ -1,0 +1,29 @@
+{
+  "name": "payus",
+  "private": true,
+  "packageManager": "pnpm@10.4.1",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "build:local": "pnpm --filter web build:local",
+    "lint": "pnpm --filter web lint"
+  },
+  "workspaces": [
+    "web"
+  ],
+  "dependencies": {
+    "@fontsource/aileron": "^5.2.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "viem": "2.52.0"
+    },
+    "packageExtensions": {
+      "@hookform/resolvers": {
+        "peerDependencies": {
+          "zod": "*"
+        }
+      }
+    }
+  }
+}
