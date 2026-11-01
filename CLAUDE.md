@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Payus is a payments app: users get a @username, payment links, invoices and a merchant checkout API. The previous payment rail (an in-browser wallet) and every screen built on it were removed, so the repository is currently an application shell with no payment rail. `README.md` lists what still works and what is a placeholder; `docs/setup.md` is local setup, `docs/api.md` the widget and checkout API.
+Payus is a payments app: users get a @username, payment links, invoices and a merchant checkout API. The previous payment rail (an in-browser wallet) and every screen built on it were removed, so the repository is currently an application shell with no payment rail. `README.md` lists what still works and what is a placeholder; `docs/plan.md` is the dated work plan and the decisions already locked in; `docs/setup.md` is local setup, `docs/api.md` the widget and checkout API.
 
 When adding a payment rail, put the integration behind the existing modules (invoices, paymentLinks, developer/checkouts) rather than threading a provider SDK through the UI.
 
