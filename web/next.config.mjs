@@ -92,9 +92,9 @@ const nextConfig = {
   distDir: localBuild ? ".next-local" : ".next",
   outputFileTracingRoot: repoRoot,
   reactStrictMode: true,
-  // mongodb pulls in optional native drivers that webpack can't statically
-  // bundle for the Node.js server runtime — require it from node_modules.
-  serverExternalPackages: ["mongodb"],
+  // pg loads optional native bindings that webpack can't statically bundle
+  // for the Node.js server runtime — require it from node_modules.
+  serverExternalPackages: ["pg"],
   webpack: (config) => {
     config.resolve = config.resolve || {};
     config.resolve.alias = {

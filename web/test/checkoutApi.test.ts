@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -10,14 +9,16 @@ import {
   signClaim,
   type UsernameClaim,
 } from "../src/lib/usernameClaim";
+import {
+  createTestDb,
+  type IsolatedDb,
+  postgresAvailable,
+} from "./helpers/pgTestDb";
 
-// The merchant Checkout API end to end against a real MongoDB (skipped when
+// The merchant Checkout API end to end against a real Postgres (skipped when
 // none is reachable): keys, the REST routes and signed webhooks to a local
 // HTTP server.
-const URI = process.env.PAYUS_TEST_MONGODB_URI ?? "mongodb://localhost:27017";
-const DB = `payus_test_${randomUUID().replaceAll("-", "")}`;
-const { mongoAvailable } = await import("./helpers/mongoTestDb");
-const available = await mongoAvailable();
+const available = await postgresAvailable();
 
 const seed = profileSigningSeed(new Uint8Array(32).fill(4));
 const profile: UsernameClaim = {
@@ -28,33 +29,37 @@ const profile: UsernameClaim = {
   issuedAt: "2026-10-15T00:00:00.000Z",
 };
 
-describe.skipIf(!available)("checkout API (MongoDB)", () => {
+describe.skipIf(!available)("checkout API (Postgres)", () => {
   let dev: typeof import("../src/server/modules/developer/developer.service");
   let invoices: typeof import("../src/server/modules/invoices/invoices.service");
   let checkoutsRoute: typeof import("../src/app/api/v1/checkouts/route");
   let checkoutRoute: typeof import("../src/app/api/v1/checkouts/[id]/route");
-  let mongo: typeof import("../src/server/db/mongo");
+  let db: typeof import("../src/server/db/client");
+  let temp: IsolatedDb;
   let server: Server;
   let hookUrl = "";
   const received: { body: string; signature: string }[] = [];
   let failNext = 0;
 
   beforeAll(async () => {
-    process.env.MONGODB_URI = `${URI.replace(/\/$/, "")}/${DB}`;
-    mongo = await import("../src/server/db/mongo");
+    temp = await createTestDb();
+    process.env.DATABASE_URL = temp.url;
+    db = await import("../src/server/db/client");
     dev = await import("../src/server/modules/developer/developer.service");
     invoices = await import("../src/server/modules/invoices/invoices.service");
     checkoutsRoute = await import("../src/app/api/v1/checkouts/route");
     checkoutRoute = await import("../src/app/api/v1/checkouts/[id]/route");
-    await (await mongo.getProfiles()).insertOne({
-      _id: "shop",
-      userId: "u-shop",
-      signPubkeyHex: profile.signPubkeyHex,
-      msgPubkeyHex: profile.msgPubkeyHex,
-      claimJson: canonicalClaim(profile),
-      claimSigHex: signClaim(profile, seed),
-      createdAt: new Date(),
-    });
+    await db
+      .getDb()
+      .insert(db.profiles)
+      .values({
+        username: "shop",
+        userId: "u-shop",
+        signPubkeyHex: profile.signPubkeyHex,
+        msgPubkeyHex: profile.msgPubkeyHex,
+        claimJson: canonicalClaim(profile),
+        claimSigHex: signClaim(profile, seed),
+      });
     server = createServer((req, res) => {
       let body = "";
       req.on("data", (c) => {
@@ -79,8 +84,7 @@ describe.skipIf(!available)("checkout API (MongoDB)", () => {
 
   afterAll(async () => {
     server?.close();
-    const db = await mongo.getDb();
-    if (db.databaseName.startsWith("payus_test_")) await db.dropDatabase();
+    await temp?.dispose();
   });
 
   const post = (key: string | null, body: unknown) =>

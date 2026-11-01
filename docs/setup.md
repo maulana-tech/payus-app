@@ -11,7 +11,7 @@ How to run the app locally.
 ## 1. Requirements
 
 - Node 22+ and pnpm 10
-- MongoDB: local, or a free MongoDB Atlas cluster
+- Postgres 14+: local, or a managed instance (Render, Neon, Supabase)
 - A [Privy](https://dashboard.privy.io) app (login only)
 - Optional: a [Resend](https://resend.com) API key for email notifications
 
@@ -38,17 +38,19 @@ cp web/.env.example web/.env.local
 A valid app ID is also needed to run `pnpm build`: the Privy provider refuses
 to initialize without one, and prerendering then fails.
 
-### MongoDB
+### Postgres
 
-Set `MONGODB_URI`. It must include a database name, for example
-`mongodb+srv://user:pass@cluster.mongodb.net/app`. Without one, the driver
-writes to a database called `test`.
-
-Then create the collections and indexes:
+Set `DATABASE_URL`, for example `postgres://localhost:5432/payus` or the
+connection string of a managed instance. Create the database first, then
+apply the schema:
 
 ```sh
-pnpm --filter web migrate:up
+createdb payus                      # or whatever the URL names
+pnpm --filter web db:migrate        # applies web/drizzle/*.sql
 ```
+
+After editing `src/server/db/schema.ts`, run `pnpm --filter web db:generate`
+to write a new SQL migration, then `db:migrate` again.
 
 ### Email notifications (optional)
 
@@ -83,6 +85,7 @@ pnpm --filter web exec tsc --noEmit     # types
 pnpm --filter web biome:check           # lint + format
 ```
 
-Service tests that need a database run against a disposable one on a local
-MongoDB and skip themselves when none is reachable
-(`PAYUS_TEST_MONGODB_URI` to point elsewhere).
+Service tests that need a database create a disposable one on a local
+Postgres, migrate it, and drop it afterwards; they skip themselves when no
+server is reachable (`PAYUS_TEST_DATABASE_URL`, default
+`postgres://localhost:5432/postgres`).

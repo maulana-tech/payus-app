@@ -1,7 +1,13 @@
 import "server-only";
-import type { MongoServerError } from "mongodb";
+import { eq } from "drizzle-orm";
 import { verifyClaim } from "../../../lib/usernameClaim";
-import { getProfiles, getUsers, type ProfileDoc } from "../../db/mongo";
+import {
+  getDb,
+  isUniqueViolation,
+  type ProfileRow,
+  profiles,
+  users,
+} from "../../db/client";
 import {
   InvalidClaimError,
   ProfileExistsError,
@@ -14,12 +20,12 @@ import {
   usernameSchema,
 } from "./profiles.schema";
 
-const toPublic = (doc: ProfileDoc): PublicProfile => ({
-  username: doc._id,
-  signPubkeyHex: doc.signPubkeyHex,
-  msgPubkeyHex: doc.msgPubkeyHex,
-  claimJson: doc.claimJson,
-  claimSigHex: doc.claimSigHex,
+const toPublic = (row: ProfileRow): PublicProfile => ({
+  username: row.username,
+  signPubkeyHex: row.signPubkeyHex,
+  msgPubkeyHex: row.msgPubkeyHex,
+  claimJson: row.claimJson,
+  claimSigHex: row.claimSigHex,
 });
 
 export async function createProfile(
@@ -35,56 +41,76 @@ export async function createProfile(
   if (!/^[0-9a-f]{64}$/.test(claim.msgPubkeyHex ?? ""))
     throw new InvalidClaimError("invalid messaging key");
 
+  const db = getDb();
   // The claim must be signed by the key this account's recovery reproduces.
-  const user = await (await getUsers()).findOne({ _id: userId });
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
   if (!user?.escrow && !user?.passkey)
     throw new InvalidClaimError("set up recovery first");
   if (user.passkey && user.passkey.signPubkeyHex !== claim.signPubkeyHex)
     throw new InvalidClaimError("signing key does not match your passkey");
 
-  const profiles = await getProfiles();
-  if (await profiles.findOne({ userId })) throw new ProfileExistsError();
-  const doc: ProfileDoc = {
-    _id: claim.username,
-    userId,
-    signPubkeyHex: claim.signPubkeyHex,
-    msgPubkeyHex: claim.msgPubkeyHex,
-    claimJson: input.claimJson,
-    claimSigHex: input.claimSigHex.toLowerCase(),
-    createdAt: new Date(),
-  };
+  if (await myProfile(userId)) throw new ProfileExistsError();
   try {
-    await profiles.insertOne(doc);
+    const [row] = await db
+      .insert(profiles)
+      .values({
+        username: claim.username,
+        userId,
+        signPubkeyHex: claim.signPubkeyHex,
+        msgPubkeyHex: claim.msgPubkeyHex,
+        claimJson: input.claimJson,
+        claimSigHex: input.claimSigHex.toLowerCase(),
+      })
+      .returning();
+    return toPublic(row);
   } catch (e) {
-    if ((e as MongoServerError).code === 11000) {
-      if (await profiles.findOne({ userId })) throw new ProfileExistsError();
+    // One profile per account, one account per username: the unique indexes
+    // decide the race, and which one tripped says which error to report.
+    if (isUniqueViolation(e)) {
+      if (await myProfile(userId)) throw new ProfileExistsError();
       throw new UsernameTakenError();
     }
     throw e;
   }
-  return toPublic(doc);
 }
 
 export async function profileByUsername(
   username: string,
 ): Promise<PublicProfile | null> {
-  const doc = await (await getProfiles()).findOne({ _id: username });
-  return doc ? toPublic(doc) : null;
+  const [row] = await getDb()
+    .select()
+    .from(profiles)
+    .where(eq(profiles.username, username))
+    .limit(1);
+  return row ? toPublic(row) : null;
 }
 
 export async function myProfile(userId: string): Promise<PublicProfile | null> {
-  const doc = await (await getProfiles()).findOne({ userId });
-  return doc ? toPublic(doc) : null;
+  const [row] = await getDb()
+    .select()
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+  return row ? toPublic(row) : null;
 }
 
 export async function usernameAvailable(username: string): Promise<boolean> {
   if (isReservedUsername(username)) return false;
-  return !(await (await getProfiles()).findOne({ _id: username }));
+  return !(await profileByUsername(username));
 }
 
 /** Owner username for a Privy user, or throws for callers that need one. */
 export async function requireUsername(userId: string): Promise<string> {
-  const doc = await (await getProfiles()).findOne({ userId });
-  if (!doc) throw new InvalidClaimError("create your username first");
-  return doc._id;
+  const profile = await myProfile(userId);
+  if (!profile) throw new InvalidClaimError("create your username first");
+  return profile.username;
+}
+
+/** True when @username exists; used before addressing a payment request. */
+export async function profileExists(username: string): Promise<boolean> {
+  return Boolean(await profileByUsername(username));
 }

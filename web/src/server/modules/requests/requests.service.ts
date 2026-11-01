@@ -1,10 +1,12 @@
 import "server-only";
-import type { MongoServerError } from "mongodb";
+import { and, count, desc, eq, inArray, or } from "drizzle-orm";
 import {
-  getPaymentRequests,
-  getProfiles,
-  type PaymentRequestDoc,
-} from "../../db/mongo";
+  getDb,
+  isUniqueViolation,
+  type PaymentRequestRow,
+  paymentRequests,
+} from "../../db/client";
+import { profileExists } from "../profiles/profiles.service";
 import {
   RequestClosedError,
   RequestNotFoundError,
@@ -16,14 +18,14 @@ import type {
   RequestOutput,
 } from "./requests.schema";
 
-const view = (doc: PaymentRequestDoc, me: string): RequestOutput => ({
-  id: doc._id,
-  from: doc.from,
-  to: doc.to,
-  sealed: doc.from === me ? doc.forRequester : doc.forPayer,
-  status: doc.status,
-  createdAt: doc.createdAt.toISOString(),
-  updatedAt: doc.updatedAt.toISOString(),
+const view = (row: PaymentRequestRow, me: string): RequestOutput => ({
+  id: row.id,
+  from: row.fromUsername,
+  to: row.toUsername,
+  sealed: row.fromUsername === me ? row.forRequester : row.forPayer,
+  status: row.status,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
 });
 
 export async function createRequest(
@@ -32,66 +34,78 @@ export async function createRequest(
 ): Promise<RequestOutput> {
   if (input.to === me)
     throw new RequestRecipientError("You can't request from yourself.");
-  if (!(await (await getProfiles()).findOne({ _id: input.to })))
+  if (!(await profileExists(input.to)))
     throw new RequestRecipientError(`@${input.to} doesn't exist.`);
-  const now = new Date();
-  const doc: PaymentRequestDoc = {
-    _id: input.id,
-    from: me,
-    to: input.to,
-    forPayer: input.forPayer,
-    forRequester: input.forRequester,
-    status: "pending",
-    createdAt: now,
-    updatedAt: now,
-  };
   try {
-    await (await getPaymentRequests()).insertOne(doc);
+    const [row] = await getDb()
+      .insert(paymentRequests)
+      .values({
+        id: input.id,
+        fromUsername: me,
+        toUsername: input.to,
+        forPayer: input.forPayer,
+        forRequester: input.forRequester,
+        status: "pending",
+      })
+      .returning();
+    return view(row, me);
   } catch (e) {
-    if ((e as MongoServerError).code === 11000)
-      throw new RequestRecipientError("Try again.");
+    if (isUniqueViolation(e)) throw new RequestRecipientError("Try again.");
     throw e;
   }
-  return view(doc, me);
 }
 
 export async function listRequests(
   me: string,
   direction: "incoming" | "outgoing",
 ): Promise<RequestOutput[]> {
-  const docs = await (await getPaymentRequests())
-    .find(direction === "incoming" ? { to: me } : { from: me })
-    .sort({ createdAt: -1 })
-    .limit(100)
-    .toArray();
-  return docs.map((d) => view(d, me));
+  const rows = await getDb()
+    .select()
+    .from(paymentRequests)
+    .where(
+      direction === "incoming"
+        ? eq(paymentRequests.toUsername, me)
+        : eq(paymentRequests.fromUsername, me),
+    )
+    .orderBy(desc(paymentRequests.createdAt))
+    .limit(100);
+  return rows.map((row) => view(row, me));
 }
 
 export async function pendingIncomingCount(me: string): Promise<number> {
-  return (await getPaymentRequests()).countDocuments({
-    to: me,
-    status: "pending",
-  });
+  const [row] = await getDb()
+    .select({ n: count() })
+    .from(paymentRequests)
+    .where(
+      and(
+        eq(paymentRequests.toUsername, me),
+        eq(paymentRequests.status, "pending"),
+      ),
+    );
+  return Number(row?.n ?? 0);
 }
 
-/** Either party reports the payment (payer after sending, requester on sync). */
+/** Either party reports the payment (payer after sending, requester later). */
 export async function markRequestPaid(
   me: string,
   input: MarkPaidInput,
 ): Promise<RequestOutput> {
-  const doc = await (await getPaymentRequests()).findOneAndUpdate(
-    {
-      _id: input.id,
-      $or: [{ from: me }, { to: me }],
-      status: { $in: ["pending", "paid"] },
-    },
-    {
-      $set: { status: "paid", updatedAt: new Date() },
-    },
-    { returnDocument: "after" },
-  );
-  if (!doc) throw new RequestNotFoundError();
-  return view(doc, me);
+  const [row] = await getDb()
+    .update(paymentRequests)
+    .set({ status: "paid", updatedAt: new Date() })
+    .where(
+      and(
+        eq(paymentRequests.id, input.id),
+        or(
+          eq(paymentRequests.fromUsername, me),
+          eq(paymentRequests.toUsername, me),
+        ),
+        inArray(paymentRequests.status, ["pending", "paid"]),
+      ),
+    )
+    .returning();
+  if (!row) throw new RequestNotFoundError();
+  return view(row, me);
 }
 
 async function close(
@@ -100,13 +114,24 @@ async function close(
   role: "from" | "to",
   status: "declined" | "cancelled",
 ): Promise<RequestOutput> {
-  const doc = await (await getPaymentRequests()).findOneAndUpdate(
-    { _id: id, [role]: me, status: "pending" },
-    { $set: { status, updatedAt: new Date() } },
-    { returnDocument: "after" },
-  );
-  if (!doc) throw new RequestClosedError();
-  return view(doc, me);
+  const [row] = await getDb()
+    .update(paymentRequests)
+    .set({ status, updatedAt: new Date() })
+    .where(
+      and(
+        eq(paymentRequests.id, id),
+        eq(
+          role === "from"
+            ? paymentRequests.fromUsername
+            : paymentRequests.toUsername,
+          me,
+        ),
+        eq(paymentRequests.status, "pending"),
+      ),
+    )
+    .returning();
+  if (!row) throw new RequestClosedError();
+  return view(row, me);
 }
 
 export const declineRequest = (me: string, id: string) =>

@@ -1,11 +1,12 @@
 import "server-only";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { getServerEnv } from "../../../env.server";
 import {
   SIGNATURE_HEADER,
   signWebhook,
 } from "../../../features/developer/signature";
-import { getApiKeys, getWebhookDeliveries, getWebhooks } from "../../db/mongo";
+import { apiKeys, getDb, webhookDeliveries, webhooks } from "../../db/client";
 import {
   ApiKeyNotFoundError,
   InvalidWebhookUrlError,
@@ -20,38 +21,48 @@ export async function createApiKey(owner: string, name: string) {
   const id = randomBytes(6).toString("hex");
   const key = `payus_sk_${id}_${randomBytes(24).toString("base64url")}`;
   const now = new Date();
-  await (await getApiKeys()).insertOne({
-    _id: id,
-    owner,
-    name,
-    secretHash: sha256(key),
-    createdAt: now,
-    lastUsedAt: null,
-    revokedAt: null,
-  });
+  await getDb()
+    .insert(apiKeys)
+    .values({
+      id,
+      owner,
+      name,
+      secretHash: sha256(key),
+      createdAt: now,
+      lastUsedAt: null,
+      revokedAt: null,
+    });
   return { id, name, key, createdAt: now.toISOString() };
 }
 
 export async function listApiKeys(owner: string) {
-  const docs = await (await getApiKeys())
-    .find({ owner, revokedAt: null })
-    .sort({ createdAt: -1 })
-    .toArray();
-  return docs.map((d) => ({
-    id: d._id,
-    name: d.name,
-    preview: `payus_sk_${d._id}_…`,
-    createdAt: d.createdAt.toISOString(),
-    lastUsedAt: d.lastUsedAt?.toISOString() ?? null,
+  const rows = await getDb()
+    .select()
+    .from(apiKeys)
+    .where(and(eq(apiKeys.owner, owner), isNull(apiKeys.revokedAt)))
+    .orderBy(desc(apiKeys.createdAt));
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    preview: `payus_sk_${row.id}_…`,
+    createdAt: row.createdAt.toISOString(),
+    lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
   }));
 }
 
 export async function revokeApiKey(owner: string, id: string) {
-  const res = await (await getApiKeys()).updateOne(
-    { _id: id, owner, revokedAt: null },
-    { $set: { revokedAt: new Date() } },
-  );
-  if (!res.matchedCount) throw new ApiKeyNotFoundError();
+  const revoked = await getDb()
+    .update(apiKeys)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(apiKeys.id, id),
+        eq(apiKeys.owner, owner),
+        isNull(apiKeys.revokedAt),
+      ),
+    )
+    .returning({ id: apiKeys.id });
+  if (!revoked.length) throw new ApiKeyNotFoundError();
 }
 
 /** Owner of a valid, unrevoked key from an `Authorization: Bearer` header. */
@@ -62,15 +73,22 @@ export async function authenticateApiKey(
     /^Bearer (payus_sk_([0-9a-f]{12})_[A-Za-z0-9_-]{32})$/,
   );
   if (!key) return null;
-  const keys = await getApiKeys();
-  const doc = await keys.findOne({ _id: key[2], revokedAt: null });
-  if (!doc) return null;
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(apiKeys)
+    .where(and(eq(apiKeys.id, key[2]), isNull(apiKeys.revokedAt)))
+    .limit(1);
+  if (!row) return null;
   const given = Buffer.from(sha256(key[1]));
-  const stored = Buffer.from(doc.secretHash);
+  const stored = Buffer.from(row.secretHash);
   if (given.length !== stored.length || !timingSafeEqual(given, stored))
     return null;
-  void keys.updateOne({ _id: doc._id }, { $set: { lastUsedAt: new Date() } });
-  return { owner: doc.owner, keyId: doc._id };
+  void db
+    .update(apiKeys)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(apiKeys.id, row.id));
+  return { owner: row.owner, keyId: row.id };
 }
 
 // ---- Webhooks --------------------------------------------------------------
@@ -97,57 +115,68 @@ function validWebhookUrl(url: string) {
   }
 }
 
+async function findWebhook(owner: string) {
+  const [row] = await getDb()
+    .select()
+    .from(webhooks)
+    .where(eq(webhooks.owner, owner))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function setWebhook(owner: string, url: string) {
   if (!validWebhookUrl(url)) throw new InvalidWebhookUrlError();
-  const hooks = await getWebhooks();
+  const db = getDb();
   const now = new Date();
-  const existing = await hooks.findOne({ _id: owner });
-  const secret =
-    existing?.secret ?? `whsec_${randomBytes(24).toString("base64url")}`;
-  await hooks.updateOne(
-    { _id: owner },
-    {
-      $set: { url, secret, updatedAt: now },
-      $setOnInsert: { createdAt: now },
-    },
-    { upsert: true },
-  );
-  return { url, secret };
+  const secret = `whsec_${randomBytes(24).toString("base64url")}`;
+  // An endpoint keeps its secret when it is only re-pointed, so merchants
+  // don't have to redeploy their verifier to change the URL.
+  const [row] = await db
+    .insert(webhooks)
+    .values({ owner, url, secret, createdAt: now, updatedAt: now })
+    .onConflictDoUpdate({
+      target: webhooks.owner,
+      set: { url, updatedAt: now },
+    })
+    .returning();
+  return { url: row.url, secret: row.secret };
 }
 
 export async function rotateWebhookSecret(owner: string) {
   const secret = `whsec_${randomBytes(24).toString("base64url")}`;
-  const res = await (await getWebhooks()).updateOne(
-    { _id: owner },
-    { $set: { secret, updatedAt: new Date() } },
-  );
-  if (!res.matchedCount) throw new InvalidWebhookUrlError();
+  const rotated = await getDb()
+    .update(webhooks)
+    .set({ secret, updatedAt: new Date() })
+    .where(eq(webhooks.owner, owner))
+    .returning({ owner: webhooks.owner });
+  if (!rotated.length) throw new InvalidWebhookUrlError();
   return { secret };
 }
 
 export async function deleteWebhook(owner: string) {
-  await (await getWebhooks()).deleteOne({ _id: owner });
+  await getDb().delete(webhooks).where(eq(webhooks.owner, owner));
 }
 
 export async function getWebhook(owner: string) {
-  const doc = await (await getWebhooks()).findOne({ _id: owner });
-  return doc ? { url: doc.url, secret: doc.secret } : null;
+  const row = await findWebhook(owner);
+  return row ? { url: row.url, secret: row.secret } : null;
 }
 
 export async function listDeliveries(owner: string) {
-  const docs = await (await getWebhookDeliveries())
-    .find({ owner })
-    .sort({ createdAt: -1 })
-    .limit(20)
-    .toArray();
-  return docs.map((d) => ({
-    id: d._id,
-    event: d.event,
-    status: d.status,
-    attempts: d.attempts,
-    responseStatus: d.responseStatus,
-    error: d.error,
-    createdAt: d.createdAt.toISOString(),
+  const rows = await getDb()
+    .select()
+    .from(webhookDeliveries)
+    .where(eq(webhookDeliveries.owner, owner))
+    .orderBy(desc(webhookDeliveries.createdAt))
+    .limit(20);
+  return rows.map((row) => ({
+    id: row.id,
+    event: row.event,
+    status: row.status,
+    attempts: row.attempts,
+    responseStatus: row.responseStatus,
+    error: row.error,
+    createdAt: row.createdAt.toISOString(),
   }));
 }
 
@@ -163,7 +192,7 @@ export async function deliverEvent(
   data: unknown,
   sleep = (ms: number) => new Promise((r) => setTimeout(r, ms)),
 ) {
-  const hook = await (await getWebhooks()).findOne({ _id: owner });
+  const hook = await findWebhook(owner);
   if (!hook) return null;
   const id = `evt_${randomBytes(12).toString("hex")}`;
   const body = JSON.stringify({
@@ -202,7 +231,7 @@ export async function deliverEvent(
     }
   }
   const delivery = {
-    _id: id,
+    id,
     owner,
     event: type,
     status: error ? ("failed" as const) : ("delivered" as const),
@@ -211,6 +240,6 @@ export async function deliverEvent(
     error,
     createdAt: new Date(),
   };
-  await (await getWebhookDeliveries()).insertOne(delivery);
+  await getDb().insert(webhookDeliveries).values(delivery);
   return delivery;
 }

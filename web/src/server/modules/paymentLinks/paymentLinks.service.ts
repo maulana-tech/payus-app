@@ -1,7 +1,12 @@
 import "server-only";
-import type { MongoServerError } from "mongodb";
+import { and, desc, eq } from "drizzle-orm";
 import { newId } from "../../../lib/ids";
-import { getPaymentLinks, type PaymentLinkDoc } from "../../db/mongo";
+import {
+  getDb,
+  isUniqueViolation,
+  type PaymentLinkRow,
+  paymentLinks,
+} from "../../db/client";
 import {
   PaymentLinkNotFoundError,
   PaymentLinkSlugUnavailableError,
@@ -17,100 +22,101 @@ import type {
 /** Single currency for now; PayPal-era money is priced per account. */
 const DEFAULT_CURRENCY = "USD";
 
-const toOutput = (doc: PaymentLinkDoc): LinkOutput => ({
-  id: doc._id,
-  owner: doc.owner,
-  slug: doc.slug,
-  title: doc.title,
-  description: doc.description,
-  amountMinor: doc.amountMinor,
-  currency: doc.currency,
-  state: doc.state,
-  createdAt: doc.createdAt.toISOString(),
-  updatedAt: doc.updatedAt.toISOString(),
+const toOutput = (row: PaymentLinkRow): LinkOutput => ({
+  id: row.id,
+  owner: row.owner,
+  slug: row.slug,
+  title: row.title,
+  description: row.description,
+  amountMinor: row.amountMinor,
+  currency: row.currency,
+  state: row.state,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
 });
 
 export async function createLink(
   owner: string,
   input: CreateLinkInput,
 ): Promise<LinkOutput> {
-  const now = new Date();
-  const doc: PaymentLinkDoc = {
-    _id: newId(),
-    owner,
-    slug: input.slug,
-    title: input.title,
-    description: input.description,
-    amountMinor: input.amount,
-    currency: DEFAULT_CURRENCY,
-    state: "active",
-    createdAt: now,
-    updatedAt: now,
-  };
   try {
-    await (await getPaymentLinks()).insertOne(doc);
+    const [row] = await getDb()
+      .insert(paymentLinks)
+      .values({
+        id: newId(),
+        owner,
+        slug: input.slug,
+        title: input.title,
+        description: input.description,
+        amountMinor: input.amount,
+        currency: DEFAULT_CURRENCY,
+        state: "active",
+      })
+      .returning();
+    return toOutput(row);
   } catch (e) {
-    if ((e as MongoServerError).code === 11000)
-      throw new PaymentLinkSlugUnavailableError();
+    if (isUniqueViolation(e)) throw new PaymentLinkSlugUnavailableError();
     throw e;
   }
-  return toOutput(doc);
 }
 
 export async function listMyLinks(owner: string): Promise<LinkOutput[]> {
-  const docs = await (await getPaymentLinks())
-    .find({ owner })
-    .sort({ createdAt: -1 })
-    .toArray();
-  return docs.map(toOutput);
+  const rows = await getDb()
+    .select()
+    .from(paymentLinks)
+    .where(eq(paymentLinks.owner, owner))
+    .orderBy(desc(paymentLinks.createdAt));
+  return rows.map(toOutput);
 }
 
 export async function updateLink(
   owner: string,
   input: UpdateLinkInput,
 ): Promise<LinkOutput> {
-  const doc = await (await getPaymentLinks()).findOneAndUpdate(
-    { _id: input.id, owner },
-    {
-      $set: {
-        title: input.title,
-        description: input.description,
-        amountMinor: input.amount,
-        updatedAt: new Date(),
-      },
-    },
-    { returnDocument: "after" },
-  );
-  if (!doc) throw new PaymentLinkNotFoundError();
-  return toOutput(doc);
+  const [row] = await getDb()
+    .update(paymentLinks)
+    .set({
+      title: input.title,
+      description: input.description,
+      amountMinor: input.amount,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(paymentLinks.id, input.id), eq(paymentLinks.owner, owner)))
+    .returning();
+  if (!row) throw new PaymentLinkNotFoundError();
+  return toOutput(row);
 }
 
 export async function setLinkArchived(
   owner: string,
   input: ArchiveLinkInput,
 ): Promise<LinkOutput> {
-  const doc = await (await getPaymentLinks()).findOneAndUpdate(
-    { _id: input.id, owner },
-    {
-      $set: {
-        state: input.archived ? "archived" : "active",
-        updatedAt: new Date(),
-      },
-    },
-    { returnDocument: "after" },
-  );
-  if (!doc) throw new PaymentLinkNotFoundError();
-  return toOutput(doc);
+  const [row] = await getDb()
+    .update(paymentLinks)
+    .set({
+      state: input.archived ? "archived" : "active",
+      updatedAt: new Date(),
+    })
+    .where(and(eq(paymentLinks.id, input.id), eq(paymentLinks.owner, owner)))
+    .returning();
+  if (!row) throw new PaymentLinkNotFoundError();
+  return toOutput(row);
 }
 
 /** Public: an active link by owner and slug, for /pay/<owner>/<slug>. */
 export async function resolveLink(
   input: ResolveLinkInput,
 ): Promise<LinkOutput | null> {
-  const doc = await (await getPaymentLinks()).findOne({
-    owner: input.owner,
-    slug: input.slug,
-    state: "active",
-  });
-  return doc ? toOutput(doc) : null;
+  const [row] = await getDb()
+    .select()
+    .from(paymentLinks)
+    .where(
+      and(
+        eq(paymentLinks.owner, input.owner),
+        eq(paymentLinks.slug, input.slug),
+        eq(paymentLinks.state, "active"),
+      ),
+    )
+    .limit(1);
+  return row ? toOutput(row) : null;
 }

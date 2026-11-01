@@ -1,8 +1,9 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { toDecimal } from "../../../features/invoices/money";
 import type { InvoiceView } from "../../../features/invoices/types";
-import { getInvoices } from "../../db/mongo";
+import { getDb, invoices } from "../../db/client";
 import { createInvoice, publicInvoice } from "../invoices/invoices.service";
 import type { CheckoutInput, CheckoutView } from "./developer.schema";
 
@@ -67,6 +68,10 @@ export async function getCheckout(
   owner: string,
   id: string,
 ): Promise<InvoiceView | null> {
-  const doc = await (await getInvoices()).findOne({ _id: id, owner });
-  return doc ? publicInvoice(doc.token) : null;
+  const [row] = await getDb()
+    .select({ token: invoices.token, owner: invoices.owner })
+    .from(invoices)
+    .where(eq(invoices.id, id))
+    .limit(1);
+  return row?.owner === owner ? publicInvoice(row.token) : null;
 }

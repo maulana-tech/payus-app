@@ -1,5 +1,6 @@
 import "server-only";
-import { getProfiles, getUsers } from "../../db/mongo";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { getDb, profiles, users } from "../../db/client";
 import {
   EscrowMissingError,
   EscrowRevisionConflictError,
@@ -17,26 +18,31 @@ import type {
 
 async function ensureUser(userId: string, email?: string) {
   const now = new Date();
-  await (await getUsers()).updateOne(
-    { _id: userId },
-    {
-      $setOnInsert: { createdAt: now },
-      $set: { updatedAt: now, ...(email ? { email } : {}) },
-    },
-    { upsert: true },
-  );
+  await getDb()
+    .insert(users)
+    .values({
+      id: userId,
+      email: email ?? null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: users.id,
+      set: { updatedAt: now, ...(email ? { email } : {}) },
+    });
 }
 
 export async function me(userId: string, email?: string): Promise<MeOutput> {
   await ensureUser(userId, email);
-  const [user, profile] = await Promise.all([
-    (await getUsers()).findOne({ _id: userId }),
-    (await getProfiles()).findOne({ userId }),
+  const db = getDb();
+  const [[user], [profile]] = await Promise.all([
+    db.select().from(users).where(eq(users.id, userId)).limit(1),
+    db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1),
   ]);
   return {
     recovery: user?.passkey ? "passkey" : user?.escrow ? "pin" : null,
     passkey: user?.passkey ?? null,
-    username: profile?._id ?? null,
+    username: profile?.username ?? null,
     accountType: user?.accountType ?? null,
     businessName: user?.businessName ?? null,
   };
@@ -50,36 +56,32 @@ export async function setAccountType(
   await ensureUser(userId);
   const businessName =
     input.accountType === "personal" ? null : input.businessName || null;
-  await (await getUsers()).updateOne(
-    { _id: userId },
-    {
-      $set: {
-        accountType: input.accountType,
-        businessName,
-        updatedAt: new Date(),
-      },
-    },
-  );
+  await getDb()
+    .update(users)
+    .set({
+      accountType: input.accountType,
+      businessName,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
   return { accountType: input.accountType, businessName };
 }
 
 // Recovery is write-once: a second method would mean a second master, and the
 // account's keys derive from exactly one.
-const noRecovery = {
-  escrow: { $exists: false },
-  passkey: { $exists: false },
-};
+const noRecovery = and(isNull(users.escrow), isNull(users.passkey));
 
 export async function saveEscrow(
   userId: string,
   input: EscrowInput,
 ): Promise<void> {
   await ensureUser(userId);
-  const result = await (await getUsers()).updateOne(
-    { _id: userId, ...noRecovery },
-    { $set: { escrow: { ...input, revision: 1 }, updatedAt: new Date() } },
-  );
-  if (result.matchedCount !== 1) throw new RecoveryAlreadySetError();
+  const updated = await getDb()
+    .update(users)
+    .set({ escrow: { ...input, revision: 1 }, updatedAt: new Date() })
+    .where(and(eq(users.id, userId), noRecovery))
+    .returning({ id: users.id });
+  if (updated.length !== 1) throw new RecoveryAlreadySetError();
 }
 
 export async function savePasskey(
@@ -87,15 +89,20 @@ export async function savePasskey(
   input: PasskeyInput,
 ): Promise<void> {
   await ensureUser(userId);
-  const result = await (await getUsers()).updateOne(
-    { _id: userId, ...noRecovery },
-    { $set: { passkey: input, updatedAt: new Date() } },
-  );
-  if (result.matchedCount !== 1) throw new RecoveryAlreadySetError();
+  const updated = await getDb()
+    .update(users)
+    .set({ passkey: input, updatedAt: new Date() })
+    .where(and(eq(users.id, userId), noRecovery))
+    .returning({ id: users.id });
+  if (updated.length !== 1) throw new RecoveryAlreadySetError();
 }
 
 export async function getEscrow(userId: string): Promise<EscrowOutput> {
-  const user = await (await getUsers()).findOne({ _id: userId });
+  const [user] = await getDb()
+    .select({ escrow: users.escrow })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
   return user?.escrow ?? null;
 }
 
@@ -104,18 +111,25 @@ export async function rotateEscrow(
   input: RotateEscrowInput,
 ): Promise<{ revision: number }> {
   const revision = input.expectedRevision + 1;
-  const users = await getUsers();
-  const result = await users.updateOne(
-    { _id: userId, "escrow.revision": input.expectedRevision },
-    {
-      $set: {
-        escrow: { ...input.escrow, revision },
-        updatedAt: new Date(),
-      },
-    },
-  );
-  if (result.matchedCount === 1) return { revision };
-  if (!(await users.findOne({ _id: userId }))?.escrow)
-    throw new EscrowMissingError();
+  const db = getDb();
+  // Only the revision we were shown may be replaced, so two tabs rotating at
+  // once cannot both win.
+  const updated = await db
+    .update(users)
+    .set({ escrow: { ...input.escrow, revision }, updatedAt: new Date() })
+    .where(
+      and(
+        eq(users.id, userId),
+        sql`(${users.escrow} -> 'revision')::int = ${input.expectedRevision}`,
+      ),
+    )
+    .returning({ id: users.id });
+  if (updated.length === 1) return { revision };
+  const [user] = await db
+    .select({ escrow: users.escrow })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user?.escrow) throw new EscrowMissingError();
   throw new EscrowRevisionConflictError();
 }

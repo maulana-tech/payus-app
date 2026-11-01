@@ -51,7 +51,7 @@ show the amount, then say the payment step is being rebuilt.
 
 ## Stack
 
-Next.js 15 (App Router) · React 19 · tRPC 11 · MongoDB (migrate-mongo) ·
+Next.js 15 (App Router) · React 19 · tRPC 11 · Postgres (Drizzle ORM) ·
 Privy · Tailwind v4 · Biome · Vitest.
 
 ## Run it
@@ -61,8 +61,8 @@ See [`docs/setup.md`](docs/setup.md). For the widget and the checkout API,
 
 ```sh
 pnpm install
-cp web/.env.example web/.env.local   # Privy app id + MONGODB_URI
-pnpm --filter web migrate:up
+cp web/.env.example web/.env.local   # Privy app id + DATABASE_URL
+pnpm --filter web db:migrate
 pnpm dev
 ```
 

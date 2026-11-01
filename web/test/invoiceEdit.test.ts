@@ -1,17 +1,15 @@
-import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { suggestNextNumber } from "../src/features/invoices/input";
+import {
+  createTestDb,
+  type IsolatedDb,
+  postgresAvailable,
+} from "./helpers/pgTestDb";
 
-// Editing pending invoices against a real MongoDB (skipped when none is
-// reachable): only before any payment, keeping the link and the address.
-const URI = process.env.PAYUS_TEST_MONGODB_URI ?? "mongodb://localhost:27017";
-const DB = `payus_test_${randomUUID().replaceAll("-", "")}`;
-vi.mock("../src/server/lib/zecPrice", () => ({
-  zecUsd: async () => ({ usd: 50, rates: { USD: 50 }, fetchedAt: Date.now() }),
-}));
-
-const { mongoAvailable } = await import("./helpers/mongoTestDb");
-const available = await mongoAvailable();
+// Editing pending invoices against a real Postgres (skipped when none is
+// reachable): only before any payment, and the link stays the same.
+const available = await postgresAvailable();
 
 describe("suggestNextNumber", () => {
   it("bumps the trailing number and skips used ones", () => {
@@ -21,36 +19,28 @@ describe("suggestNextNumber", () => {
   });
 });
 
-describe.skipIf(!available)("invoice edits (MongoDB)", () => {
+describe.skipIf(!available)("invoice edits (Postgres)", () => {
   let service: typeof import("../src/server/modules/invoices/invoices.service");
-  let mongo: typeof import("../src/server/db/mongo");
+  let db: typeof import("../src/server/db/client");
+  let temp: IsolatedDb;
 
   beforeAll(async () => {
-    process.env.MONGODB_URI = `${URI.replace(/\/$/, "")}/${DB}`;
-    mongo = await import("../src/server/db/mongo");
+    temp = await createTestDb();
+    process.env.DATABASE_URL = temp.url;
+    db = await import("../src/server/db/client");
     service = await import("../src/server/modules/invoices/invoices.service");
-    // As in the initial migration: invoice numbers are unique per owner.
-    await (await mongo.getInvoices()).createIndex(
-      { owner: 1, number: 1 },
-      { unique: true, name: "owner_number" },
-    );
-    await (await mongo.getProfiles()).insertOne({
-      _id: "dinar",
+    await db.getDb().insert(db.profiles).values({
+      username: "dinar",
       userId: "u1",
-      network: "main",
-      ua: "u1profile",
-      birthday: 1,
       signPubkeyHex: "",
       msgPubkeyHex: "",
       claimJson: "{}",
       claimSigHex: "",
-      createdAt: new Date(),
     });
   });
 
   afterAll(async () => {
-    const db = await mongo.getDb();
-    if (db.databaseName.startsWith("payus_test_")) await db.dropDatabase();
+    await temp?.dispose();
   });
 
   const details = (number: string) => ({
@@ -82,9 +72,14 @@ describe.skipIf(!available)("invoice edits (MongoDB)", () => {
       totalFormatted: "$3.00",
       notes: "Net 14",
     });
-    const doc = await (await mongo.getInvoices()).findOne({ _id: inv.id });
-    expect(doc?.clientEmail).toBe("ap@acme.test"); // kept
-    expect(doc?.seriesNumber).toBe("ED-1A");
+    const [row] = await db
+      .getDb()
+      .select()
+      .from(db.invoices)
+      .where(eq(db.invoices.id, inv.id))
+      .limit(1);
+    expect(row?.clientEmail).toBe("ap@acme.test"); // kept
+    expect(row?.seriesNumber).toBe("ED-1A");
   });
 
   it("refuses once a payment arrived, after void, for API checkouts and taken numbers", async () => {

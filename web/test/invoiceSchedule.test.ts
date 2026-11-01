@@ -1,44 +1,38 @@
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  createTestDb,
+  type IsolatedDb,
+  postgresAvailable,
+} from "./helpers/pgTestDb";
 
-// Real-Mongo test of recurring invoices and reminders. Runs when a local
-// MongoDB is reachable (PAYUS_TEST_MONGODB_URI, default localhost:27017) and
-// skips otherwise. Uses its own throwaway database.
-const URI = process.env.PAYUS_TEST_MONGODB_URI ?? "mongodb://localhost:27017";
-const DB = `payus_test_${randomUUID().replaceAll("-", "")}`;
+// Real-Postgres test of recurring invoices and reminders. Runs when a local
+// server is reachable (PAYUS_TEST_DATABASE_URL, default
+// postgres://localhost:5432/postgres) and skips otherwise. Uses its own
+// throwaway database.
+const available = await postgresAvailable();
 
-const { mongoAvailable } = await import("./helpers/mongoTestDb");
-const available = await mongoAvailable();
-
-describe.skipIf(!available)("invoice schedule (MongoDB)", () => {
+describe.skipIf(!available)("invoice schedule (Postgres)", () => {
   let service: typeof import("../src/server/modules/invoices/invoices.service");
-  let mongo: typeof import("../src/server/db/mongo");
+  let db: typeof import("../src/server/db/client");
+  let temp: IsolatedDb;
 
   beforeAll(async () => {
-    process.env.MONGODB_URI = `${URI.replace(/\/$/, "")}/${DB}`;
-    mongo = await import("../src/server/db/mongo");
+    temp = await createTestDb();
+    process.env.DATABASE_URL = temp.url;
+    db = await import("../src/server/db/client");
     service = await import("../src/server/modules/invoices/invoices.service");
-    await (await mongo.getProfiles()).insertOne({
-      _id: "dinar",
+    await db.getDb().insert(db.profiles).values({
+      username: "dinar",
       userId: "u1",
-      network: "main",
-      ua: "u1profile",
-      birthday: 1,
       signPubkeyHex: "",
       msgPubkeyHex: "",
       claimJson: "{}",
       claimSigHex: "",
-      createdAt: new Date(),
     });
-    await (await mongo.getInvoices()).createIndex(
-      { owner: 1, number: 1 },
-      { unique: true },
-    );
   });
 
   afterAll(async () => {
-    const db = await mongo.getDb();
-    if (db.databaseName.startsWith("payus_test_")) await db.dropDatabase();
+    await temp?.dispose();
   });
 
   const create = (

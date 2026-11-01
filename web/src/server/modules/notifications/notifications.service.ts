@@ -1,8 +1,9 @@
 import "server-only";
+import { eq } from "drizzle-orm";
 import { getServerEnv } from "../../../env.server";
 import type { InvoiceView } from "../../../features/invoices/types";
 import { APP_NAME } from "../../../lib/brand";
-import { getProfiles } from "../../db/mongo";
+import { getDb, profiles } from "../../db/client";
 import { buildEmailHtml, buildEmailText, sendEmail } from "../../lib/email";
 import {
   findSettings,
@@ -135,12 +136,22 @@ export const emailInvoiceReminder = (
   clientEmail: string,
 ) => emailInvoiceLink(invoice, clientEmail, "invoiceReminder");
 
+/** The Privy user behind a @username, or null when it doesn't exist. */
+async function ownerOf(username: string) {
+  const [row] = await getDb()
+    .select({ userId: profiles.userId })
+    .from(profiles)
+    .where(eq(profiles.username, username))
+    .limit(1);
+  return row ?? null;
+}
+
 /**
  * A payer pressed "I've paid" on a payment page. No amount, address or txid:
  * the server never learns those, and the email must not leak them either.
  */
 export async function notifyPaymentPing(username: string, nonce: string) {
-  const profile = await (await getProfiles()).findOne({ _id: username });
+  const profile = await ownerOf(username);
   if (!profile) return;
   await dispatch({
     userId: profile.userId,
@@ -161,7 +172,7 @@ export async function notifyRequestReceived(
   from: string,
   id: string,
 ) {
-  const profile = await (await getProfiles()).findOne({ _id: to });
+  const profile = await ownerOf(to);
   if (!profile) return;
   await dispatch({
     userId: profile.userId,

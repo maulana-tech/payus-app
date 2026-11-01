@@ -13,7 +13,7 @@ export const serverEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
-  MONGODB_URI: optionalString,
+  DATABASE_URL: optionalString,
   CRON_SECRET: optionalString,
   PRIVY_APP_ID: optionalString,
   PRIVY_APP_SECRET: optionalString,
@@ -25,7 +25,7 @@ export const serverEnvSchema = z.object({
 export function getServerEnv() {
   return serverEnvSchema.parse({
     NODE_ENV: process.env.NODE_ENV,
-    MONGODB_URI: process.env.MONGODB_URI,
+    DATABASE_URL: process.env.DATABASE_URL,
     CRON_SECRET: process.env.CRON_SECRET,
     PRIVY_APP_ID: process.env.PRIVY_APP_ID,
     PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,

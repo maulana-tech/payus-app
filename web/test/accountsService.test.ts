@@ -1,26 +1,25 @@
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  createTestDb,
+  type IsolatedDb,
+  postgresAvailable,
+} from "./helpers/pgTestDb";
 
-// Account type against a real MongoDB (skipped when none is reachable).
-const URI = process.env.PAYUS_TEST_MONGODB_URI ?? "mongodb://localhost:27017";
-const DB = `payus_test_${randomUUID().replaceAll("-", "")}`;
+// Account type against a real Postgres (skipped when none is reachable).
+const available = await postgresAvailable();
 
-const { mongoAvailable } = await import("./helpers/mongoTestDb");
-const available = await mongoAvailable();
-
-describe.skipIf(!available)("account type (MongoDB)", () => {
+describe.skipIf(!available)("account type (Postgres)", () => {
   let service: typeof import("../src/server/modules/accounts/accounts.service");
-  let mongo: typeof import("../src/server/db/mongo");
+  let temp: IsolatedDb;
 
   beforeAll(async () => {
-    process.env.MONGODB_URI = `${URI.replace(/\/$/, "")}/${DB}`;
-    mongo = await import("../src/server/db/mongo");
+    temp = await createTestDb();
+    process.env.DATABASE_URL = temp.url;
     service = await import("../src/server/modules/accounts/accounts.service");
   });
 
   afterAll(async () => {
-    const db = await mongo.getDb();
-    if (db.databaseName.startsWith("payus_test_")) await db.dropDatabase();
+    await temp?.dispose();
   });
 
   it("is unset until chosen", async () => {
