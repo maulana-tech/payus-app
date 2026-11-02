@@ -180,9 +180,17 @@ bawahnya.
       berdesimal, dan ditolak Guardian saat melebihi limit (dengan
       penolakannya tercatat atas nama agen)
 - [ ] **Allocator** — usulkan split tiap dana masuk (butuh jenis usulan
-      kedua di Guardian: `split.change`)
-- [ ] **Developer Agent (storefront)** — chat → konfigurasi JSON ber-skema →
-      render template kita → publish `/{slug}`. Tanpa HTML bebas
+      kedua di Guardian: `split.change`) — **berikutnya**
+- [x] **Developer Agent (storefront)** — deskripsi → konfigurasi JSON
+      ber-skema → template kita → halaman di `/shop/<slug>`. Tanpa HTML
+      bebas: skema yang sama mengikat editor manual **dan** agen, dan
+      satu-satunya renderer meloloskan teks apa adanya (ada test-nya).
+      Agen menulis **draf**; pemilik yang menerbitkan — menaruh harga di
+      depan publik itu keputusan dagang, bukan keputusan model, dan itu
+      pula sebabnya tidak perlu jenis usulan baru di Guardian.
+      Membeli satu item menulis invoice dulu, jadi penjualan toko turun
+      lewat jalur settlement yang sama. 13 test (10 layanan + eval, 3
+      render)
 - [ ] **Reporter** — ringkasan dari query ledger
 - [ ] **Merchant Ops / Advisor** — kalau waktu sisa
 

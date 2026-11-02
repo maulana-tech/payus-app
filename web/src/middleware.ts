@@ -65,6 +65,7 @@ export const config = {
     "/links/:path*",
     "/invoices/:path*",
     "/transactions/:path*",
+    "/storefront/:path*",
     "/requests/:path*",
     "/developers/:path*",
     "/settings/:path*",

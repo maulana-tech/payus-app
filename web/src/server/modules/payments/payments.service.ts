@@ -14,6 +14,7 @@ import { settleCapture } from "../ledger/settlement.service";
 import { enqueue } from "../outbox/outbox.service";
 import { topics } from "../outbox/topics";
 import { resolveLink } from "../paymentLinks/paymentLinks.service";
+import { publishedProduct } from "../storefront/storefront.service";
 import { applyInvoicePayment, appOrigin } from "./applyPayment";
 import {
   InvoiceNotPayableError,
@@ -113,6 +114,52 @@ export async function startLinkOrder(input: {
     currency: link.currency as Currency,
     recurrence: "none",
     reference: `link:${link.slug}`,
+  });
+  return { ...(await startPaypalOrder(invoice.token)), token: invoice.token };
+}
+
+/**
+ * Paying for one item on a storefront. Like a payment link, the invoice is
+ * written at the moment someone decides to pay, so a storefront sale settles
+ * down exactly the same path as everything else.
+ */
+export async function startStorefrontOrder(input: {
+  slug: string;
+  productId: string;
+  /** Only used when the item lets the payer choose. */
+  amount?: string;
+}) {
+  const found = await publishedProduct(input.slug, input.productId);
+  if (!found) throw new PaymentNotFoundError("No such item for sale.");
+  const { storefront, product } = found;
+
+  let amountMinor: bigint;
+  try {
+    amountMinor = product.priceMinor
+      ? BigInt(product.priceMinor)
+      : toMinor(input.amount ?? "");
+  } catch {
+    throw new InvoiceNotPayableError("Enter an amount like 25.00.");
+  }
+  if (amountMinor <= 0n)
+    throw new InvoiceNotPayableError("Enter an amount like 25.00.");
+
+  const invoice = await createInvoice(storefront.owner, {
+    number: `SHOP-${newId(8).toUpperCase()}`,
+    clientName: "Storefront",
+    clientEmail: null,
+    dueDate: new Date().toISOString().slice(0, 10),
+    notes: `${product.name} — ${storefront.title}`,
+    items: [
+      {
+        description: product.name,
+        quantity: 1,
+        unitPrice: toDecimal(amountMinor),
+      },
+    ],
+    currency: storefront.currency as Currency,
+    recurrence: "none",
+    reference: `shop:${storefront.slug}/${product.id}`,
   });
   return { ...(await startPaypalOrder(invoice.token)), token: invoice.token };
 }

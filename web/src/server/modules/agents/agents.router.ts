@@ -1,4 +1,5 @@
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import {
   ClaudeNotConfiguredError,
   ClaudeRefusedError,
@@ -8,6 +9,7 @@ import {
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { mapGuardianError } from "../guardian/guardian.router";
 import { requireUsername } from "../profiles/profiles.service";
+import { runBuilder } from "./builder.agent";
 import { runPayer } from "./payer.agent";
 
 // The agents' door. Each one writes a proposal and stops; what happens next
@@ -41,4 +43,16 @@ export const agentsRouter = createTRPCRouter({
   runPayer: protectedProcedure.mutation(async ({ ctx }) =>
     runPayer(await requireUsername(ctx.privyUserId)).catch(mapError),
   ),
+
+  /** Asks the Builder to write a storefront from a description, as a draft. */
+  runBuilder: protectedProcedure
+    .input(
+      z.object({ description: z.string().trim().min(8).max(1200) }).strict(),
+    )
+    .mutation(async ({ ctx, input }) =>
+      runBuilder(
+        await requireUsername(ctx.privyUserId),
+        input.description,
+      ).catch(mapError),
+    ),
 });

@@ -9,6 +9,7 @@ import { notificationsRouter } from "./modules/notifications/notifications.route
 import { paymentLinksRouter } from "./modules/paymentLinks/paymentLinks.router";
 import { profilesRouter } from "./modules/profiles/profiles.router";
 import { requestsRouter } from "./modules/requests/requests.router";
+import { storefrontRouter } from "./modules/storefront/storefront.router";
 import { createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
@@ -19,6 +20,7 @@ export const appRouter = createTRPCRouter({
   ledger: ledgerRouter,
   guardian: guardianRouter,
   agents: agentsRouter,
+  storefront: storefrontRouter,
   requests: requestsRouter,
   developer: developerRouter,
   notifications: notificationsRouter,

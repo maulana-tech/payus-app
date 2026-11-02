@@ -58,10 +58,15 @@
   own, it may only name a destination you have already paid, and the shape of
   its answer is validated before the Guardian ever sees it.
 
+- **A shop you can describe.** The Builder turns a sentence into a
+  storefront: configuration filling a template we wrote, never a page of its
+  own. It writes a draft; you publish it. Each item is paid for the same way
+  an invoice is.
+
 ## What is not built yet
 
-Six more thinking seats — the Allocator, the storefront builder, the
-Reporter and the rest — are the work left in
+Five more thinking seats — the Allocator, the Reporter and the rest — are
+the work left in
 [`docs/plan.md`](docs/plan.md), along with approving from Telegram. Without
 an `ANTHROPIC_API_KEY` the agents are simply off, and the rail runs without
 them.

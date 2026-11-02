@@ -506,6 +506,41 @@ export const auditLog = pgTable(
   (t) => [index("audit_log_by_owner").on(t.owner, t.createdAt)],
 );
 
+/** One thing a storefront sells. Price absent means the payer chooses. */
+export type StorefrontProduct = {
+  id: string;
+  name: string;
+  description: string;
+  priceMinor: string | null;
+};
+
+export type StorefrontTemplate = "shelf" | "tip";
+
+/**
+ * A page a merchant can send people to. The agent that writes one fills in
+ * this configuration — it never writes markup, so a storefront cannot carry
+ * anything the renderer was not built to show.
+ */
+export const storefronts = pgTable(
+  "storefronts",
+  {
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(), // username
+    slug: text("slug").notNull().unique(), // the public address
+    title: text("title").notNull(),
+    blurb: text("blurb").notNull(),
+    template: text("template").$type<StorefrontTemplate>().notNull(),
+    products: jsonb("products").$type<StorefrontProduct[]>().notNull(),
+    state: text("state").$type<"draft" | "published">().notNull(),
+    /** Who wrote the current draft: "owner", or an agent's name. */
+    writtenBy: text("written_by").notNull(),
+    currency: text("currency").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("storefronts_by_owner").on(t.owner, t.createdAt)],
+);
+
 export type LedgerAccountRow = typeof ledgerAccounts.$inferSelect;
 export type LedgerTxnRow = typeof ledgerTxns.$inferSelect;
 export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
@@ -516,3 +551,4 @@ export type GuardianPolicyRow = typeof guardianPolicies.$inferSelect;
 export type ProposalRow = typeof proposals.$inferSelect;
 export type ApprovalRow = typeof approvals.$inferSelect;
 export type PayoutRow = typeof payouts.$inferSelect;
+export type StorefrontRow = typeof storefronts.$inferSelect;

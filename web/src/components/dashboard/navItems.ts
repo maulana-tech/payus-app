@@ -5,6 +5,7 @@ import {
   LayoutGrid,
   Link2,
   Settings,
+  Store,
   Table2,
 } from "lucide-react";
 import {
@@ -14,6 +15,7 @@ import {
   LINKS_PATH,
   REQUESTS_PATH,
   SETTINGS_PATH,
+  STOREFRONT_PATH,
   TRANSACTIONS_PATH,
 } from "../../lib/auth-routes";
 
@@ -54,6 +56,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     short: "Txns",
     description: "Every ledger posting, sortable and exportable.",
     icon: Table2,
+  },
+  {
+    href: STOREFRONT_PATH,
+    label: "Shop",
+    description: "A page of things people can pay for, at your own address.",
+    icon: Store,
   },
   {
     href: REQUESTS_PATH,

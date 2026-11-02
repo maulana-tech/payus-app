@@ -60,6 +60,14 @@ Framework-free modules shared by routes, components and the server: `invoices` (
 - `ask` is injectable, so `test/payerAgent.test.ts` runs the whole decision path on every commit without spending anything. That file is the agent's eval set; add cases to it rather than trusting the prompt.
 - The model id and prompt version land on the proposal and in the audit log, so a decision can be traced to what produced it.
 
+### Storefronts
+A storefront is **configuration, never markup**. `features/storefront/config.ts` holds the one schema; the hand editor (`screens/StorefrontScreen.tsx`) and the Builder agent are both held to it, and `components/storefront/StorefrontPanel.tsx` is the only renderer. A field that looks like markup therefore reaches the page as text — `test/storefrontRender.test.tsx` is the test behind that claim, so do not introduce `dangerouslySetInnerHTML` here.
+- **The agent writes a draft; the owner publishes.** Putting a price in front of the public is a commercial decision, so it is not the model's. That is also why publishing needs no Guardian proposal kind.
+- Reserved and duplicate addresses are refused **by the schema**, not by a check inside the agent — a duplicate check there was written, found to be unreachable, and deleted. Put a rule where both writers pass through it.
+- `oddPrices()` compares against the median of what this merchant has charged before and **points**, rather than refusing: the owner is the one publishing.
+- Buying an item writes an invoice first (`startStorefrontOrder`), so a shop sale settles down the same path as everything else. The browser may send only *which* item, never a price.
+- The public page is client-fetched like `/i/[token]` and `/pay/*`, so it has no server-rendered content; all three are `noindex`.
+
 ### The Guardian
 Nothing moves money without a proposal, and no proposal is decided by a model. `features/guardian/decide.ts` is a pure function — proposal + policy + context → `allow | ask | refuse` with a reason per rule — and `server/modules/guardian/` writes the proposal, records the decision, holds consent and runs it. The owner's own "Release" button goes through it, so the road the agents will take is already the one in daily use.
 - **Consent is bound to a hash.** `proposalHash(kind, payload)` is sha256 over `canonical()` (keys sorted at every depth). `approvals` is a **log**, one row per act of consent, each naming the hash it was given for; `execute()` compares the newest approval's hash with the proposal's current hash and refuses on a mismatch (`approval.void` in the audit log). Amending a proposal moves the hash and puts it back to `awaiting`.

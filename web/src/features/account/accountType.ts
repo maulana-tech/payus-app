@@ -5,6 +5,7 @@ import {
   LINKS_PATH,
   REQUESTS_PATH,
   SETTINGS_PATH,
+  STOREFRONT_PATH,
   TRANSACTIONS_PATH,
 } from "../../lib/auth-routes";
 import type { AccountType } from "../../server/modules/accounts/accounts.schema";
@@ -63,6 +64,7 @@ const NAV: Record<AccountType, readonly string[]> = {
     INVOICES_PATH,
     TRANSACTIONS_PATH,
     LINKS_PATH,
+    STOREFRONT_PATH,
     REQUESTS_PATH,
     SETTINGS_PATH,
   ],
@@ -70,6 +72,7 @@ const NAV: Record<AccountType, readonly string[]> = {
     DASHBOARD_PATH,
     INVOICES_PATH,
     TRANSACTIONS_PATH,
+    STOREFRONT_PATH,
     LINKS_PATH,
     DEVELOPERS_PATH,
     SETTINGS_PATH,

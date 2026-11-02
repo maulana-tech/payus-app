@@ -123,6 +123,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (
     isPay ||
     pathname.startsWith("/i/") ||
+    pathname.startsWith("/shop/") ||
     pathname.startsWith("/unsubscribe/")
   ) {
     return (

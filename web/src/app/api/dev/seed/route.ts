@@ -13,6 +13,11 @@ import {
 import { createRule, listRules } from "@/server/modules/ledger/split.service";
 import { createLink } from "@/server/modules/paymentLinks/paymentLinks.service";
 import { recordCapture } from "@/server/modules/payments/payments.service";
+import {
+  createStorefront,
+  listStorefronts,
+  setPublished,
+} from "@/server/modules/storefront/storefront.service";
 
 // Fills the demo account with something to look at: a paid invoice that
 // really went through the rail, one still open, one overdue, split rules, a
@@ -122,6 +127,39 @@ export async function POST() {
     made.push("1 payment link");
   } catch {
     // Already there.
+  }
+
+  if ((await listStorefronts(owner)).length === 0) {
+    const shop = await createStorefront(
+      owner,
+      {
+        slug: "kopi-senja",
+        title: "Kopi Senja",
+        blurb: "Single-origin beans, roasted on Fridays in Bandung.",
+        template: "shelf",
+        currency: "USD",
+        products: [
+          {
+            name: "Bag of beans, 250g",
+            description: "This week: Gayo, washed.",
+            price: "1800",
+          },
+          {
+            name: "Flat white",
+            description: "Made at the counter.",
+            price: "450",
+          },
+          {
+            name: "Tip the roaster",
+            description: "Only if you want to.",
+            price: null,
+          },
+        ],
+      },
+      "builder-agent",
+    );
+    await setPublished(owner, shop.id, true);
+    made.push("1 storefront, published at /shop/kopi-senja");
   }
 
   // One proposal the Guardian holds, so "Waiting for you" has something in

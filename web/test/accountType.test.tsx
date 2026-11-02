@@ -27,12 +27,14 @@ describe("account type navigation", () => {
 
   it("puts invoices first for a business", () => {
     const nav = hrefs(navFor("business", NAV_ITEMS));
-    expect(nav.slice(0, 4)).toEqual([
+    // The point is the order of the first few, not the whole list: adding a
+    // page in the middle should not break this.
+    expect(nav.slice(0, 3)).toEqual([
       DASHBOARD_PATH,
       INVOICES_PATH,
       TRANSACTIONS_PATH,
-      LINKS_PATH,
     ]);
+    expect(nav).toContain(LINKS_PATH);
     expect(nav).toContain(DEVELOPERS_PATH);
     expect(nav.at(-1)).toBe(SETTINGS_PATH);
   });

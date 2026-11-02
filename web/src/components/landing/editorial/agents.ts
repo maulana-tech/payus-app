@@ -183,7 +183,7 @@ export const TABLE: Seat[] = [
     name: "Builder",
     role: "Builds the storefront",
     engine: "llm",
-    status: "building",
+    status: "live",
     head: [83.2, 33.6],
     epigram: "Describe the shop; walk into it.",
     task: "Turns a conversation into a storefront: products, prices, a page at your own address. It fills in a template we wrote — it does not write pages of its own.",
