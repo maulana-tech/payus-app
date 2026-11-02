@@ -17,12 +17,15 @@ export function DashboardGuard({
   title,
   description,
   action,
+  header = true,
   children,
 }: {
   title: string;
   description: string;
   /** Rendered beside the title once the screen is usable. */
   action?: ReactNode;
+  /** The canvas draws its own top bar, so it asks for no page header. */
+  header?: boolean;
   children: (username: string) => ReactNode;
 }) {
   const {
@@ -80,11 +83,13 @@ export function DashboardGuard({
 
   return (
     <>
-      <DashboardPageHeader
-        title={title}
-        description={description}
-        action={action}
-      />
+      {header ? (
+        <DashboardPageHeader
+          title={title}
+          description={description}
+          action={action}
+        />
+      ) : null}
       {children(username)}
     </>
   );

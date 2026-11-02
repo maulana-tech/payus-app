@@ -118,6 +118,9 @@ const CHIP: Record<string, string> = {
   overdue: OPEN,
   void: `${QUIET} line-through`,
   archived: QUIET,
+  // A shop is live or it is a draft; "active/archived" read as neither.
+  live: OPEN,
+  draft: QUIET,
   declined: QUIET,
   cancelled: QUIET,
 };

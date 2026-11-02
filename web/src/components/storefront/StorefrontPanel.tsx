@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { formatMinor } from "@/features/invoices/money";
 import { PayPalButton, post } from "@/features/payments/PayPalButton";
-import type { StorefrontView } from "@/features/storefront/config";
+import type {
+  PublicStorefrontView,
+  StorefrontView,
+} from "@/features/storefront/config";
 import { palette, paletteVars } from "@/features/storefront/theme";
 import { trpc } from "@/trpc/react";
 import { ShopHtml } from "./ShopHtml";
@@ -34,18 +37,33 @@ export function StorefrontPanel({ slug }: { slug: string }) {
       </Shell>
     );
 
-  const store = shop.data;
+  return <StorefrontPage shop={shop.data} />;
+}
+
+/**
+ * The page itself, from a view in hand rather than one fetched. The editor's
+ * canvas renders this too, so what an owner arranges is the page and not a
+ * drawing of it; `preview` is the single difference — an unpublished draft
+ * has nothing to pay for, so the button is inert.
+ */
+export function StorefrontPage({
+  shop: store,
+  preview = false,
+}: {
+  shop: PublicStorefrontView;
+  preview?: boolean;
+}) {
   const layout = store.template;
   const variant =
     layout === "menu" ? "row" : layout === "shelf" ? "card" : "hero";
 
   return (
     <Shell theme={store.theme} accent={store.accent}>
-      <header className="mx-auto w-full max-w-3xl px-6 pt-20 pb-10 sm:pt-28">
+      <header className="mx-auto w-full max-w-3xl px-6 pt-20 pb-10 @min-[640px]:pt-28">
         <p className="text-[11px] font-semibold tracking-[0.22em] text-(--shop-muted) uppercase">
           @{store.owner}
         </p>
-        <h1 className="mt-4 font-(family-name:--font-landing-serif) text-[clamp(2.75rem,8vw,4.5rem)] leading-[0.95] font-light tracking-[-0.02em]">
+        <h1 className="mt-4 font-(family-name:--font-landing-serif) text-[clamp(2.75rem,8cqw,4.5rem)] leading-[0.95] font-light tracking-[-0.02em]">
           {store.title}
         </h1>
         <span
@@ -70,7 +88,7 @@ export function StorefrontPanel({ slug }: { slug: string }) {
       <main
         className={
           variant === "card"
-            ? "mx-auto grid w-full max-w-3xl gap-5 px-6 pb-24 sm:grid-cols-2"
+            ? "mx-auto grid w-full max-w-3xl gap-5 px-6 pb-24 @min-[640px]:grid-cols-2"
             : variant === "row"
               ? "mx-auto grid w-full max-w-3xl gap-2 px-6 pb-24"
               : "mx-auto grid w-full max-w-3xl gap-5 px-6 pb-24"
@@ -79,7 +97,8 @@ export function StorefrontPanel({ slug }: { slug: string }) {
         {store.products.map((product) => (
           <Item
             key={product.id}
-            slug={slug}
+            slug={store.slug}
+            preview={preview}
             currency={store.currency}
             product={product}
             variant={variant}
@@ -97,7 +116,12 @@ export function StorefrontPanel({ slug }: { slug: string }) {
   );
 }
 
-/** The page itself: the shop's colours, and nothing of ours inside them. */
+/**
+ * The page itself: the shop's colours, and nothing of ours inside them. It
+ * is a `@container`, and every breakpoint inside measures this element
+ * rather than the window — so the editor's canvas can show the page at a
+ * phone's width and have it answer honestly.
+ */
 function Shell({
   theme = "paper",
   accent = "clay",
@@ -110,7 +134,7 @@ function Shell({
   return (
     <div
       style={paletteVars(theme, accent) as React.CSSProperties}
-      className="flex min-h-svh flex-col bg-(--shop-page) font-(family-name:--font-landing) text-(--shop-text) antialiased"
+      className="@container flex min-h-svh flex-col bg-(--shop-page) font-(family-name:--font-landing) text-(--shop-text) antialiased"
     >
       {children}
     </div>
@@ -119,12 +143,15 @@ function Shell({
 
 function Item({
   slug,
+  preview,
   currency,
   product,
   variant,
   wide,
 }: {
   slug: string;
+  /** Draw the page, but do not take money: the canvas renders this. */
+  preview: boolean;
   currency: string;
   product: Product;
   /** How densely to draw it, decided by the shop's layout. */
@@ -149,15 +176,15 @@ function Item({
       className={[
         "flex flex-col border border-(--shop-line) bg-(--shop-surface)",
         variant === "row" ? "rounded-xl p-4" : "rounded-2xl p-6",
-        variant === "hero" ? "sm:p-8" : "",
-        wide ? "sm:col-span-2" : "",
+        variant === "hero" ? "@min-[640px]:p-8" : "",
+        wide ? "@min-[640px]:col-span-2" : "",
         product.soldOut ? "opacity-60" : "",
       ].join(" ")}
     >
       <div className="flex items-baseline justify-between gap-4">
         <h2
           className={`font-(family-name:--font-landing-serif) leading-tight font-light ${
-            variant === "hero" ? "text-3xl sm:text-4xl" : "text-2xl"
+            variant === "hero" ? "text-3xl @min-[640px]:text-4xl" : "text-2xl"
           }`}
         >
           {product.name}
@@ -245,21 +272,27 @@ function Item({
                 </div>
               ) : null}
 
-              <PayPalButton
-                currency={currency}
-                disabled={!payable}
-                createOrder={async () =>
-                  (
-                    await post("/api/payments/paypal/storefront", {
-                      slug,
-                      productId: product.id,
-                      amount: openAmount ? amount.trim() : undefined,
-                      quantity: product.quantity ? count : undefined,
-                    })
-                  ).orderId as string
-                }
-                onPaid={() => setPaid(true)}
-              />
+              {preview ? (
+                <p className="rounded-xl border border-dashed border-(--shop-line) px-4 py-3 text-center text-sm text-(--shop-muted)">
+                  Pay with PayPal
+                </p>
+              ) : (
+                <PayPalButton
+                  currency={currency}
+                  disabled={!payable}
+                  createOrder={async () =>
+                    (
+                      await post("/api/payments/paypal/storefront", {
+                        slug,
+                        productId: product.id,
+                        amount: openAmount ? amount.trim() : undefined,
+                        quantity: product.quantity ? count : undefined,
+                      })
+                    ).orderId as string
+                  }
+                  onPaid={() => setPaid(true)}
+                />
+              )}
             </>
           )}
         </div>

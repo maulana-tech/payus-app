@@ -51,6 +51,21 @@ export function ShopHtml({
   table { border-collapse: collapse; width: 100%; }
   th, td { border-bottom: 1px solid ${palette.line}; padding: 0.5em 0; text-align: left; }
   small, figcaption { color: ${palette.muted}; font-size: 0.875rem; }
+  /* The allowlisted classes: shop- is the only prefix the sanitiser keeps,
+     and these are what it keeps it for — a writer gets a few shapes
+     without getting a stylesheet. */
+  .shop-lead { font-size: 1.2rem; line-height: 1.5; }
+  .shop-muted { color: ${palette.muted}; font-size: 0.9375rem; }
+  .shop-center { text-align: center; }
+  .shop-cols { display: grid; gap: 1.25rem; grid-template-columns: 1fr 1fr; }
+  .shop-card {
+    border: 1px solid ${palette.line};
+    background: ${palette.surface};
+    border-radius: 16px;
+    padding: 1.25rem;
+  }
+  .shop-card > :last-child { margin-bottom: 0; }
+  @media (max-width: 520px) { .shop-cols { grid-template-columns: 1fr; } }
 </style></head><body>${html}</body></html>`;
 
   useEffect(() => {

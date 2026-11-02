@@ -31,10 +31,17 @@ function readMode(): DashboardMode {
 export function DashboardBackground({
   children,
   compact = false,
+  backdrop = true,
 }: {
   children: ReactNode;
   /** Size to the content (embedded widgets) instead of filling the screen. */
   compact?: boolean;
+  /**
+   * Draw the dithered field behind the page. The canvas covers the whole
+   * window with opaque surfaces, so it asks for no backdrop rather than
+   * running a shader nobody can see.
+   */
+  backdrop?: boolean;
 }) {
   const [mode, setMode] = useState<DashboardMode>("light");
 
@@ -55,9 +62,11 @@ export function DashboardBackground({
     >
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static, no user input */}
       <script dangerouslySetInnerHTML={{ __html: applyStoredMode }} />
-      <div aria-hidden="true" className="fixed inset-0 -z-10">
-        <DitherField {...DITHER[mode]} />
-      </div>
+      {backdrop ? (
+        <div aria-hidden="true" className="fixed inset-0 -z-10">
+          <DitherField {...DITHER[mode]} />
+        </div>
+      ) : null}
       {children}
     </div>
   );

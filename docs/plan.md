@@ -220,6 +220,18 @@ bawahnya.
       meninggalkan server. Editor melihat pratinjau lewat
       `storefront.previewHtml` — satu sanitiser, milik server — dan daftar
       tag yang dibuang ditampilkan ke penulis. 9 test sanitiser.
+- [x] **Kanvas: editor toko jadi halaman, bukan dialog.** `/canvas/[id]`
+      memakai seluruh jendela — kontrol di kiri (Page, Items, HTML, Look),
+      halaman tokonya sendiri di kanan, dengan lebar ponsel/tablet/penuh.
+      Yang di kanan adalah `StorefrontPage`, komponen yang sama yang
+      disajikan ke publik, diberi draf; jadi tidak ada renderer kedua yang
+      harus dijaga seirama. Editor HTML-nya CodeMirror sungguhan (nomor
+      baris, sorotan sintaks, tag menutup sendiri, bungkus baris), dimuat
+      malas sehingga route lain tidak ikut membayarnya, dengan toolbar
+      sisipan yang semuanya lolos sanitiser apa adanya. Halaman toko kini
+      `@container` dengan breakpoint `@min-[640px]:`, sehingga pratinjau
+      414px menjawab seperti ponsel sungguhan. `EditorDialog` lama dihapus.
+      4 test kanvas.
 - [x] **Reporter** — ringkasan dari angka ledger, dan di sinilah invarian
       §2.2 ditegakkan secara **mekanis**, bukan lewat prompt: setiap angka
       dalam jawabannya dibandingkan dengan daftar angka yang kita berikan,

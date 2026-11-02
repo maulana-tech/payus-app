@@ -1,28 +1,10 @@
 "use client";
 
-import { ExternalLink, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { ShopHtml } from "@/components/storefront/ShopHtml";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ExternalLink, Plus } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { formatMinor, toDecimal } from "@/features/invoices/money";
-import {
-  ACCENTS,
-  type Accent,
-  MAX_HTML,
-  MAX_PRODUCTS,
-  MAX_QUANTITY,
-  type Template,
-  THEMES,
-  type Theme,
-} from "@/features/storefront/config";
-import { palette } from "@/features/storefront/theme";
 import type { RouterOutputs } from "@/server/root";
 import { trpc } from "@/trpc/react";
 import {
@@ -41,9 +23,9 @@ import {
   StatusChip,
 } from "./kit";
 
-// Building a page to sell from. What is edited here is configuration, not a
-// page: the same shape an agent writes, so neither can produce something the
-// renderer was not built to show.
+// The list of shops. Editing one happens on its own page — `/canvas/[id]` —
+// because a page is what is being written, and a dialog is the wrong size
+// for that.
 
 type Store = RouterOutputs["storefront"]["mine"][number];
 
@@ -51,72 +33,67 @@ const origin = () =>
   typeof window === "undefined" ? "" : window.location.origin;
 
 export function StorefrontScreen() {
-  const stores = trpc.storefront.mine.useQuery();
-  const [editing, setEditing] = useState<Store | "new" | null>(null);
-
   return (
     <div className="grid gap-4">
-      <DescribeIt onWritten={(store) => setEditing(store)} />
+      <DescribeIt />
 
       <Panel
         title="Your shops"
         hint="A page of things people can pay for, at an address you choose."
         action={
-          <button
-            type="button"
-            className={dashButtonPrimary}
-            onClick={() => setEditing("new")}
-          >
+          <Link href="/canvas/new" className={dashButtonPrimary}>
             <Plus aria-hidden="true" />
             New shop
-          </button>
+          </Link>
         }
       >
-        {stores.isLoading ? (
-          <div className="px-5 py-12 text-center text-sm text-(--dash-ash)">
-            Loading…
-          </div>
-        ) : (stores.data ?? []).length === 0 ? (
-          <EmptyState
-            title="No shop yet"
-            action={
-              <button
-                type="button"
-                className={dashButtonSecondary}
-                onClick={() => setEditing("new")}
-              >
-                Open one
-              </button>
-            }
-          >
-            Put a few things on a page and send the address. Each one is paid
-            the same way an invoice is, and lands in the same ledger.
-          </EmptyState>
-        ) : (
-          <Ledger className="border-0 border-t border-(--dash-line-solid)">
-            {stores.data?.map((store) => (
-              <StoreRow key={store.id} store={store} onEdit={setEditing} />
-            ))}
-          </Ledger>
-        )}
+        <StoreList />
       </Panel>
-
-      {editing ? (
-        <EditorDialog
-          store={editing === "new" ? null : editing}
-          onClose={() => setEditing(null)}
-        />
-      ) : null}
     </div>
   );
 }
 
+function StoreList() {
+  const stores = trpc.storefront.mine.useQuery();
+
+  if (stores.isLoading)
+    return (
+      <div className="px-5 py-12 text-center text-sm text-(--dash-ash)">
+        Loading…
+      </div>
+    );
+
+  if ((stores.data ?? []).length === 0)
+    return (
+      <EmptyState
+        title="No shop yet"
+        action={
+          <Link href="/canvas/new" className={dashButtonSecondary}>
+            Open one
+          </Link>
+        }
+      >
+        Put a few things on a page and send the address. Each one is paid the
+        same way an invoice is, and lands in the same ledger.
+      </EmptyState>
+    );
+
+  return (
+    <Ledger className="border-0 border-t border-(--dash-line-solid)">
+      {stores.data?.map((store) => (
+        <StoreRow key={store.id} store={store} />
+      ))}
+    </Ledger>
+  );
+}
+
 /**
- * The Builder: a description in, a draft out. What comes back is opened in
- * the editor rather than published, because putting a price in front of the
+ * The Builder: a description in, a draft out. What comes back opens on the
+ * canvas rather than going live, because putting a price in front of the
  * public is the owner's decision and not the model's.
  */
-function DescribeIt({ onWritten }: { onWritten: (store: Store) => void }) {
+function DescribeIt() {
+  const router = useRouter();
   const utils = trpc.useUtils();
   const status = trpc.agents.status.useQuery();
   const [description, setDescription] = useState("");
@@ -132,7 +109,7 @@ function DescribeIt({ onWritten }: { onWritten: (store: Store) => void }) {
             )} ${result.oddly.length === 1 ? "is" : "are"} priced well above anything you have charged before.`
           : "Written as a draft — nothing is public until you publish it.",
       );
-      onWritten(result.storefront);
+      router.push(`/canvas/${result.storefront.id}`);
     },
     onError: () => setNote(null),
   });
@@ -177,13 +154,7 @@ function DescribeIt({ onWritten }: { onWritten: (store: Store) => void }) {
   );
 }
 
-function StoreRow({
-  store,
-  onEdit,
-}: {
-  store: Store;
-  onEdit: (store: Store) => void;
-}) {
+function StoreRow({ store }: { store: Store }) {
   const utils = trpc.useUtils();
   const publish = trpc.storefront.setPublished.useMutation({
     onSuccess: () => void utils.storefront.mine.invalidate(),
@@ -197,7 +168,7 @@ function StoreRow({
         title={
           <>
             <span className="font-medium">{store.title}</span>
-            <StatusChip status={published ? "active" : "archived"} />
+            <StatusChip status={published ? "live" : "draft"} />
             {store.writtenBy !== "owner" ? (
               <span className="text-[11px] font-semibold tracking-[0.1em] text-(--dash-ash) uppercase">
                 written by {store.writtenBy}
@@ -224,13 +195,9 @@ function StoreRow({
                 <ExternalLink aria-hidden="true" />
               </a>
             ) : null}
-            <button
-              type="button"
-              className={dashButtonSecondary}
-              onClick={() => onEdit(store)}
-            >
-              Edit
-            </button>
+            <Link href={`/canvas/${store.id}`} className={dashButtonSecondary}>
+              Open canvas
+            </Link>
             <button
               type="button"
               className={published ? dashButtonSecondary : dashButtonPrimary}
@@ -245,542 +212,6 @@ function StoreRow({
         }
       />
       {publish.error ? <ErrorNote>{publish.error.message}</ErrorNote> : null}
-    </div>
-  );
-}
-
-type Line = {
-  name: string;
-  description: string;
-  price: string;
-  min: string;
-  max: string;
-  quantity: boolean;
-  limit: string;
-  soldOut: boolean;
-};
-
-const emptyLine: Line = {
-  name: "",
-  description: "",
-  price: "",
-  min: "",
-  max: "",
-  quantity: false,
-  limit: "10",
-  soldOut: false,
-};
-
-const slugify = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40);
-
-function EditorDialog({
-  store,
-  onClose,
-}: {
-  store: Store | null;
-  onClose: () => void;
-}) {
-  const utils = trpc.useUtils();
-  const [title, setTitle] = useState(store?.title ?? "");
-  const [slug, setSlug] = useState(store?.slug ?? "");
-  const [slugEdited, setSlugEdited] = useState(Boolean(store));
-  const [blurb, setBlurb] = useState(store?.blurb ?? "");
-  const [html, setHtml] = useState(store?.html ?? "");
-  const [template, setTemplate] = useState<Template>(
-    store?.template ?? "shelf",
-  );
-  const [theme, setTheme] = useState<Theme>(store?.theme ?? "paper");
-  const [accent, setAccent] = useState<Accent>(store?.accent ?? "clay");
-  const [lines, setLines] = useState<Line[]>(
-    store?.products.map((product) => ({
-      name: product.name,
-      description: product.description,
-      price: product.priceMinor ? toDecimal(BigInt(product.priceMinor)) : "",
-      min: product.minMinor ? toDecimal(BigInt(product.minMinor)) : "",
-      max: product.maxMinor ? toDecimal(BigInt(product.maxMinor)) : "",
-      quantity: product.quantity,
-      limit: String(product.limit),
-      soldOut: product.soldOut,
-    })) ?? [{ ...emptyLine }],
-  );
-
-  const done = () => {
-    void utils.storefront.mine.invalidate();
-    onClose();
-  };
-  const create = trpc.storefront.create.useMutation({ onSuccess: done });
-  const update = trpc.storefront.update.useMutation({ onSuccess: done });
-  const saving = create.isPending || update.isPending;
-  const error = create.error?.message ?? update.error?.message;
-
-  const setLine = (index: number, patch: Partial<Line>) =>
-    setLines((all) =>
-      all.map((line, i) => (i === index ? { ...line, ...patch } : line)),
-    );
-
-  const submit = () => {
-    const config = {
-      slug: slug || slugify(title),
-      title,
-      blurb,
-      template,
-      theme,
-      accent,
-      html,
-      products: lines.map((line) => {
-        const open = template === "tip" || !line.price;
-        return {
-          name: line.name,
-          description: line.description,
-          price: open ? null : line.price,
-          // Bounds belong to an item the payer prices; the schema refuses
-          // them on anything else, so they are dropped rather than sent.
-          min: open ? line.min || null : null,
-          max: open ? line.max || null : null,
-          quantity: line.quantity,
-          limit: Number(line.limit) || 10,
-          soldOut: line.soldOut,
-        };
-      }),
-    };
-    if (store) update.mutate({ id: store.id, config });
-    else create.mutate(config);
-  };
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent size="lg" className="max-h-[90svh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{store ? "Edit shop" : "New shop"}</DialogTitle>
-          <DialogDescription>
-            Publishing is a separate step, so you can get it right before anyone
-            sees it. A tip jar lets the payer name the amount.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form
-          className="grid gap-5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit();
-          }}
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Name">
-              <Input
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  if (!slugEdited) setSlug(slugify(e.target.value));
-                }}
-                placeholder="Kopi Senja"
-                required
-              />
-            </Field>
-            <Field label="Address" hint={`${origin()}/shop/…`}>
-              <Input
-                value={slug}
-                onChange={(e) => {
-                  setSlugEdited(true);
-                  setSlug(e.target.value);
-                }}
-                placeholder="kopi-senja"
-                required
-              />
-            </Field>
-          </div>
-
-          <Field label="One line about it" hint="Optional">
-            <Input
-              value={blurb}
-              onChange={(e) => setBlurb(e.target.value)}
-              placeholder="Single-origin beans, roasted on Fridays"
-            />
-          </Field>
-
-          <Field label="Kind">
-            <select
-              value={template}
-              onChange={(e) => setTemplate(e.target.value as typeof template)}
-              className="h-10 w-full rounded-lg border border-input bg-card/70 px-3 text-sm"
-            >
-              <option value="shelf">A shelf — items side by side</option>
-              <option value="menu">A menu — a compact list</option>
-              <option value="single">One thing — a single offer</option>
-              <option value="tip">A tip jar — the payer chooses</option>
-            </select>
-          </Field>
-
-          <fieldset className="grid gap-3">
-            <legend className="text-[11px] font-semibold tracking-[0.14em] text-(--dash-ash) uppercase">
-              {template === "tip"
-                ? "What they are supporting"
-                : "What you sell"}
-            </legend>
-            {lines.map((line, index) => {
-              const open = template === "tip" || !line.price;
-              return (
-                <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: positional rows
-                  key={index}
-                  className="grid gap-2 rounded-(--dash-radius) border border-(--dash-line) p-3"
-                >
-                  <div className="grid grid-cols-[1fr_1.2fr_6.5rem_auto] items-center gap-2">
-                    <Input
-                      value={line.name}
-                      onChange={(e) => setLine(index, { name: e.target.value })}
-                      placeholder="Flat white"
-                      aria-label={`Item ${index + 1} name`}
-                      required
-                    />
-                    <Input
-                      value={line.description}
-                      onChange={(e) =>
-                        setLine(index, { description: e.target.value })
-                      }
-                      placeholder="Short description"
-                      aria-label={`Item ${index + 1} description`}
-                    />
-                    <Input
-                      value={template === "tip" ? "" : line.price}
-                      inputMode="decimal"
-                      disabled={template === "tip"}
-                      onChange={(e) =>
-                        setLine(index, { price: e.target.value })
-                      }
-                      placeholder={template === "tip" ? "—" : "25.00"}
-                      aria-label={`Item ${index + 1} price`}
-                    />
-                    <button
-                      type="button"
-                      className={dashIconButton}
-                      aria-label={`Remove item ${index + 1}`}
-                      disabled={lines.length === 1}
-                      onClick={() =>
-                        setLines((all) => all.filter((_, i) => i !== index))
-                      }
-                    >
-                      <Trash2 aria-hidden="true" />
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-                    {open ? (
-                      <span className="flex items-center gap-2">
-                        <span className="text-(--dash-ash)">Between</span>
-                        <Input
-                          value={line.min}
-                          inputMode="decimal"
-                          onChange={(e) =>
-                            setLine(index, { min: e.target.value })
-                          }
-                          placeholder="2.00"
-                          aria-label={`Item ${index + 1} lowest amount`}
-                          className="h-9 w-24"
-                        />
-                        <span className="text-(--dash-ash)">and</span>
-                        <Input
-                          value={line.max}
-                          inputMode="decimal"
-                          onChange={(e) =>
-                            setLine(index, { max: e.target.value })
-                          }
-                          placeholder="200.00"
-                          aria-label={`Item ${index + 1} highest amount`}
-                          className="h-9 w-24"
-                        />
-                      </span>
-                    ) : (
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={line.quantity}
-                          onChange={(e) =>
-                            setLine(index, { quantity: e.target.checked })
-                          }
-                          className="size-4 accent-(--dash-fg)"
-                        />
-                        <span>Payer picks how many</span>
-                        {line.quantity ? (
-                          <Input
-                            value={line.limit}
-                            inputMode="numeric"
-                            onChange={(e) =>
-                              setLine(index, { limit: e.target.value })
-                            }
-                            aria-label={`Item ${index + 1} limit per order`}
-                            className="h-9 w-16"
-                          />
-                        ) : null}
-                        {line.quantity ? (
-                          <span className="text-(--dash-ash)">
-                            at most, up to {MAX_QUANTITY}
-                          </span>
-                        ) : null}
-                      </label>
-                    )}
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={line.soldOut}
-                        onChange={(e) =>
-                          setLine(index, { soldOut: e.target.checked })
-                        }
-                        className="size-4 accent-(--dash-fg)"
-                      />
-                      <span>Sold out</span>
-                    </label>
-                  </div>
-                </div>
-              );
-            })}
-            {lines.length < MAX_PRODUCTS ? (
-              <div>
-                <button
-                  type="button"
-                  className={dashButtonSecondary}
-                  onClick={() => setLines((all) => [...all, { ...emptyLine }])}
-                >
-                  <Plus aria-hidden="true" />
-                  Add item
-                </button>
-              </div>
-            ) : null}
-          </fieldset>
-
-          <HtmlField
-            value={html}
-            onChange={setHtml}
-            theme={theme}
-            accent={accent}
-          />
-
-          <Field label="Look">
-            <div className="flex flex-wrap gap-2">
-              {THEMES.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  aria-pressed={theme === option}
-                  onClick={() => setTheme(option)}
-                  className={`rounded-full border px-4 py-1.5 text-sm capitalize transition-colors ${
-                    theme === option
-                      ? "border-(--dash-fg) bg-(--dash-fg) text-(--dash-surface)"
-                      : "border-(--dash-line-strong) text-(--dash-fg)"
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </Field>
-
-          <Field label="Accent">
-            <div className="flex flex-wrap gap-2">
-              {ACCENTS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  aria-label={option}
-                  aria-pressed={accent === option}
-                  onClick={() => setAccent(option)}
-                  className={`size-8 rounded-full border-2 transition-transform ${
-                    accent === option
-                      ? "scale-110 border-(--dash-fg)"
-                      : "border-transparent"
-                  }`}
-                  style={{ background: palette(theme, option).accent }}
-                />
-              ))}
-            </div>
-          </Field>
-
-          <Preview
-            title={title}
-            blurb={blurb}
-            lines={lines}
-            template={template}
-            theme={theme}
-            accent={accent}
-          />
-
-          {error ? <ErrorNote>{error}</ErrorNote> : null}
-
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              className={dashButtonSecondary}
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={dashButtonPrimary}
-              disabled={saving}
-            >
-              {saving ? "Saving…" : store ? "Save" : "Create as draft"}
-            </button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/**
- * The merchant's own HTML, with the preview coming back from the server —
- * the same sanitiser that will store it. So what is shown here is what will
- * be published, not a hopeful rendering of the draft.
- */
-function HtmlField({
-  value,
-  onChange,
-  theme,
-  accent,
-}: {
-  value: string;
-  onChange: (html: string) => void;
-  theme: Theme;
-  accent: Accent;
-}) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), 400);
-    return () => clearTimeout(timer);
-  }, [value]);
-
-  const preview = trpc.storefront.previewHtml.useQuery(
-    { html: debounced },
-    { enabled: debounced.trim().length > 0 },
-  );
-  const removed = preview.data?.removed ?? [];
-
-  return (
-    <div className="grid gap-2">
-      <Field
-        label="About this shop"
-        hint={`HTML · ${value.length}/${MAX_HTML}`}
-      >
-        <textarea
-          value={value}
-          onChange={(event) => onChange(event.target.value.slice(0, MAX_HTML))}
-          rows={6}
-          spellCheck={false}
-          placeholder={
-            "<h2>How we roast</h2>\n<p>Small batches, Friday mornings.</p>"
-          }
-          className="w-full rounded-lg border border-input bg-card/70 p-3 font-(family-name:--font-landing-mono) text-[13px] leading-relaxed"
-        />
-      </Field>
-
-      <p className="text-sm text-(--dash-ash)">
-        Headings, text, lists, tables, links and images. Scripts, styles, frames
-        and forms are removed, and what is left is shown in a sandbox that
-        cannot run anything.
-      </p>
-
-      {removed.length > 0 ? (
-        <p className="text-sm text-(--dash-err)" role="status">
-          Removed: {removed.map((tag) => `<${tag}>`).join(", ")}
-        </p>
-      ) : null}
-
-      {preview.data?.clean ? (
-        <div className="rounded-(--dash-radius) border border-(--dash-line-solid) p-4">
-          <p className="mb-3 text-[11px] font-semibold tracking-[0.14em] text-(--dash-ash) uppercase">
-            Exactly what will be published
-          </p>
-          <div
-            style={{ background: palette(theme, accent).page }}
-            className="rounded-xl p-4"
-          >
-            <ShopHtml
-              html={preview.data.clean}
-              palette={palette(theme, accent)}
-            />
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** The page as it will read, from the same values that will be stored. */
-function Preview({
-  title,
-  blurb,
-  lines,
-  template,
-  theme,
-  accent,
-}: {
-  title: string;
-  blurb: string;
-  lines: Line[];
-  template: Template;
-  theme: Theme;
-  accent: Accent;
-}) {
-  const colours = palette(theme, accent);
-  const price = (value: string) => {
-    if (template === "tip") return "You choose";
-    try {
-      return value
-        ? formatMinor(BigInt(Math.round(Number(value) * 100)))
-        : "You choose";
-    } catch {
-      return "—";
-    }
-  };
-  return (
-    <div className="grid gap-2">
-      <p className="text-[11px] font-semibold tracking-[0.14em] text-(--dash-ash) uppercase">
-        How it will look
-      </p>
-      <div
-        className="rounded-(--dash-radius) border border-(--dash-line-solid) p-6"
-        style={{ background: colours.page, color: colours.text }}
-      >
-        <p className="font-(family-name:--font-landing-serif) text-3xl leading-tight font-light">
-          {title || "Your shop"}
-        </p>
-        <span
-          aria-hidden="true"
-          className="mt-3 block h-px w-12"
-          style={{ background: colours.accent }}
-        />
-        {blurb ? (
-          <p className="mt-3 text-sm" style={{ color: colours.muted }}>
-            {blurb}
-          </p>
-        ) : null}
-        <ul className="mt-4 grid gap-2">
-          {lines.map((line, index) => (
-            <li
-              // biome-ignore lint/suspicious/noArrayIndexKey: positional rows
-              key={index}
-              className="flex justify-between gap-4 rounded-xl px-3 py-2.5 text-sm"
-              style={{ background: colours.surface }}
-            >
-              <span className="min-w-0 truncate">
-                {line.name || "Untitled"}
-              </span>
-              <span
-                className="shrink-0 font-medium tabular-nums"
-                style={{ color: colours.accent }}
-              >
-                {price(line.price)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   );
 }
