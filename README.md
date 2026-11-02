@@ -38,6 +38,10 @@
 - **A real ledger.** Double entry in integer minor units. A transaction that
   does not balance is refused before the database is touched, and a
   transaction id posts exactly once, so a replayed event writes nothing.
+- **Splitting and releasing.** Money that arrives is divided by your own
+  rules — a share for tax, a pot of your own, a platform fee — with
+  percentages settled by largest remainder so no cent is lost. What is left
+  is yours to release, and the same release cannot be sent twice.
 - **Merchant API.** API keys, `POST /api/v1/checkouts`, and webhooks signed
   Stripe-style (`Payus-Signature: t=…,v1=…`) with retries and a delivery log.
 - **Embed widget.** `public/embed.js`, one script tag, no build step.
@@ -53,8 +57,9 @@ keeping the books, telling your server, writing the invoices). The Guardian
 seven language-model seats above it are the work in
 [`docs/plan.md`](docs/plan.md).
 
-Splitting a payment into pots, settlement and payouts are Phase 2 of that
-plan; the ledger accounts they will use already exist.
+Refunds after settlement. That one is a policy question — a rolling reserve,
+or letting what you are owed go negative — and it is being decided rather
+than guessed at.
 
 ## Stack
 

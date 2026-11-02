@@ -1,23 +1,61 @@
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { toMinor } from "../../../features/invoices/money";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { listInvoices } from "../invoices/invoices.service";
 import { recentPayments } from "../payments/payments.service";
+import {
+  listPayouts,
+  PayoutRefusedError,
+  payableMinor,
+  releasePayout,
+} from "../payments/payouts.service";
 import { requireUsername } from "../profiles/profiles.service";
 import { balances, entriesFor } from "./ledger.service";
+import { createRule, listRules, planSplit, updateRule } from "./split.service";
 
-// What the overview screen shows. Every number here is read from the
+// What the money screens read and write. Every number here comes from the
 // ledger or from the invoices themselves — nothing is cached or guessed.
 
+const target = z
+  .string()
+  .regex(
+    /^(platform_fee|tax_reserve|merchant_payable|pos:[a-z0-9][a-z0-9-]{0,40})$/,
+    "Choose a pot, tax, the platform fee, or what is yours.",
+  );
+
+const ruleInput = z.object({
+  name: z.string().trim().min(1).max(40),
+  target,
+  kind: z.enum(["percent", "fixed"]),
+  /** Basis points for a percent, minor units for a fixed cut. */
+  value: z.string().regex(/^\d{1,15}$/),
+  priority: z.number().int().min(0).max(99),
+});
+
+const owner = (ctx: { privyUserId: string }) =>
+  requireUsername(ctx.privyUserId);
+
+function mapError(e: unknown): never {
+  if (e instanceof PayoutRefusedError)
+    throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
+  if (
+    e instanceof Error &&
+    /not somewhere money can go|usable pot/.test(e.message)
+  )
+    throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
+  throw e;
+}
+
 export const ledgerRouter = createTRPCRouter({
-  /** Every posting of this account, for the transactions grid. */
-  entries: protectedProcedure.query(async ({ ctx }) =>
-    entriesFor(await requireUsername(ctx.privyUserId)),
-  ),
   summary: protectedProcedure.query(async ({ ctx }) => {
-    const owner = await requireUsername(ctx.privyUserId);
-    const [accounts, invoices, payments] = await Promise.all([
-      balances(owner),
-      listInvoices(owner),
-      recentPayments(owner),
+    const me = await owner(ctx);
+    const [accounts, invoices, payments, payable, rules] = await Promise.all([
+      balances(me),
+      listInvoices(me),
+      recentPayments(me),
+      payableMinor(me),
+      listRules(me),
     ]);
 
     let outstandingMinor = 0n;
@@ -36,6 +74,8 @@ export const ledgerRouter = createTRPCRouter({
     return {
       accounts,
       payments,
+      payableMinor: payable.toString(),
+      rules: rules.map((rule) => ({ ...rule, value: rule.value.toString() })),
       invoices: {
         total: invoices.length,
         pending: invoices.filter((i) => i.status === "pending").length,
@@ -46,4 +86,67 @@ export const ledgerRouter = createTRPCRouter({
       recentInvoices: invoices.slice(0, 5),
     };
   }),
+
+  /** Every posting of this account, for the transactions grid. */
+  entries: protectedProcedure.query(async ({ ctx }) =>
+    entriesFor(await owner(ctx)),
+  ),
+
+  /** What the rules would do with an amount, without writing anything. */
+  previewSplit: protectedProcedure
+    .input(z.object({ amount: z.string().regex(/^\d{1,12}(\.\d{1,2})?$/) }))
+    .query(async ({ ctx, input }) => {
+      const allocations = await planSplit(
+        await owner(ctx),
+        toMinor(input.amount),
+      );
+      return allocations.map((allocation) => ({
+        ...allocation,
+        amountMinor: allocation.amountMinor.toString(),
+      }));
+    }),
+
+  createRule: protectedProcedure
+    .input(ruleInput)
+    .mutation(async ({ ctx, input }) => {
+      const rule = await createRule(await owner(ctx), input).catch(mapError);
+      return { ...rule, value: rule.value.toString() };
+    }),
+
+  updateRule: protectedProcedure
+    .input(
+      ruleInput.partial().extend({
+        id: z.string().min(8).max(24),
+        state: z.enum(["active", "archived"]).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...patch } = input;
+      const rule = await updateRule(await owner(ctx), id, patch).catch(
+        mapError,
+      );
+      return { ...rule, value: rule.value.toString() };
+    }),
+
+  payouts: protectedProcedure.query(async ({ ctx }) =>
+    listPayouts(await owner(ctx)),
+  ),
+
+  /** Sends what is owed to the merchant's PayPal address. */
+  release: protectedProcedure
+    .input(
+      z.object({
+        amount: z.string().regex(/^\d{1,12}(\.\d{1,2})?$/),
+        destination: z.string().trim().email().max(200),
+        /** Held by the form for one attempt, so a retry cannot pay twice. */
+        intentKey: z.string().min(8).max(64),
+      }),
+    )
+    .mutation(async ({ ctx, input }) =>
+      releasePayout(await owner(ctx), {
+        amountMinor: toMinor(input.amount),
+        destination: input.destination,
+        intentKey: input.intentKey,
+      }).catch(mapError),
+    ),
 });

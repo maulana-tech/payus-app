@@ -1,6 +1,8 @@
 import "server-only";
 import { getCapture } from "../../lib/paypal";
+import { settleCapture } from "../ledger/settlement.service";
 import { recordCapture } from "../payments/payments.service";
+import { topics } from "./topics";
 
 // One handler per topic. A handler must be safe to run again: the worker
 // retries after a crash, and a provider may deliver the same event twice.
@@ -14,14 +16,19 @@ const str = (payload: Record<string, unknown>, key: string): string => {
   return value;
 };
 
-export const topics = {
-  /** A PayPal capture completed; the amounts are read back from PayPal. */
-  captureCompleted: "paypal.capture.completed",
-} as const;
-
 export const handlers: Record<string, Handler> = {
   // The webhook body is only a hint: the authoritative amounts come from the
   // capture itself, so a forged or stale body cannot move money.
   [topics.captureCompleted]: async (payload) =>
     recordCapture(await getCapture(str(payload, "captureId"))),
+
+  // Settling again is harmless: the posting id comes from the capture.
+  [topics.settleCapture]: async (payload) =>
+    settleCapture({
+      owner: str(payload, "owner"),
+      captureId: str(payload, "captureId"),
+      invoiceId: str(payload, "invoiceId"),
+      grossMinor: BigInt(str(payload, "grossMinor")),
+      currency: str(payload, "currency"),
+    }),
 };

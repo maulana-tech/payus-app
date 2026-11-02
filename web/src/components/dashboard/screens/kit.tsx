@@ -174,6 +174,23 @@ export function CopyButton({
   );
 }
 
+// Ledger account ids are machine-shaped; these are the words for them.
+const ACCOUNT_LABEL: Record<string, string> = {
+  in_flight: "Taken, not yet split",
+  merchant_payable: "Owed to you",
+  tax_reserve: "Set aside for tax",
+  platform_fee: "Platform fee",
+  paypal_cash: "Held at PayPal",
+  psp_fee: "PayPal's fee",
+  external: "Outside this system",
+};
+
+/** What to call a ledger account on screen. */
+export function accountLabel(kind: string, accountId: string): string {
+  if (kind === "pos") return `Pot · ${accountId.split(":")[2] ?? ""}`;
+  return ACCOUNT_LABEL[kind] ?? accountId;
+}
+
 export function EmptyState({
   title,
   children,

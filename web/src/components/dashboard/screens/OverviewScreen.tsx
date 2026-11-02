@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { invoiceStatus } from "@/features/invoices/input";
 import { formatMinor } from "@/features/invoices/money";
 import { trpc } from "@/trpc/react";
 import { dashButtonSecondary } from "../styles";
 import {
+  accountLabel,
   EmptyState,
   Ledger,
   ListRow,
@@ -14,20 +16,17 @@ import {
   Stat,
   StatusChip,
 } from "./kit";
+import { ReleaseDialog } from "./ReleaseDialog";
+import { SplitRulesPanel } from "./SplitRules";
 
 // Everything on this screen is read from the ledger and the invoices
 // themselves. Nothing is cached, averaged or estimated.
 
-const ACCOUNT_LABEL: Record<string, string> = {
-  in_flight: "Taken, not yet split",
-  merchant_payable: "Owed to you",
-  tax_reserve: "Set aside for tax",
-  pos: "Pot",
-};
-
 export function OverviewScreen({ username }: { username: string }) {
   const summary = trpc.ledger.summary.useQuery();
+  const [releasing, setReleasing] = useState(false);
   const data = summary.data;
+  const payable = data?.payableMinor ?? "0";
 
   return (
     <div className="grid gap-4">
@@ -56,9 +55,9 @@ export function OverviewScreen({ username }: { username: string }) {
           foot="Across every settled invoice"
         />
         <Stat
-          label="Payments taken"
-          value={data?.payments.length ?? "—"}
-          foot="Captures recorded on the rail"
+          label="Owed to you"
+          value={data ? formatMinor(BigInt(payable)) : "—"}
+          foot="After every split, ready to release"
         />
       </Ledger>
 
@@ -66,6 +65,16 @@ export function OverviewScreen({ username }: { username: string }) {
         <Panel
           title="On the books"
           hint="Balances straight out of the double-entry ledger."
+          action={
+            <button
+              type="button"
+              className={dashButtonSecondary}
+              disabled={BigInt(payable) <= 0n}
+              onClick={() => setReleasing(true)}
+            >
+              Release
+            </button>
+          }
         >
           {!data || data.accounts.length === 0 ? (
             <EmptyState title="No entries yet">
@@ -79,7 +88,7 @@ export function OverviewScreen({ username }: { username: string }) {
                   key={account.account}
                   title={
                     <span className="font-medium">
-                      {ACCOUNT_LABEL[account.kind] ?? account.label}
+                      {accountLabel(account.kind, account.account)}
                     </span>
                   }
                   meta={account.account}
@@ -136,6 +145,8 @@ export function OverviewScreen({ username }: { username: string }) {
         </Panel>
       </div>
 
+      <SplitRulesPanel rules={data?.rules ?? []} />
+
       <Panel
         title="Latest invoices"
         hint={`Everything you have billed as @${username}.`}
@@ -182,6 +193,12 @@ export function OverviewScreen({ username }: { username: string }) {
           </Ledger>
         )}
       </Panel>
+
+      <ReleaseDialog
+        open={releasing}
+        onOpenChange={setReleasing}
+        payableMinor={payable}
+      />
     </div>
   );
 }

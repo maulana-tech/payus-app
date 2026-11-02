@@ -1,7 +1,7 @@
 import { getDb, webhookEvents } from "@/server/db/client";
 import { paypalConfigured, verifyWebhookSignature } from "@/server/lib/paypal";
-import { topics } from "@/server/modules/outbox/handlers";
 import { enqueue } from "@/server/modules/outbox/outbox.service";
+import { topics } from "@/server/modules/outbox/topics";
 
 // PayPal's events. Every delivery is verified with PayPal, stored under its
 // own `event_id` and turned into outbox work in the same transaction. A

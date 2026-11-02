@@ -98,19 +98,36 @@ pemakai adalah hutang), dan tombol bayar di `/i/<token>` tetap di Fase 5 —
 artinya **pembayaran sandbox sungguhan belum pernah dijalankan**; itu
 menunggu kredensial.
 
-### Fase 2 — 3–5 Nov · split & settlement
-- Tabel `split_rules` (dipindah dari Fase 1, dibuat bersama pemakainya)
-- `features/split/`: evaluasi aturan (persen + nominal tetap, urutan
-  prioritas, sisa ke pos default, sisa pembulatan dengan largest-remainder)
-- Settlement merchant: pembayaran masuk dipecah → `platform_fee`,
-  `tax_reserve`, `merchant_payable`
-- Payout keluar via Payouts dengan `sender_batch_id = hash(payout_intent)`;
-  status dipantau; gagal → dana kembali ke pos asal
-- Jalur refund sesuai keputusan Hari 2
+### Fase 2 — 2–3 Nov · split & settlement
+- [x] Tabel `split_rules` dan `payouts` (migrasi `0002_*.sql`)
+- [x] `features/split/evaluate.ts` **murni**: persen (dari jumlah utuh, bukan
+      dari sisa), nominal tetap, urutan prioritas, sisa jadi milik pemilik,
+      dan pembulatan persen diselesaikan dengan **largest-remainder** — jadi
+      tidak ada sen yang hilang atau tercipta. 10 test, semuanya memeriksa
+      Σ alokasi === jumlah masuk lebih dulu
+- [x] Settlement: `settleCapture()` memindahkan seluruh `in_flight` dalam
+      satu posting, id-nya diturunkan dari capture, jadi settlement
+      sebagian tidak bisa ada. Jalur cepat inline, dan kalau gagal
+      diantrekan ke outbox supaya uang tidak diam di `in_flight`
+- [x] Payout: `sender_batch_id = sha256(owner|amount|currency|tujuan|intentKey)`.
+      **Catatan penting:** menurunkannya dari posisi ledger tidak bisa —
+      posting payout itu sendiri menggeser posisinya, jadi retry terbaca
+      sebagai intent baru. Sudah dicoba dan dibatalkan; `intentKey` adalah
+      identitas percobaan (nonce dari dialog, nanti id usulan yang disetujui)
+- [x] Fallback Payouts: tanpa `PAYPAL_PAYOUTS_ENABLED=true`, rilis dicatat
+      sebagai `payout.simulated` **dengan label eksplisit di UI**, bukan
+      dipura-purakan terkirim. Kalau PayPal menolak, baris `payouts`
+      ditandai `failed` dan **ledger tidak disentuh sama sekali**
+- [x] UI: panel "How money is divided" (dengan pratinjau memakai mesin yang
+      sama persis dengan server) dan tombol "Release" di Overview
+- [ ] **Jalur refund — masih menunggu keputusanmu.** Ini satu-satunya bagian
+      Fase 2 yang tidak kukerjakan, karena pilihannya (rolling reserve vs
+      `merchant_payable` negatif) adalah kebijakan, bukan mekanika
 
-**Selesai jika:** satu pembayaran menghasilkan entri yang totalnya sama
-dengan jumlah masuk, dan payout dua kali dengan intent sama hanya mengirim
-satu batch.
+**Terbukti oleh test:** satu pembayaran menghasilkan entri yang totalnya sama
+dengan jumlah masuk (`trialBalance() === 0n` di setiap kasus), settlement
+kedua tidak berefek, dan dua rilis dengan intent sama hanya menghasilkan satu
+batch sementara percobaan baru yang disengaja tetap bisa.
 
 ### Fase 3 — 6–7 Nov · Guardian
 - `features/guardian/`: limit per transaksi & per hari, allowlist penerima,

@@ -236,6 +236,65 @@ export async function getCapture(captureId: string): Promise<Capture> {
   );
 }
 
+/**
+ * Payouts needs its own approval on a PayPal account, so it is opt-in: until
+ * `PAYPAL_PAYOUTS_ENABLED` is set, a release is recorded as simulated and
+ * labelled as such rather than quietly doing nothing.
+ */
+export function payoutsEnabled(): boolean {
+  return paypalConfigured() && getServerEnv().PAYPAL_PAYOUTS_ENABLED === "true";
+}
+
+export type PayoutResult = {
+  batchId: string;
+  status: string;
+};
+
+/**
+ * Sends one payout. `senderBatchId` is PayPal's own idempotency key: the
+ * same id returns the first batch instead of paying twice.
+ */
+export async function createPayout(input: {
+  senderBatchId: string;
+  destination: string;
+  amountMinor: bigint;
+  currency: string;
+  note: string;
+}): Promise<PayoutResult> {
+  const result = await call<{
+    batch_header?: { payout_batch_id?: string; batch_status?: string };
+  }>("/v1/payments/payouts", {
+    method: "POST",
+    requestId: input.senderBatchId,
+    body: {
+      sender_batch_header: {
+        sender_batch_id: input.senderBatchId,
+        email_subject: "You have a payment",
+        email_message: input.note,
+      },
+      items: [
+        {
+          recipient_type: "EMAIL",
+          receiver: input.destination,
+          amount: {
+            currency: input.currency,
+            value: toDecimal(input.amountMinor),
+          },
+          note: input.note,
+          sender_item_id: input.senderBatchId,
+        },
+      ],
+    },
+  });
+  const header = result.batch_header;
+  if (!header?.payout_batch_id)
+    throw new Error("PayPal accepted the payout without naming a batch");
+  return {
+    batchId: header.payout_batch_id,
+    status: header.batch_status ?? "PENDING",
+  };
+}
+
 export type WebhookHeaders = {
   get(name: string): string | null;
 };

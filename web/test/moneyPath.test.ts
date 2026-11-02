@@ -159,11 +159,15 @@ describe.skipIf(!available)("money path (Postgres)", () => {
 
     const paid = await invoices.publicInvoice(invoice.token);
     expect(paid).toMatchObject({ status: "paid", paidMinor: "15000" });
-    // The payer's 150.00 arrives as 145.00 of cash plus 5.00 of PayPal's fee,
-    // and the whole 150.00 is owed onward to the merchant.
+    // The payer's 150.00 arrives as 145.00 of cash plus 5.00 of PayPal's fee.
     expect(await ledger.balance(ledger.account.paypalCash())).toBe(14500n);
     expect(await ledger.balance(ledger.account.pspFee())).toBe(500n);
-    expect(await ledger.balance(ledger.account.inFlight("shop"))).toBe(15000n);
+    // With no split rules yet, settlement passes the whole 150.00 straight
+    // through to the merchant and leaves nothing in flight.
+    expect(await ledger.balance(ledger.account.inFlight("shop"))).toBe(0n);
+    expect(await ledger.balance(ledger.account.merchantPayable("shop"))).toBe(
+      15000n,
+    );
     expect(await ledger.trialBalance()).toBe(0n);
   });
 
@@ -186,10 +190,14 @@ describe.skipIf(!available)("money path (Postgres)", () => {
     const response = await deliver("EVT-2", "CAP-1");
     expect(await response.json()).toMatchObject({ queued: true });
     expect(await outbox.drainOutbox()).toMatchObject({ done: 1 });
-    // The job ran again and changed nothing: the ledger refused the second
-    // posting and the invoice is reported with the sum of its captures.
+    // The job ran again and changed nothing: the ledger refused both the
+    // capture and the settlement, and the invoice is reported with the sum
+    // of its captures.
     expect(await ledger.balance(ledger.account.paypalCash())).toBe(14500n);
-    expect(await ledger.balance(ledger.account.inFlight("shop"))).toBe(15000n);
+    expect(await ledger.balance(ledger.account.inFlight("shop"))).toBe(0n);
+    expect(await ledger.balance(ledger.account.merchantPayable("shop"))).toBe(
+      15000n,
+    );
     expect(await ledger.trialBalance()).toBe(0n);
   });
 

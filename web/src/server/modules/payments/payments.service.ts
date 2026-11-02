@@ -10,6 +10,9 @@ import { getDb, invoices, payments } from "../../db/client";
 import * as paypal from "../../lib/paypal";
 import { createInvoice, publicInvoice } from "../invoices/invoices.service";
 import { account, type Posting, post } from "../ledger/ledger.service";
+import { settleCapture } from "../ledger/settlement.service";
+import { enqueue } from "../outbox/outbox.service";
+import { topics } from "../outbox/topics";
 import { resolveLink } from "../paymentLinks/paymentLinks.service";
 import { applyInvoicePayment, appOrigin } from "./applyPayment";
 import {
@@ -190,6 +193,27 @@ export async function recordCapture(capture: paypal.Capture): Promise<{
       updatedAt: now,
     })
     .where(and(eq(payments.id, row.id), eq(payments.status, "created")));
+
+  // Divide it according to the owner's rules. The fast path keeps the demo
+  // instant; if it fails, the queue retries it rather than leaving the money
+  // sitting in `in_flight` unnoticed.
+  try {
+    await settleCapture({
+      owner: row.owner,
+      captureId: capture.captureId,
+      invoiceId: row.invoiceId,
+      grossMinor: capture.grossMinor,
+      currency: capture.currency,
+    });
+  } catch {
+    await enqueue(topics.settleCapture, {
+      owner: row.owner,
+      captureId: capture.captureId,
+      invoiceId: row.invoiceId,
+      grossMinor: capture.grossMinor.toString(),
+      currency: capture.currency,
+    });
+  }
 
   const paid = await capturedTotal(row.invoiceId);
   const applied = await applyInvoicePayment(

@@ -366,8 +366,60 @@ export type ApiKeyRow = typeof apiKeys.$inferSelect;
 export type WebhookRow = typeof webhooks.$inferSelect;
 export type WebhookDeliveryRow = typeof webhookDeliveries.$inferSelect;
 export type NotificationSettingsRow = typeof notificationSettings.$inferSelect;
+/**
+ * How an owner divides money that arrives. `target` names where a share
+ * goes — "tax_reserve", "platform_fee", "merchant_payable" or "pos:<slug>" —
+ * and the engine in `features/split` turns these into ledger postings.
+ */
+export const splitRules = pgTable(
+  "split_rules",
+  {
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(), // username
+    name: text("name").notNull(),
+    target: text("target").notNull(),
+    kind: text("kind").$type<"percent" | "fixed">().notNull(),
+    // Basis points for a percent (2500 = 25%), minor units for a fixed cut.
+    value: minor("value").notNull(),
+    priority: integer("priority").notNull(),
+    state: text("state").$type<"active" | "archived">().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("split_rules_by_owner").on(t.owner, t.priority)],
+);
+
+export type PayoutStatus = "pending" | "paid" | "failed" | "simulated";
+
+/**
+ * Money released to the merchant. `senderBatchId` is derived from the intent
+ * (who, how much, and the ledger position it was requested at), so asking
+ * twice for the same payout cannot send twice — PayPal replays the batch and
+ * our ledger refuses the second posting.
+ */
+export const payouts = pgTable(
+  "payouts",
+  {
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(),
+    senderBatchId: text("sender_batch_id").notNull().unique(),
+    destination: text("destination").notNull(), // PayPal email
+    amountMinor: minor("amount_minor").notNull(),
+    currency: text("currency").notNull(),
+    status: text("status").$type<PayoutStatus>().notNull(),
+    /** PayPal's batch id, once it has one. */
+    batchId: text("batch_id"),
+    error: text("error"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("payouts_by_owner").on(t.owner, t.createdAt)],
+);
+
 export type LedgerAccountRow = typeof ledgerAccounts.$inferSelect;
 export type LedgerTxnRow = typeof ledgerTxns.$inferSelect;
 export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
 export type PaymentRow = typeof payments.$inferSelect;
 export type OutboxRow = typeof outbox.$inferSelect;
+export type SplitRuleRow = typeof splitRules.$inferSelect;
+export type PayoutRow = typeof payouts.$inferSelect;

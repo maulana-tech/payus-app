@@ -26,6 +26,9 @@ export const serverEnvSchema = z.object({
   PAYPAL_CLIENT_SECRET: optionalString,
   // From the webhook you registered; without it no event is trusted.
   PAYPAL_WEBHOOK_ID: optionalString,
+  // "true" once Payouts is approved on the PayPal account. Until then a
+  // release is recorded as simulated and labelled in the UI.
+  PAYPAL_PAYOUTS_ENABLED: optionalString,
 });
 
 export function getServerEnv() {
@@ -42,6 +45,7 @@ export function getServerEnv() {
     PAYPAL_CLIENT_ID: process.env.PAYPAL_CLIENT_ID,
     PAYPAL_CLIENT_SECRET: process.env.PAYPAL_CLIENT_SECRET,
     PAYPAL_WEBHOOK_ID: process.env.PAYPAL_WEBHOOK_ID,
+    PAYPAL_PAYOUTS_ENABLED: process.env.PAYPAL_PAYOUTS_ENABLED,
   });
 }
 
