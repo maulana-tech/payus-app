@@ -58,8 +58,10 @@ const BASE: Record<Theme, Omit<Palette, "accent" | "accentText">> = {
 };
 
 export function palette(theme: Theme, accent: Accent): Palette {
-  const base = BASE[theme];
-  const hue = ACCENT_HUE[accent];
+  // Fall back rather than throw: this renders a public page, and a row
+  // written before a theme existed must still open.
+  const base = BASE[theme] ?? BASE.paper;
+  const hue = ACCENT_HUE[accent] ?? ACCENT_HUE.clay;
   return {
     ...base,
     accent: base.scheme === "dark" ? hue.dark : hue.light,

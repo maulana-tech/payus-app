@@ -16,15 +16,24 @@ const shop = {
   title: "Kopi Senja",
   blurb: "Beans roasted on Fridays",
   template: "shelf" as const,
+  theme: "paper" as const,
+  accent: "clay" as const,
   currency: "USD",
   state: "published" as const,
   writtenBy: "builder-agent",
+  html: "<p>raw</p><script>alert(1)</script>",
+  htmlClean: "<h2>How we roast</h2><p>Fridays.</p>",
   products: [
     {
       id: "p1",
       name: "<script>alert('x')</script>",
       description: "<img src=x onerror=alert(1)>",
       priceMinor: "450",
+      minMinor: null,
+      maxMinor: null,
+      quantity: false,
+      limit: 1,
+      soldOut: false,
     },
     {
       id: "p2",
@@ -63,6 +72,23 @@ describe("storefront page", () => {
     await waitFor(() => expect(screen.getByText("$4.50")).toBeInTheDocument());
     expect(screen.getByText("You choose")).toBeInTheDocument();
     expect(screen.getByLabelText("Amount")).toBeInTheDocument();
+  });
+
+  it("renders the sanitised copy, in a frame that cannot run anything", async () => {
+    const { container } = render(shop);
+    await waitFor(() =>
+      expect(screen.getByText("Kopi Senja")).toBeInTheDocument(),
+    );
+
+    const frame = container.querySelector("iframe");
+    expect(frame).not.toBeNull();
+    // No allow-scripts: whatever is inside, nothing executes.
+    expect(frame?.getAttribute("sandbox")).toBe("allow-same-origin");
+    const doc = frame?.getAttribute("srcdoc") ?? "";
+    expect(doc).toContain("How we roast");
+    // The author's raw copy never reaches the page.
+    expect(doc).not.toContain("<script>");
+    expect(doc).not.toContain("<p>raw</p>");
   });
 
   it("says nothing is there when the shop is a draft", async () => {

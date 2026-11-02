@@ -93,6 +93,28 @@ describe.skipIf(!available)("storefront (Postgres)", () => {
     ).toMatchObject({ product: { name: "Thing" } });
   });
 
+  it("serves the sanitised copy and keeps the author's own markup back", async () => {
+    const shop = await store.createStorefront("shop", {
+      slug: "html-shop",
+      title: "Notes",
+      blurb: "",
+      template: "shelf",
+      currency: "USD",
+      html: '<p>Hi<script>alert(1)</script></p><p onclick="x()">Bye</p>',
+      products: [{ name: "Thing", description: "", price: "1000" }],
+    });
+    // The owner sees both: what they wrote, and what it became.
+    expect(shop.html).toContain("<script>");
+    expect(shop.htmlClean).not.toContain("<script>");
+    expect(shop.htmlClean).not.toContain("onclick");
+
+    await store.setPublished("shop", shop.id, true);
+    const live = await store.publishedStorefront("html-shop");
+    expect(live?.htmlClean).toContain("Hi");
+    // A visitor is never handed the draft, so no client bug can render it.
+    expect(live && "html" in live).toBe(false);
+  });
+
   it("keeps an address to one shop", async () => {
     await expect(
       store.createStorefront("other", {

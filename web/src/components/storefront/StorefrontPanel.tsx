@@ -4,8 +4,9 @@ import { useState } from "react";
 import { formatMinor } from "@/features/invoices/money";
 import { PayPalButton, post } from "@/features/payments/PayPalButton";
 import type { StorefrontView } from "@/features/storefront/config";
-import { paletteVars } from "@/features/storefront/theme";
+import { palette, paletteVars } from "@/features/storefront/theme";
 import { trpc } from "@/trpc/react";
+import { ShopHtml } from "./ShopHtml";
 
 // A storefront as its visitors see it: the merchant's page, in the colours
 // they chose, built only from stored values. There is no field anywhere in
@@ -55,6 +56,14 @@ export function StorefrontPanel({ slug }: { slug: string }) {
           <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-(--shop-muted)">
             {store.blurb}
           </p>
+        ) : null}
+        {store.htmlClean ? (
+          <div className="mt-8">
+            <ShopHtml
+              html={store.htmlClean}
+              palette={palette(store.theme, store.accent)}
+            />
+          </div>
         ) : null}
       </header>
 

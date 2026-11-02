@@ -59,9 +59,11 @@
   its answer is validated before the Guardian ever sees it.
 
 - **A shop you can describe.** The Builder turns a sentence into a
-  storefront: configuration filling templates we wrote, never a page of its
-  own. Four layouts, a palette to choose, quantities, sold-out items and
-  bounds on what a payer may name. It writes a draft; you publish it.
+  storefront: configuration filling templates we wrote, plus one block of
+  prose that goes through a server-side sanitiser and renders in a sandboxed
+  frame with no scripts. Four layouts, a palette to choose, quantities,
+  sold-out items and bounds on what a payer may name. It writes a draft; you
+  publish it.
   Everything a payer sends is checked against the stored item — the page is
   never the authority on what something costs.
 

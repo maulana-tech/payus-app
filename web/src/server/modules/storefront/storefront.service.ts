@@ -1,6 +1,7 @@
 import "server-only";
 import { and, desc, eq } from "drizzle-orm";
 import type {
+  PublicStorefrontView,
   StorefrontConfig,
   StorefrontView,
 } from "../../../features/storefront/config";
@@ -12,6 +13,7 @@ import {
   type StorefrontRow,
   storefronts,
 } from "../../db/client";
+import { sanitizeShopHtml } from "./sanitize";
 import { SlugTakenError, StorefrontNotFoundError } from "./storefront.errors";
 
 // Storefronts are configuration, never markup: a row here is read by one
@@ -27,12 +29,20 @@ const toView = (row: StorefrontRow): StorefrontView => ({
   template: row.template,
   theme: row.theme,
   accent: row.accent as StorefrontView["accent"],
+  html: row.htmlRaw,
+  htmlClean: row.htmlClean,
   currency: row.currency,
   state: row.state,
   writtenBy: row.writtenBy,
   products: row.products,
   updatedAt: row.updatedAt.toISOString(),
 });
+
+/** Sanitising happens here, so no path can store HTML that skipped it. */
+const html = (input: string | undefined) => {
+  const { raw, clean } = sanitizeShopHtml(input ?? "");
+  return { htmlRaw: raw, htmlClean: clean };
+};
 
 const withIds = (config: StorefrontConfig): StorefrontProduct[] =>
   config.products.map((product) => ({
@@ -66,6 +76,7 @@ export async function createStorefront(
         template: config.template,
         theme: config.theme,
         accent: config.accent,
+        ...html(config.html),
         currency: config.currency,
         products: withIds(config),
         state: "draft",
@@ -96,6 +107,7 @@ export async function updateStorefront(
         template: config.template,
         theme: config.theme,
         accent: config.accent,
+        ...html(config.html),
         currency: config.currency,
         products: withIds(config),
         writtenBy,
@@ -139,13 +151,15 @@ export async function listStorefronts(
 /** The public page. A draft resolves to nothing, whoever asks. */
 export async function publishedStorefront(
   slug: string,
-): Promise<StorefrontView | null> {
+): Promise<PublicStorefrontView | null> {
   const [row] = await getDb()
     .select()
     .from(storefronts)
     .where(and(eq(storefronts.slug, slug), eq(storefronts.state, "published")))
     .limit(1);
-  return row ? toView(row) : null;
+  if (!row) return null;
+  const { html: _withheld, ...view } = toView(row);
+  return view;
 }
 
 /** One product of a published storefront, for taking a payment for it. */
@@ -153,7 +167,7 @@ export async function publishedProduct(
   slug: string,
   productId: string,
 ): Promise<{
-  storefront: StorefrontView;
+  storefront: PublicStorefrontView;
   product: StorefrontProduct;
 } | null> {
   const storefront = await publishedStorefront(slug);

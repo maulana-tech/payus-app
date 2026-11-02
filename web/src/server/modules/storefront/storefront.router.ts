@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
+  MAX_HTML,
   slugSchema,
   storefrontInput,
 } from "../../../features/storefront/config";
@@ -10,6 +11,7 @@ import {
   publicProcedure,
 } from "../../trpc";
 import { requireUsername } from "../profiles/profiles.service";
+import { sanitizeShopHtml } from "./sanitize";
 import { SlugTakenError, StorefrontNotFoundError } from "./storefront.errors";
 import {
   createStorefront,
@@ -56,6 +58,15 @@ export const storefrontRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) =>
       setPublished(await owner(ctx), input.id, input.published).catch(mapError),
     ),
+
+  /**
+   * What a block of HTML will become. The editor previews through this so
+   * the author sees the sanitised copy, not their draft — there is one
+   * sanitiser and it lives on the server.
+   */
+  previewHtml: protectedProcedure
+    .input(z.object({ html: z.string().max(MAX_HTML) }).strict())
+    .query(({ input }) => sanitizeShopHtml(input.html)),
 
   /** The public page, which only ever resolves a published storefront. */
   public: publicProcedure

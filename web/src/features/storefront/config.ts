@@ -19,6 +19,9 @@ export type Template = (typeof TEMPLATES)[number];
 /** The most of one item a single order may carry, whatever the page says. */
 export const MAX_QUANTITY = 50;
 
+/** The most HTML a shop may carry, before sanitising. */
+export const MAX_HTML = 8_000;
+
 export const THEMES = ["paper", "ink", "sun"] as const;
 export type Theme = (typeof THEMES)[number];
 
@@ -115,6 +118,12 @@ export const storefrontInput = z
     blurb: z.string().trim().max(300).default(""),
     template: z.enum(TEMPLATES),
     theme: z.enum(THEMES).default("paper"),
+    /**
+     * A block of the merchant's own HTML, shown under the title. It is
+     * sanitised on the way in and rendered in a sandbox that cannot run
+     * scripts — see `server/modules/storefront/sanitize.ts`.
+     */
+    html: z.string().max(MAX_HTML).default(""),
     accent: z.enum(ACCENTS).default("clay"),
     currency: z.enum(CURRENCIES).default(DEFAULT_CURRENCY),
     products: z.array(productInput).min(1).max(MAX_PRODUCTS),
@@ -139,6 +148,10 @@ export type StorefrontView = {
   template: Template;
   theme: Theme;
   accent: Accent;
+  /** What the author wrote. */
+  html: string;
+  /** What is rendered. Never `html`. */
+  htmlClean: string;
   currency: string;
   state: "draft" | "published";
   writtenBy: string;
@@ -155,3 +168,9 @@ export type StorefrontView = {
   }[];
   updatedAt: string;
 };
+
+/**
+ * What a visitor is served. The author's own markup never leaves the server,
+ * so no client bug can put unsanitised HTML on a page.
+ */
+export type PublicStorefrontView = Omit<StorefrontView, "html">;

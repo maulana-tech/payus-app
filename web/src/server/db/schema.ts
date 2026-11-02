@@ -543,6 +543,9 @@ export const storefronts = pgTable(
       .notNull()
       .default("paper"),
     accent: text("accent").notNull().default("clay"),
+    /** The author's own HTML, and the sanitised copy that is rendered. */
+    htmlRaw: text("html_raw").notNull().default(""),
+    htmlClean: text("html_clean").notNull().default(""),
     products: jsonb("products").$type<StorefrontProduct[]>().notNull(),
     state: text("state").$type<"draft" | "published">().notNull(),
     /** Who wrote the current draft: "owner", or an agent's name. */

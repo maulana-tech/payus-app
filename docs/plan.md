@@ -207,6 +207,19 @@ bawahnya.
       dan `MAX_ORDER_MINOR` membatasi satu pesanan apa pun caranya. Satu
       lubang nyata ikut tertutup: sebelumnya harga-bebas menerima sampai
       $999.999.999.999. 21 test storefront + 3 render
+- [x] **Satu blok HTML di toko, disanitasi di server.** Penulis (pemilik
+      maupun Builder) boleh menulis prosa HTML untuk halaman tokonya, dan
+      satu-satunya jalan masuk adalah `sanitizeShopHtml()` di dalam helper
+      `html()` milik service — jadi tidak ada jalur tulis yang bisa
+      melewatinya. Allowlist tag teks/daftar/tabel/`a`/`img`, tanpa atribut
+      `style`, skema hanya `https`/`mailto`, kelas hanya `shop-*`, tautan
+      dipaksa `rel="noopener noreferrer nofollow ugc"`, batas 8.000 aksara.
+      Dua lapis lagi di belakangnya: render di `<iframe sandbox>` **tanpa**
+      `allow-scripts`, dan view publik tidak lagi memuat `html` mentah
+      (`PublicStorefrontView`) sehingga draf penulis tidak pernah
+      meninggalkan server. Editor melihat pratinjau lewat
+      `storefront.previewHtml` — satu sanitiser, milik server — dan daftar
+      tag yang dibuang ditampilkan ke penulis. 9 test sanitiser.
 - [x] **Reporter** — ringkasan dari angka ledger, dan di sinilah invarian
       §2.2 ditegakkan secara **mekanis**, bukan lewat prompt: setiap angka
       dalam jawabannya dibandingkan dengan daftar angka yang kita berikan,

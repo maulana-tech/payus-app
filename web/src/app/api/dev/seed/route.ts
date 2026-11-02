@@ -139,6 +139,13 @@ export async function POST() {
         template: "shelf",
         theme: "sun",
         accent: "ochre",
+        html: [
+          "<h2>How we roast</h2>",
+          "<p>Small batches on a 1kg drum, Friday mornings, so a bag you order",
+          "on Saturday was green coffee the day before.</p>",
+          "<ul><li>Washed Gayo, Aceh</li><li>Natural Kintamani, Bali</li></ul>",
+          '<p><a href="https://example.com/visit">Come and see the roastery</a></p>',
+        ].join("\n"),
         currency: "USD",
         products: [
           {

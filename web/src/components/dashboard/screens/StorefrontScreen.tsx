@@ -1,7 +1,8 @@
 "use client";
 
 import { ExternalLink, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ShopHtml } from "@/components/storefront/ShopHtml";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,7 @@ import { formatMinor, toDecimal } from "@/features/invoices/money";
 import {
   ACCENTS,
   type Accent,
+  MAX_HTML,
   MAX_PRODUCTS,
   MAX_QUANTITY,
   type Template,
@@ -288,6 +290,7 @@ function EditorDialog({
   const [slug, setSlug] = useState(store?.slug ?? "");
   const [slugEdited, setSlugEdited] = useState(Boolean(store));
   const [blurb, setBlurb] = useState(store?.blurb ?? "");
+  const [html, setHtml] = useState(store?.html ?? "");
   const [template, setTemplate] = useState<Template>(
     store?.template ?? "shelf",
   );
@@ -328,6 +331,7 @@ function EditorDialog({
       template,
       theme,
       accent,
+      html,
       products: lines.map((line) => {
         const open = template === "tip" || !line.price;
         return {
@@ -549,6 +553,13 @@ function EditorDialog({
             ) : null}
           </fieldset>
 
+          <HtmlField
+            value={html}
+            onChange={setHtml}
+            theme={theme}
+            accent={accent}
+          />
+
           <Field label="Look">
             <div className="flex flex-wrap gap-2">
               {THEMES.map((option) => (
@@ -619,6 +630,84 @@ function EditorDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The merchant's own HTML, with the preview coming back from the server —
+ * the same sanitiser that will store it. So what is shown here is what will
+ * be published, not a hopeful rendering of the draft.
+ */
+function HtmlField({
+  value,
+  onChange,
+  theme,
+  accent,
+}: {
+  value: string;
+  onChange: (html: string) => void;
+  theme: Theme;
+  accent: Accent;
+}) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), 400);
+    return () => clearTimeout(timer);
+  }, [value]);
+
+  const preview = trpc.storefront.previewHtml.useQuery(
+    { html: debounced },
+    { enabled: debounced.trim().length > 0 },
+  );
+  const removed = preview.data?.removed ?? [];
+
+  return (
+    <div className="grid gap-2">
+      <Field
+        label="About this shop"
+        hint={`HTML · ${value.length}/${MAX_HTML}`}
+      >
+        <textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value.slice(0, MAX_HTML))}
+          rows={6}
+          spellCheck={false}
+          placeholder={
+            "<h2>How we roast</h2>\n<p>Small batches, Friday mornings.</p>"
+          }
+          className="w-full rounded-lg border border-input bg-card/70 p-3 font-(family-name:--font-landing-mono) text-[13px] leading-relaxed"
+        />
+      </Field>
+
+      <p className="text-sm text-(--dash-ash)">
+        Headings, text, lists, tables, links and images. Scripts, styles, frames
+        and forms are removed, and what is left is shown in a sandbox that
+        cannot run anything.
+      </p>
+
+      {removed.length > 0 ? (
+        <p className="text-sm text-(--dash-err)" role="status">
+          Removed: {removed.map((tag) => `<${tag}>`).join(", ")}
+        </p>
+      ) : null}
+
+      {preview.data?.clean ? (
+        <div className="rounded-(--dash-radius) border border-(--dash-line-solid) p-4">
+          <p className="mb-3 text-[11px] font-semibold tracking-[0.14em] text-(--dash-ash) uppercase">
+            Exactly what will be published
+          </p>
+          <div
+            style={{ background: palette(theme, accent).page }}
+            className="rounded-xl p-4"
+          >
+            <ShopHtml
+              html={preview.data.clean}
+              palette={palette(theme, accent)}
+            />
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

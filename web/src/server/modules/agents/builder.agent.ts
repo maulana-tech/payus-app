@@ -46,6 +46,11 @@ const CONFIG_SCHEMA = {
     },
     title: { type: "string", maxLength: 80 },
     blurb: { type: "string", maxLength: 300 },
+    html: {
+      type: "string",
+      description:
+        "Optional. A short section about the shop, as simple HTML: h2, p, ul, li, strong, em, a. Nothing else survives.",
+    },
     template: {
       type: "string",
       enum: ["shelf", "menu", "single", "tip"],
@@ -112,6 +117,10 @@ Rules you must follow:
   what something costs, leave the price null rather than guessing.
 - Descriptions are one short sentence, in the owner's voice, no marketing
   padding.
+- You may add a short "about" section as simple HTML — headings, paragraphs,
+  lists, links. Scripts, styles, frames and forms are stripped before it is
+  stored, so do not reach for them. Leave it out if the description gives
+  you nothing to say.
 - Choose a theme and an accent that suit the trade, and say nothing about
   layout or styling beyond those two words: the page is already designed.`;
 
