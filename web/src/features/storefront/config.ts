@@ -12,6 +12,13 @@ export const MAX_PRODUCTS = 12;
  * chooses from them, it does not describe a page of its own — and they are
  * named after what they feel like rather than what they are made of.
  */
+/** The layouts a shop can be arranged in. */
+export const TEMPLATES = ["shelf", "menu", "single", "tip"] as const;
+export type Template = (typeof TEMPLATES)[number];
+
+/** The most of one item a single order may carry, whatever the page says. */
+export const MAX_QUANTITY = 50;
+
 export const THEMES = ["paper", "ink", "sun"] as const;
 export type Theme = (typeof THEMES)[number];
 
@@ -75,8 +82,28 @@ export const productInput = z
     name: z.string().trim().min(1, "Give it a name.").max(80),
     description: z.string().trim().max(200).default(""),
     price: priceInput,
+    /** Bounds for an item whose price the payer names. Ignored otherwise. */
+    min: priceInput.optional().transform((v) => v ?? null),
+    max: priceInput.optional().transform((v) => v ?? null),
+    /** Let the payer choose how many. */
+    quantity: z.boolean().default(false),
+    /** The most of this item one order may carry. */
+    limit: z.number().int().min(1).max(MAX_QUANTITY).default(10),
+    soldOut: z.boolean().default(false),
   })
-  .strict();
+  .strict()
+  .refine(
+    (product) =>
+      product.price === null || (product.min === null && product.max === null),
+    { message: "Bounds belong to an item whose price the payer names." },
+  )
+  .refine(
+    (product) =>
+      product.min === null ||
+      product.max === null ||
+      BigInt(product.min) <= BigInt(product.max),
+    { message: "The lowest amount has to be below the highest." },
+  );
 
 export const storefrontInput = z
   .object({
@@ -86,7 +113,7 @@ export const storefrontInput = z
     ),
     title: z.string().trim().min(1, "Give the shop a name.").max(80),
     blurb: z.string().trim().max(300).default(""),
-    template: z.enum(["shelf", "tip"]),
+    template: z.enum(TEMPLATES),
     theme: z.enum(THEMES).default("paper"),
     accent: z.enum(ACCENTS).default("clay"),
     currency: z.enum(CURRENCIES).default(DEFAULT_CURRENCY),
@@ -109,7 +136,7 @@ export type StorefrontView = {
   slug: string;
   title: string;
   blurb: string;
-  template: "shelf" | "tip";
+  template: Template;
   theme: Theme;
   accent: Accent;
   currency: string;
@@ -120,6 +147,11 @@ export type StorefrontView = {
     name: string;
     description: string;
     priceMinor: string | null;
+    minMinor: string | null;
+    maxMinor: string | null;
+    quantity: boolean;
+    limit: number;
+    soldOut: boolean;
   }[];
   updatedAt: string;
 };

@@ -4,6 +4,13 @@ export const CURRENCIES = ["USD"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 export const DEFAULT_CURRENCY: Currency = "USD";
 
+/**
+ * The most any one order may come to. A payer naming their own amount is
+ * still a stranger typing into a form, so there is a ceiling above which we
+ * do not write an invoice at all.
+ */
+export const MAX_ORDER_MINOR = 10_000_000n; // $100,000.00
+
 /** "12.5" → 1250n minor units. Throws on more than 2 decimals or junk. */
 export function toMinor(value: string): bigint {
   const v = value.trim();

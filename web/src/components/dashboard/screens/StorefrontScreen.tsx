@@ -15,6 +15,8 @@ import {
   ACCENTS,
   type Accent,
   MAX_PRODUCTS,
+  MAX_QUANTITY,
+  type Template,
   THEMES,
   type Theme,
 } from "@/features/storefront/config";
@@ -245,9 +247,27 @@ function StoreRow({
   );
 }
 
-type Line = { name: string; description: string; price: string };
+type Line = {
+  name: string;
+  description: string;
+  price: string;
+  min: string;
+  max: string;
+  quantity: boolean;
+  limit: string;
+  soldOut: boolean;
+};
 
-const emptyLine: Line = { name: "", description: "", price: "" };
+const emptyLine: Line = {
+  name: "",
+  description: "",
+  price: "",
+  min: "",
+  max: "",
+  quantity: false,
+  limit: "10",
+  soldOut: false,
+};
 
 const slugify = (value: string) =>
   value
@@ -268,7 +288,7 @@ function EditorDialog({
   const [slug, setSlug] = useState(store?.slug ?? "");
   const [slugEdited, setSlugEdited] = useState(Boolean(store));
   const [blurb, setBlurb] = useState(store?.blurb ?? "");
-  const [template, setTemplate] = useState<"shelf" | "tip">(
+  const [template, setTemplate] = useState<Template>(
     store?.template ?? "shelf",
   );
   const [theme, setTheme] = useState<Theme>(store?.theme ?? "paper");
@@ -278,6 +298,11 @@ function EditorDialog({
       name: product.name,
       description: product.description,
       price: product.priceMinor ? toDecimal(BigInt(product.priceMinor)) : "",
+      min: product.minMinor ? toDecimal(BigInt(product.minMinor)) : "",
+      max: product.maxMinor ? toDecimal(BigInt(product.maxMinor)) : "",
+      quantity: product.quantity,
+      limit: String(product.limit),
+      soldOut: product.soldOut,
     })) ?? [{ ...emptyLine }],
   );
 
@@ -303,11 +328,21 @@ function EditorDialog({
       template,
       theme,
       accent,
-      products: lines.map((line) => ({
-        name: line.name,
-        description: line.description,
-        price: template === "tip" ? null : line.price || null,
-      })),
+      products: lines.map((line) => {
+        const open = template === "tip" || !line.price;
+        return {
+          name: line.name,
+          description: line.description,
+          price: open ? null : line.price,
+          // Bounds belong to an item the payer prices; the schema refuses
+          // them on anything else, so they are dropped rather than sent.
+          min: open ? line.min || null : null,
+          max: open ? line.max || null : null,
+          quantity: line.quantity,
+          limit: Number(line.limit) || 10,
+          soldOut: line.soldOut,
+        };
+      }),
     };
     if (store) update.mutate({ id: store.id, config });
     else create.mutate(config);
@@ -370,7 +405,9 @@ function EditorDialog({
               onChange={(e) => setTemplate(e.target.value as typeof template)}
               className="h-10 w-full rounded-lg border border-input bg-card/70 px-3 text-sm"
             >
-              <option value="shelf">A shelf — things with prices</option>
+              <option value="shelf">A shelf — items side by side</option>
+              <option value="menu">A menu — a compact list</option>
+              <option value="single">One thing — a single offer</option>
               <option value="tip">A tip jar — the payer chooses</option>
             </select>
           </Field>
@@ -381,48 +418,123 @@ function EditorDialog({
                 ? "What they are supporting"
                 : "What you sell"}
             </legend>
-            {lines.map((line, index) => (
-              <div
-                // biome-ignore lint/suspicious/noArrayIndexKey: positional rows
-                key={index}
-                className="grid grid-cols-[1fr_1.2fr_6.5rem_auto] items-center gap-2"
-              >
-                <Input
-                  value={line.name}
-                  onChange={(e) => setLine(index, { name: e.target.value })}
-                  placeholder="Flat white"
-                  aria-label={`Item ${index + 1} name`}
-                  required
-                />
-                <Input
-                  value={line.description}
-                  onChange={(e) =>
-                    setLine(index, { description: e.target.value })
-                  }
-                  placeholder="Short description"
-                  aria-label={`Item ${index + 1} description`}
-                />
-                <Input
-                  value={template === "tip" ? "" : line.price}
-                  inputMode="decimal"
-                  disabled={template === "tip"}
-                  onChange={(e) => setLine(index, { price: e.target.value })}
-                  placeholder={template === "tip" ? "—" : "25.00"}
-                  aria-label={`Item ${index + 1} price`}
-                />
-                <button
-                  type="button"
-                  className={dashIconButton}
-                  aria-label={`Remove item ${index + 1}`}
-                  disabled={lines.length === 1}
-                  onClick={() =>
-                    setLines((all) => all.filter((_, i) => i !== index))
-                  }
+            {lines.map((line, index) => {
+              const open = template === "tip" || !line.price;
+              return (
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: positional rows
+                  key={index}
+                  className="grid gap-2 rounded-(--dash-radius) border border-(--dash-line) p-3"
                 >
-                  <Trash2 aria-hidden="true" />
-                </button>
-              </div>
-            ))}
+                  <div className="grid grid-cols-[1fr_1.2fr_6.5rem_auto] items-center gap-2">
+                    <Input
+                      value={line.name}
+                      onChange={(e) => setLine(index, { name: e.target.value })}
+                      placeholder="Flat white"
+                      aria-label={`Item ${index + 1} name`}
+                      required
+                    />
+                    <Input
+                      value={line.description}
+                      onChange={(e) =>
+                        setLine(index, { description: e.target.value })
+                      }
+                      placeholder="Short description"
+                      aria-label={`Item ${index + 1} description`}
+                    />
+                    <Input
+                      value={template === "tip" ? "" : line.price}
+                      inputMode="decimal"
+                      disabled={template === "tip"}
+                      onChange={(e) =>
+                        setLine(index, { price: e.target.value })
+                      }
+                      placeholder={template === "tip" ? "—" : "25.00"}
+                      aria-label={`Item ${index + 1} price`}
+                    />
+                    <button
+                      type="button"
+                      className={dashIconButton}
+                      aria-label={`Remove item ${index + 1}`}
+                      disabled={lines.length === 1}
+                      onClick={() =>
+                        setLines((all) => all.filter((_, i) => i !== index))
+                      }
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+                    {open ? (
+                      <span className="flex items-center gap-2">
+                        <span className="text-(--dash-ash)">Between</span>
+                        <Input
+                          value={line.min}
+                          inputMode="decimal"
+                          onChange={(e) =>
+                            setLine(index, { min: e.target.value })
+                          }
+                          placeholder="2.00"
+                          aria-label={`Item ${index + 1} lowest amount`}
+                          className="h-9 w-24"
+                        />
+                        <span className="text-(--dash-ash)">and</span>
+                        <Input
+                          value={line.max}
+                          inputMode="decimal"
+                          onChange={(e) =>
+                            setLine(index, { max: e.target.value })
+                          }
+                          placeholder="200.00"
+                          aria-label={`Item ${index + 1} highest amount`}
+                          className="h-9 w-24"
+                        />
+                      </span>
+                    ) : (
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={line.quantity}
+                          onChange={(e) =>
+                            setLine(index, { quantity: e.target.checked })
+                          }
+                          className="size-4 accent-(--dash-fg)"
+                        />
+                        <span>Payer picks how many</span>
+                        {line.quantity ? (
+                          <Input
+                            value={line.limit}
+                            inputMode="numeric"
+                            onChange={(e) =>
+                              setLine(index, { limit: e.target.value })
+                            }
+                            aria-label={`Item ${index + 1} limit per order`}
+                            className="h-9 w-16"
+                          />
+                        ) : null}
+                        {line.quantity ? (
+                          <span className="text-(--dash-ash)">
+                            at most, up to {MAX_QUANTITY}
+                          </span>
+                        ) : null}
+                      </label>
+                    )}
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={line.soldOut}
+                        onChange={(e) =>
+                          setLine(index, { soldOut: e.target.checked })
+                        }
+                        className="size-4 accent-(--dash-fg)"
+                      />
+                      <span>Sold out</span>
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
             {lines.length < MAX_PRODUCTS ? (
               <div>
                 <button
@@ -522,7 +634,7 @@ function Preview({
   title: string;
   blurb: string;
   lines: Line[];
-  template: "shelf" | "tip";
+  template: Template;
   theme: Theme;
   accent: Accent;
 }) {

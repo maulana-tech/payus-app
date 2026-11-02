@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   createTestDb,
   type IsolatedDb,
@@ -10,9 +10,26 @@ import {
 // stored — which is the schema the hand editor is held to as well.
 const available = await postgresAvailable();
 
+// Only PayPal is stubbed: every bound below is checked by our own code
+// against the stored item, which is the thing being tested.
+vi.mock("../src/server/lib/paypal", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../src/server/lib/paypal")>();
+  return {
+    ...actual,
+    paypalConfigured: () => true,
+    createOrder: async (input: { paymentId: string }) => ({
+      orderId: `ORDER-${input.paymentId}`,
+      status: "CREATED",
+      approveUrl: null,
+    }),
+  };
+});
+
 describe.skipIf(!available)("storefront (Postgres)", () => {
   let store: typeof import("../src/server/modules/storefront/storefront.service");
   let builder: typeof import("../src/server/modules/agents/builder.agent");
+  let payments: typeof import("../src/server/modules/payments/payments.service");
   let db: typeof import("../src/server/db/client");
   let temp: IsolatedDb;
 
@@ -42,6 +59,7 @@ describe.skipIf(!available)("storefront (Postgres)", () => {
     db = await import("../src/server/db/client");
     store = await import("../src/server/modules/storefront/storefront.service");
     builder = await import("../src/server/modules/agents/builder.agent");
+    payments = await import("../src/server/modules/payments/payments.service");
   });
 
   afterAll(async () => {
@@ -204,5 +222,179 @@ describe.skipIf(!available)("storefront (Postgres)", () => {
     expect(builder.oddPrices([{ name: "Any", price: "900.00" }], [])).toEqual(
       [],
     );
+  });
+
+  describe("what a payer may ask for", () => {
+    let slug: string;
+    let fixed: string;
+    let open: string;
+    let gone: string;
+
+    beforeAll(async () => {
+      slug = "guarded-shop";
+      const shop = await store.createStorefront("shop", {
+        slug,
+        title: "Guarded",
+        blurb: "",
+        template: "shelf",
+        theme: "paper",
+        accent: "clay",
+        currency: "USD",
+        products: [
+          {
+            name: "Mug",
+            description: "",
+            price: "2000",
+            min: null,
+            max: null,
+            quantity: true,
+            limit: 3,
+            soldOut: false,
+          },
+          {
+            name: "Tip",
+            description: "",
+            price: null,
+            min: "200",
+            max: "5000",
+            quantity: false,
+            limit: 1,
+            soldOut: false,
+          },
+          {
+            name: "Workshop",
+            description: "",
+            price: "10000",
+            min: null,
+            max: null,
+            quantity: false,
+            limit: 1,
+            soldOut: true,
+          },
+        ],
+      });
+      await store.setPublished("shop", shop.id, true);
+      const live = await store.publishedStorefront(slug);
+      fixed = live?.products[0]?.id ?? "";
+      open = live?.products[1]?.id ?? "";
+      gone = live?.products[2]?.id ?? "";
+    });
+
+    it("sells what is for sale", async () => {
+      const order = await payments.startStorefrontOrder({
+        slug,
+        productId: fixed,
+        quantity: 2,
+      });
+      expect(order.amountMinor).toBe("4000"); // two mugs
+    });
+
+    it("refuses what is sold out", async () => {
+      await expect(
+        payments.startStorefrontOrder({ slug, productId: gone }),
+      ).rejects.toThrow(/sold out/);
+    });
+
+    it("refuses more than the item's own limit, whatever is asked for", async () => {
+      await expect(
+        payments.startStorefrontOrder({ slug, productId: fixed, quantity: 4 }),
+      ).rejects.toThrow(/at most 3/);
+      await expect(
+        payments.startStorefrontOrder({
+          slug,
+          productId: fixed,
+          quantity: 999,
+        }),
+      ).rejects.toThrow(/at most 3/);
+    });
+
+    it("ignores a count on an item that is not sold by the number", async () => {
+      const order = await payments.startStorefrontOrder({
+        slug,
+        productId: open,
+        amount: "5.00",
+        quantity: 50,
+      });
+      expect(order.amountMinor).toBe("500"); // one, not fifty
+    });
+
+    it("holds a payer-named amount to the shop's bounds", async () => {
+      await expect(
+        payments.startStorefrontOrder({
+          slug,
+          productId: open,
+          amount: "1.00",
+        }),
+      ).rejects.toThrow(/least for this is \$2\.00/);
+      await expect(
+        payments.startStorefrontOrder({
+          slug,
+          productId: open,
+          amount: "500.00",
+        }),
+      ).rejects.toThrow(/most for this is \$50\.00/);
+      await expect(
+        payments.startStorefrontOrder({ slug, productId: open, amount: "0" }),
+      ).rejects.toThrow(/least for this|like 25\.00/);
+    });
+
+    it("refuses an amount that is not money at all", async () => {
+      for (const amount of ["", "abc", "-5", "1.005", "1e9"])
+        await expect(
+          payments.startStorefrontOrder({ slug, productId: open, amount }),
+        ).rejects.toThrow(/like 25\.00|least for this/);
+    });
+
+    it("caps any single order, however it is reached", async () => {
+      const shop = await store.createStorefront("shop", {
+        slug: "big-ticket",
+        title: "Big",
+        blurb: "",
+        template: "shelf",
+        theme: "paper",
+        accent: "clay",
+        currency: "USD",
+        products: [
+          {
+            name: "Crate",
+            description: "",
+            price: "6000000",
+            min: null,
+            max: null,
+            quantity: true,
+            limit: 5,
+            soldOut: false,
+          },
+        ],
+      });
+      await store.setPublished("shop", shop.id, true);
+      const live = await store.publishedStorefront("big-ticket");
+      const crate = live?.products[0]?.id ?? "";
+
+      // One is fine; two passes $100,000.00 and is refused.
+      await expect(
+        payments.startStorefrontOrder({
+          slug: "big-ticket",
+          productId: crate,
+          quantity: 1,
+        }),
+      ).resolves.toMatchObject({ amountMinor: "6000000" });
+      await expect(
+        payments.startStorefrontOrder({
+          slug: "big-ticket",
+          productId: crate,
+          quantity: 2,
+        }),
+      ).rejects.toThrow(/cannot come to more than \$100,000\.00/);
+    });
+
+    it("refuses an item that is not on this shop", async () => {
+      await expect(
+        payments.startStorefrontOrder({ slug, productId: "deadbeef" }),
+      ).rejects.toThrow(/No such item/);
+      await expect(
+        payments.startStorefrontOrder({ slug: "no-shop", productId: fixed }),
+      ).rejects.toThrow(/No such item/);
+    });
   });
 });

@@ -40,6 +40,12 @@ const withIds = (config: StorefrontConfig): StorefrontProduct[] =>
     name: product.name,
     description: product.description,
     priceMinor: product.price,
+    // Bounds only mean anything when the payer names the amount.
+    minMinor: product.price === null ? product.min : null,
+    maxMinor: product.price === null ? product.max : null,
+    quantity: product.quantity,
+    limit: product.limit,
+    soldOut: product.soldOut,
   }));
 
 /** Writes a new storefront as a draft. Publishing is a separate, owner act. */

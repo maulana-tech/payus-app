@@ -18,6 +18,8 @@ const body = z
     slug: z.string().min(3).max(40),
     productId: z.string().min(4).max(24),
     amount: z.string().max(20).optional(),
+    /** Checked again on the server against the item's own limit. */
+    quantity: z.number().int().min(1).max(999).optional(),
   })
   .strict();
 

@@ -2,9 +2,12 @@ import "server-only";
 import { and, desc, eq, sql } from "drizzle-orm";
 import {
   type Currency,
+  formatMinor,
+  MAX_ORDER_MINOR,
   toDecimal,
   toMinor,
 } from "../../../features/invoices/money";
+import { MAX_QUANTITY } from "../../../features/storefront/config";
 import { newId } from "../../../lib/ids";
 import { getDb, invoices, payments } from "../../db/client";
 import * as paypal from "../../lib/paypal";
@@ -97,6 +100,10 @@ export async function startLinkOrder(input: {
   }
   if (amountMinor <= 0n)
     throw new InvoiceNotPayableError("Enter an amount like 25.00.");
+  if (amountMinor > MAX_ORDER_MINOR)
+    throw new InvoiceNotPayableError(
+      `A single payment cannot come to more than ${formatMinor(MAX_ORDER_MINOR)}.`,
+    );
 
   const invoice = await createInvoice(input.owner, {
     number: `LNK-${newId(8).toUpperCase()}`,
@@ -126,23 +133,65 @@ export async function startLinkOrder(input: {
 export async function startStorefrontOrder(input: {
   slug: string;
   productId: string;
-  /** Only used when the item lets the payer choose. */
+  /** Only used when the item lets the payer name the amount. */
   amount?: string;
+  /** Only used when the item lets the payer choose how many. */
+  quantity?: number;
 }) {
   const found = await publishedProduct(input.slug, input.productId);
   if (!found) throw new PaymentNotFoundError("No such item for sale.");
   const { storefront, product } = found;
 
-  let amountMinor: bigint;
-  try {
-    amountMinor = product.priceMinor
-      ? BigInt(product.priceMinor)
-      : toMinor(input.amount ?? "");
-  } catch {
-    throw new InvoiceNotPayableError("Enter an amount like 25.00.");
+  if (product.soldOut)
+    throw new InvoiceNotPayableError("That one is sold out.");
+
+  // How many. The page may ask for a number; what it is allowed to be comes
+  // from the stored item, never from the request.
+  let count = 1n;
+  if (product.quantity) {
+    const asked = Math.trunc(Number(input.quantity ?? 1));
+    const ceiling = Math.min(product.limit, MAX_QUANTITY);
+    if (!Number.isFinite(asked) || asked < 1)
+      throw new InvoiceNotPayableError("Choose how many you want.");
+    if (asked > ceiling)
+      throw new InvoiceNotPayableError(
+        `You can order at most ${ceiling} of those at once.`,
+      );
+    count = BigInt(asked);
   }
-  if (amountMinor <= 0n)
+
+  // What each costs. A fixed price is read from the shop; an open one is
+  // read from the payer and then held to the bounds the shop set.
+  let unitMinor: bigint;
+  if (product.priceMinor) {
+    unitMinor = BigInt(product.priceMinor);
+  } else {
+    try {
+      unitMinor = toMinor(input.amount ?? "");
+    } catch {
+      throw new InvoiceNotPayableError("Enter an amount like 25.00.");
+    }
+    const floor = product.minMinor ? BigInt(product.minMinor) : 1n;
+    const ceiling = product.maxMinor
+      ? BigInt(product.maxMinor)
+      : MAX_ORDER_MINOR;
+    if (unitMinor < floor)
+      throw new InvoiceNotPayableError(
+        `The least for this is ${formatMinor(floor, storefront.currency)}.`,
+      );
+    if (unitMinor > ceiling)
+      throw new InvoiceNotPayableError(
+        `The most for this is ${formatMinor(ceiling, storefront.currency)}.`,
+      );
+  }
+  if (unitMinor <= 0n)
     throw new InvoiceNotPayableError("Enter an amount like 25.00.");
+
+  const totalMinor = unitMinor * count;
+  if (totalMinor > MAX_ORDER_MINOR)
+    throw new InvoiceNotPayableError(
+      `A single order cannot come to more than ${formatMinor(MAX_ORDER_MINOR, storefront.currency)}.`,
+    );
 
   const invoice = await createInvoice(storefront.owner, {
     number: `SHOP-${newId(8).toUpperCase()}`,
@@ -153,8 +202,8 @@ export async function startStorefrontOrder(input: {
     items: [
       {
         description: product.name,
-        quantity: 1,
-        unitPrice: toDecimal(amountMinor),
+        quantity: Number(count),
+        unitPrice: toDecimal(unitMinor),
       },
     ],
     currency: storefront.currency as Currency,

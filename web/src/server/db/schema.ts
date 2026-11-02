@@ -511,10 +511,17 @@ export type StorefrontProduct = {
   id: string;
   name: string;
   description: string;
+  /** null means the payer names the amount, within the bounds below. */
   priceMinor: string | null;
+  minMinor: string | null;
+  maxMinor: string | null;
+  /** The payer may choose how many, up to `limit`. */
+  quantity: boolean;
+  limit: number;
+  soldOut: boolean;
 };
 
-export type StorefrontTemplate = "shelf" | "tip";
+export type StorefrontTemplate = "shelf" | "menu" | "single" | "tip";
 
 /**
  * A page a merchant can send people to. The agent that writes one fills in

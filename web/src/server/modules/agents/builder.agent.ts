@@ -48,8 +48,9 @@ const CONFIG_SCHEMA = {
     blurb: { type: "string", maxLength: 300 },
     template: {
       type: "string",
-      enum: ["shelf", "tip"],
-      description: "shelf for things with prices, tip when the payer chooses",
+      enum: ["shelf", "menu", "single", "tip"],
+      description:
+        "shelf for a few priced items, menu for a long list, single for one offer, tip when the payer names the amount",
     },
     theme: {
       type: "string",
@@ -73,6 +74,11 @@ const CONFIG_SCHEMA = {
         properties: {
           name: { type: "string", maxLength: 80 },
           description: { type: "string", maxLength: 200 },
+          quantity: {
+            type: "boolean",
+            description:
+              "true when someone might buy more than one of it at a time",
+          },
           price: {
             type: ["string", "null"],
             pattern: "^[0-9]{1,12}(\\.[0-9]{1,2})?$",
@@ -95,8 +101,11 @@ template that already exists.
 Rules you must follow:
 - The address must be short, lowercase, hyphenated, and must not be one of
   the addresses already taken, which are listed for you.
-- A shelf has priced items. A tip jar has no prices at all: leave every
-  price null and let the payer name the amount.
+- Pick the layout that fits: a shelf for a few priced items, a menu for a
+  long list, single for one offer, a tip jar when the payer names the amount.
+  A tip jar has no prices at all: leave every price null.
+- Set quantity true only for something countable that someone would buy
+  several of — a bag of beans, not a wedding photography package.
 - Prices are decimals in the shop's currency, as strings: "12.50".
 - Write between one and six items unless the description clearly calls for
   more. Invent nothing the description does not support: if it does not say

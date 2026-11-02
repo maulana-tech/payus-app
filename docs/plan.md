@@ -197,8 +197,16 @@ bawahnya.
       depan publik itu keputusan dagang, bukan keputusan model, dan itu
       pula sebabnya tidak perlu jenis usulan baru di Guardian.
       Membeli satu item menulis invoice dulu, jadi penjualan toko turun
-      lewat jalur settlement yang sama. 13 test (10 layanan + eval, 3
-      render)
+      lewat jalur settlement yang sama.
+- [x] **Toko jadi interaktif, dan batasnya ditegakkan di server.** Empat
+      layout (shelf, menu, single, tip), tiga tema × enam aksen, pemilih
+      jumlah, item habis, dan batas bawah/atas untuk harga yang ditentukan
+      pembayar. Semua dicek ulang terhadap **item yang tersimpan**: jumlah
+      dibatasi `limit` item itu sendiri, jumlah pada item yang tidak dijual
+      per-satuan diabaikan, nominal pembayar harus di dalam rentang toko,
+      dan `MAX_ORDER_MINOR` membatasi satu pesanan apa pun caranya. Satu
+      lubang nyata ikut tertutup: sebelumnya harga-bebas menerima sampai
+      $999.999.999.999. 21 test storefront + 3 render
 - [x] **Reporter** — ringkasan dari angka ledger, dan di sinilah invarian
       §2.2 ditegakkan secara **mekanis**, bukan lewat prompt: setiap angka
       dalam jawabannya dibandingkan dengan daftar angka yang kita berikan,
