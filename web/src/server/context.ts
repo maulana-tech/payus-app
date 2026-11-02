@@ -1,5 +1,7 @@
 import type { VerifyAccessTokenResponse } from "@privy-io/node";
+import { demoMode } from "../lib/demo";
 import { verifyPrivyAccessToken } from "./lib/privy";
+import { ensureDemoAccount } from "./modules/demo/demo.service";
 
 export type Context = {
   ip: string | null;
@@ -7,6 +9,12 @@ export type Context = {
   privyUserId: string | null;
   privyClaim: VerifyAccessTokenResponse | null;
   authError: unknown | null;
+  /**
+   * True only for a development demo session, which has a user id but no
+   * Privy claim to go with it. `protectedProcedure` names this explicitly
+   * rather than loosening what it requires of a real session.
+   */
+  demo: boolean;
 };
 
 function cookie(req: Request, name: string): string | null {
@@ -38,6 +46,20 @@ export async function createTRPCContext(opts?: {
       privyUserId: null,
       privyClaim: null,
       authError: null,
+      demo: false,
+    };
+  }
+
+  // Development only, and only when a demo username is set.
+  if (demoMode()) {
+    const privyUserId = await ensureDemoAccount();
+    return {
+      ip: clientIp(opts.req),
+      authToken: null,
+      privyUserId,
+      privyClaim: null,
+      authError: null,
+      demo: true,
     };
   }
 
@@ -49,6 +71,7 @@ export async function createTRPCContext(opts?: {
       privyUserId: null,
       privyClaim: null,
       authError: null,
+      demo: false,
     };
   }
 
@@ -60,6 +83,7 @@ export async function createTRPCContext(opts?: {
       privyUserId: claim.user_id,
       privyClaim: claim,
       authError: null,
+      demo: false,
     };
   } catch (authError) {
     return {
@@ -68,6 +92,7 @@ export async function createTRPCContext(opts?: {
       privyUserId: null,
       privyClaim: null,
       authError,
+      demo: false,
     };
   }
 }

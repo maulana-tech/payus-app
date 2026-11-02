@@ -14,6 +14,7 @@ import {
 } from "react";
 import type { AccountType } from "../features/account/accountType";
 import { DASHBOARD_PATH, SIGN_IN_PATH } from "../lib/auth-routes";
+import { demoMaster, demoUser } from "../lib/demo";
 import { messagingSecret, profileSigningSeed } from "../lib/derive";
 import {
   decryptMaster,
@@ -413,6 +414,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     else openPinModal("unlock");
   }, [recoveryMethod, openPinModal, openRecoveryModal]);
 
+  const demoValue = useDemoSession();
+
   const value = useMemo<SessionState>(
     () => ({
       authenticated,
@@ -490,8 +493,69 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+    <SessionContext.Provider value={demoValue ?? value}>
+      {children}
+    </SessionContext.Provider>
   );
+}
+
+/**
+ * Development only: a session for the username in NEXT_PUBLIC_DEMO_USER, so
+ * the dashboard can be looked at without a login provider. `demoUser()`
+ * returns null outside development, so this hook yields null in any
+ * production build and the real session above is the only one.
+ */
+function useDemoSession(): SessionState | null {
+  const name = demoUser();
+  return useMemo(() => {
+    if (!name) return null;
+    const master = demoMaster(name);
+    const messaging = messagingSecret(master);
+    const noop = () => {};
+    return {
+      authenticated: true,
+      sessionReady: true,
+      connecting: false,
+      error: "",
+      username: name,
+      usernameResolved: true,
+      setUsername: noop,
+      usernameModalOpen: false,
+      openUsernameModal: noop,
+      closeUsernameModal: noop,
+      claimUsername: async () => {},
+      accountType: "business",
+      businessName: "Demo Co",
+      accountTypeResolved: true,
+      chooseAccountType: async () => {},
+      accountUnlocked: true,
+      pinModalOpen: false,
+      pinMode: "unlock",
+      pinSubmitting: false,
+      pinError: "",
+      submitPin: async () => {},
+      closePinModal: noop,
+      promptUnlock: noop,
+      signIn: noop,
+      disconnect: async () => {},
+      recoveryMethod: "pin",
+      recoveryModal: null,
+      recoveryBusy: false,
+      recoveryError: "",
+      passkeySupported: false,
+      chooseRecovery: async () => {},
+      unlockWithPasskey: async () => {},
+      closeRecoveryModal: noop,
+      openBox: <T,>(box: Sealed) => {
+        try {
+          return openSealed<T>(box, messaging);
+        } catch {
+          return null;
+        }
+      },
+      messagingPubkey: () => messagingPubkeyHex(messaging),
+    };
+  }, [name]);
 }
 
 export function useSession(): SessionState {

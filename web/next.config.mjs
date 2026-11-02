@@ -95,6 +95,15 @@ const nextConfig = {
   // Bundling these breaks their dynamic requires: pg's optional native
   // bindings, and the Bedrock SDK's AWS credential chain.
   serverExternalPackages: ["pg", "@anthropic-ai/bedrock-sdk"],
+  // Turbopack runs `next dev` (see the dev script) and ignores the webpack
+  // block below, so the one alias that matters is repeated here: Privy pulls
+  // in a Solana package this app never uses.
+  turbopack: {
+    resolveAlias: {
+      "@farcaster/mini-app-solana": { browser: "./src/lib/empty.ts" },
+    },
+  },
+  // `next build` still uses webpack.
   webpack: (config) => {
     config.resolve = config.resolve || {};
     config.resolve.alias = {

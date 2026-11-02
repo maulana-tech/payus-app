@@ -8,6 +8,7 @@ import {
   REFRESH_PATH,
   SIGN_IN_PATH,
 } from "./lib/auth-routes";
+import { demoMode } from "./lib/demo";
 
 const OAUTH_QUERY_KEYS = [
   "privy_oauth_code",
@@ -17,6 +18,9 @@ const OAUTH_QUERY_KEYS = [
 
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
+  // Demo mode has no cookies to check; `demoMode()` is false outside
+  // development, so this cannot open a deployed dashboard.
+  if (demoMode()) return NextResponse.next();
   if (
     pathname === REFRESH_PATH ||
     OAUTH_QUERY_KEYS.some((key) => searchParams.has(key))
