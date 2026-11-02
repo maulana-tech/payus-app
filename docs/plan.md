@@ -148,8 +148,12 @@ ditolak Guardian saat melanggar).
 - [x] **Halaman `/i/<token>` dan `/pay/...` tersambung ke Orders.** Tombol
       PayPal memanggil route kita; membayar sebuah link menulis invoice
       lebih dulu, jadi jalur settlement-nya sama persis
-- [ ] Tabel transaksi pakai **AG Grid** (syarat hadiah sponsor, harus
-      terlihat di video)
+- [x] **Tabel transaksi pakai AG Grid** (2 Nov) — halaman `/transactions`
+      berisi setiap posting ledger (kedua sisinya), bisa diurutkan,
+      difilter per kolom, dicari, dipaginasi, dan diekspor CSV. Temanya
+      menunjuk ke variabel `--dash-*`, jadi ikut mode terang/gelap.
+      Footer-nya menjumlahkan dua kolomnya dan menyatakan "Balanced" —
+      inilah yang layak muncul di video
 - [ ] Storefront builder + pratinjau live
 - Deploy ke **Render** + Postgres terkelola, cron invoice aktif
 - Laporan: settlement harian, rekonsiliasi, ekspor CSV/PDF

@@ -5,6 +5,7 @@ export const LINKS_PATH = "/links";
 export const DEVELOPERS_PATH = "/developers";
 export const SETTINGS_PATH = "/settings";
 export const INVOICES_PATH = "/invoices";
+export const TRANSACTIONS_PATH = "/transactions";
 export const REQUESTS_PATH = "/requests";
 export const SIGN_IN_PATH = "/";
 export const REFRESH_PATH = "/refresh";
@@ -15,6 +16,7 @@ export const DASHBOARD_PATHS = [
   SETTINGS_PATH,
   DEVELOPERS_PATH,
   INVOICES_PATH,
+  TRANSACTIONS_PATH,
   REQUESTS_PATH,
 ] as const;
 const authOnlyPublicRoutes = [SIGN_IN_PATH] as const;

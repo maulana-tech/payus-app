@@ -51,20 +51,18 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+// Next requires a literal here, so it cannot be derived from
+// DASHBOARD_PATHS — `test/middleware.test.ts` checks the two agree.
 export const config = {
   matcher: [
     "/",
     "/refresh",
     "/dashboard/:path*",
     "/links/:path*",
-    "/send/:path*",
-    "/payroll/:path*",
-    "/claims/:path*",
-    "/developers/:path*",
-    "/history/:path*",
-    "/settings/:path*",
     "/invoices/:path*",
+    "/transactions/:path*",
     "/requests/:path*",
-    "/pos/:path*",
+    "/developers/:path*",
+    "/settings/:path*",
   ],
 };

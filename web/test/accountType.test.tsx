@@ -14,6 +14,7 @@ import {
   INVOICES_PATH,
   LINKS_PATH,
   SETTINGS_PATH,
+  TRANSACTIONS_PATH,
 } from "../src/lib/auth-routes";
 
 const hrefs = (items: { href: string }[]) => items.map((i) => i.href);
@@ -26,9 +27,10 @@ describe("account type navigation", () => {
 
   it("puts invoices first for a business", () => {
     const nav = hrefs(navFor("business", NAV_ITEMS));
-    expect(nav.slice(0, 3)).toEqual([
+    expect(nav.slice(0, 4)).toEqual([
       DASHBOARD_PATH,
       INVOICES_PATH,
+      TRANSACTIONS_PATH,
       LINKS_PATH,
     ]);
     expect(nav).toContain(DEVELOPERS_PATH);

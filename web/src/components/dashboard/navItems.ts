@@ -5,6 +5,7 @@ import {
   LayoutGrid,
   Link2,
   Settings,
+  Table2,
 } from "lucide-react";
 import {
   DASHBOARD_PATH,
@@ -13,6 +14,7 @@ import {
   LINKS_PATH,
   REQUESTS_PATH,
   SETTINGS_PATH,
+  TRANSACTIONS_PATH,
 } from "../../lib/auth-routes";
 
 export type NavItem = {
@@ -45,6 +47,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Invoices",
     description: "Invoices that mark themselves paid, one-off or recurring.",
     icon: FileText,
+  },
+  {
+    href: TRANSACTIONS_PATH,
+    label: "Transactions",
+    short: "Txns",
+    description: "Every ledger posting, sortable and exportable.",
+    icon: Table2,
   },
   {
     href: REQUESTS_PATH,

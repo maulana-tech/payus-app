@@ -1,6 +1,12 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { DitherField } from "../landing/DitherField";
 
 type DashboardMode = "light" | "dark";
@@ -54,6 +60,26 @@ export function DashboardBackground({
       </div>
       {children}
     </div>
+  );
+}
+
+/**
+ * The mode as the document currently has it. Unlike `useDashboardMode` this
+ * holds no state of its own, so a component far from the toggle still
+ * follows it — used by anything that has to be told a colour outright
+ * (the grid) instead of inheriting one.
+ */
+export function useDashMode(): DashboardMode {
+  return useSyncExternalStore(
+    (onChange) => {
+      const observer = new MutationObserver(onChange);
+      observer.observe(document.documentElement, {
+        attributeFilter: ["data-dash-mode"],
+      });
+      return () => observer.disconnect();
+    },
+    readMode,
+    () => "light" as DashboardMode,
   );
 }
 

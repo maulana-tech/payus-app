@@ -105,6 +105,20 @@ describe.skipIf(!available)("ledger (Postgres)", () => {
     ]);
   });
 
+  it("lists both halves of a transaction, and only this owner's", async () => {
+    const rows = await ledger.entriesFor("cafe");
+    expect(rows).toHaveLength(2); // one capture, two postings
+    expect(rows.map((r) => r.account).sort()).toEqual([
+      "in_flight:cafe",
+      "paypal_cash",
+    ]);
+    // paypal_cash is a platform account, but it is part of cafe's
+    // transaction, so hiding it would show half a posting.
+    expect(rows.every((r) => r.txnId === "capture:B")).toBe(true);
+    expect(rows.every((r) => r.kind === "payment.captured")).toBe(true);
+    expect(await ledger.entriesFor("nobody")).toEqual([]);
+  });
+
   it("splits what is in flight without leaving the ledger unbalanced", async () => {
     await ledger.post({ id: "settle:A", kind: "settlement", owner: "shop" }, [
       { account: ledger.account.inFlight("shop"), debitMinor: 2500n },

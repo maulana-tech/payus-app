@@ -1,5 +1,5 @@
 import "server-only";
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { DEFAULT_CURRENCY } from "../../../features/invoices/money";
 import { newId } from "../../../lib/ids";
 import {
@@ -197,4 +197,50 @@ export async function entriesOf(txnId: string) {
     .from(ledgerEntries)
     .where(eq(ledgerEntries.txnId, txnId))
     .orderBy(asc(ledgerEntries.id));
+}
+
+export type LedgerRow = {
+  id: string;
+  txnId: string;
+  kind: string;
+  ref: string | null;
+  memo: string | null;
+  account: string;
+  debitMinor: string;
+  creditMinor: string;
+  currency: string;
+  createdAt: string;
+};
+
+/**
+ * Every entry of this owner's transactions, newest first. Both sides of a
+ * transaction are returned — including the platform's own accounts — because
+ * a half-shown posting is a misleading one.
+ */
+export async function entriesFor(
+  owner: string,
+  limit = 500,
+): Promise<LedgerRow[]> {
+  const rows = await getDb()
+    .select({
+      id: ledgerEntries.id,
+      txnId: ledgerEntries.txnId,
+      kind: ledgerTxns.kind,
+      ref: ledgerTxns.ref,
+      memo: ledgerTxns.memo,
+      account: ledgerEntries.account,
+      debitMinor: ledgerEntries.debitMinor,
+      creditMinor: ledgerEntries.creditMinor,
+      currency: ledgerEntries.currency,
+      createdAt: ledgerEntries.createdAt,
+    })
+    .from(ledgerEntries)
+    .innerJoin(ledgerTxns, eq(ledgerTxns.id, ledgerEntries.txnId))
+    .where(eq(ledgerTxns.owner, owner))
+    .orderBy(desc(ledgerEntries.createdAt), asc(ledgerEntries.id))
+    .limit(limit);
+  return rows.map((row) => ({
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+  }));
 }

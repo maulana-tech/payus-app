@@ -2,12 +2,16 @@ import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { listInvoices } from "../invoices/invoices.service";
 import { recentPayments } from "../payments/payments.service";
 import { requireUsername } from "../profiles/profiles.service";
-import { balances } from "./ledger.service";
+import { balances, entriesFor } from "./ledger.service";
 
 // What the overview screen shows. Every number here is read from the
 // ledger or from the invoices themselves — nothing is cached or guessed.
 
 export const ledgerRouter = createTRPCRouter({
+  /** Every posting of this account, for the transactions grid. */
+  entries: protectedProcedure.query(async ({ ctx }) =>
+    entriesFor(await requireUsername(ctx.privyUserId)),
+  ),
   summary: protectedProcedure.query(async ({ ctx }) => {
     const owner = await requireUsername(ctx.privyUserId);
     const [accounts, invoices, payments] = await Promise.all([
