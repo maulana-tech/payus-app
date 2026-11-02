@@ -34,6 +34,18 @@ export class ClaudeRefusedError extends Error {
   }
 }
 
+/**
+ * The provider accepted the credentials and refused the model. On Bedrock
+ * this is the usual first wall: a key authenticates, and the AWS account
+ * still has no access to the model granted.
+ */
+export class ClaudeAccessError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ClaudeAccessError";
+  }
+}
+
 export class ClaudeShapeError extends Error {
   constructor(message: string) {
     super(message);
@@ -70,7 +82,7 @@ type Caller = Pick<Anthropic, "messages">;
 let client: Caller | undefined;
 let clientBackend: Backend | undefined;
 
-function anthropic(): { caller: Caller; model: string } {
+function anthropic(): { caller: Caller; which: Backend; model: string } {
   const which = backend();
   if (!which)
     throw new ClaudeNotConfiguredError(
@@ -88,8 +100,37 @@ function anthropic(): { caller: Caller; model: string } {
   // Bedrock namespaces the model; the first-party API does not.
   return {
     caller: client,
+    which,
     model: which === "bedrock" ? `anthropic.${MODEL}` : MODEL,
   };
+}
+
+/**
+ * Turns a provider's "no" into something the owner can act on. A 403 from
+ * Bedrock means the credentials were fine and the account has no access to
+ * the model; a 404 there means the region does not serve it at all.
+ */
+async function call<T>(
+  which: Backend,
+  model: string,
+  send: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await send();
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    if (which === "bedrock" && (status === 403 || status === 404))
+      throw new ClaudeAccessError(
+        status === 403
+          ? `Bedrock accepted the credentials but this AWS account has no access to ${model}. Grant it in the Bedrock console under Model access, in the region you configured.`
+          : `${model} is not served by Bedrock in the region you configured. Try us-east-1.`,
+      );
+    if (status === 401 || status === 403)
+      throw new ClaudeAccessError(
+        "Claude refused the credentials for this request.",
+      );
+    throw error;
+  }
 }
 
 /** What every agent call returns: the parsed JSON and what produced it. */
@@ -112,18 +153,20 @@ export async function askForJson(input: {
   /** Simple decisions do not need deep thinking; this is a cost lever. */
   effort?: "low" | "medium" | "high";
 }): Promise<Completion> {
-  const { caller, model } = anthropic();
-  const response = await caller.messages.create({
-    model,
-    // A decision object is a few hundred tokens; this is a deliberate cap.
-    max_tokens: 4096,
-    system: input.system,
-    output_config: {
-      effort: input.effort ?? "low",
-      format: { type: "json_schema", schema: input.schema },
-    },
-    messages: [{ role: "user", content: input.prompt }],
-  });
+  const { caller, model, which } = anthropic();
+  const response = await call(which, model, () =>
+    caller.messages.create({
+      model,
+      // A decision object is a few hundred tokens; this is a deliberate cap.
+      max_tokens: 4096,
+      system: input.system,
+      output_config: {
+        effort: input.effort ?? "low",
+        format: { type: "json_schema", schema: input.schema },
+      },
+      messages: [{ role: "user", content: input.prompt }],
+    }),
+  );
 
   if (response.stop_reason === "refusal")
     throw new ClaudeRefusedError(response.stop_details?.category ?? null);

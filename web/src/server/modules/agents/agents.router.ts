@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
+  ClaudeAccessError,
   ClaudeNotConfiguredError,
   ClaudeRefusedError,
   ClaudeShapeError,
@@ -25,6 +26,8 @@ function mapError(e: unknown): never {
       message:
         "The agents are switched off on this deployment: no Claude API key is set.",
     });
+  if (e instanceof ClaudeAccessError)
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: e.message });
   if (e instanceof ClaudeShapeError)
     throw new TRPCError({ code: "BAD_GATEWAY", message: e.message });
   if (e instanceof ClaudeRefusedError)
