@@ -1,12 +1,15 @@
 "use client";
 
-import { DashboardPlaceholder } from "@/components/dashboard/DashboardPlaceholder";
+import { DashboardGuard } from "@/components/dashboard/DashboardGuard";
+import { LinksScreen } from "@/components/dashboard/screens/LinksScreen";
 
 export default function DashboardLinksPage() {
   return (
-    <DashboardPlaceholder
+    <DashboardGuard
       title="Payment links"
-      description="Reusable links with a fixed or open amount."
-    />
+      description="Reusable addresses with a fixed price, or an amount the payer chooses."
+    >
+      {(username) => <LinksScreen username={username} />}
+    </DashboardGuard>
   );
 }

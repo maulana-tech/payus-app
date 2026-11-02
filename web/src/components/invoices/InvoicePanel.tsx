@@ -1,5 +1,6 @@
 "use client";
 
+import { PayPalButton, post } from "@/features/payments/PayPalButton";
 import { cn } from "@/lib/utils";
 import { trpc } from "../../trpc/react";
 import { Card } from "../ui/card";
@@ -13,6 +14,7 @@ export function InvoicePanel({
   embed?: boolean;
 }) {
   const invoice = trpc.invoices.public.useQuery({ token });
+  const utils = trpc.useUtils();
 
   if (invoice.isLoading)
     return <Card className="p-6 text-sm text-ink/60">Loading…</Card>;
@@ -60,10 +62,22 @@ export function InvoicePanel({
         ))}
       </ul>
       {inv.notes ? <p className="text-sm text-ink/60">{inv.notes}</p> : null}
-      <p className="rounded-lg bg-ink/5 p-4 text-sm text-ink/60">
-        Payment is being rebuilt on a new rail. The invoice, its totals and its
-        webhook are already here.
-      </p>
+      {inv.status === "pending" ? (
+        <PayPalButton
+          currency={inv.currency}
+          createOrder={async () =>
+            (await post("/api/payments/paypal/orders", { token }))
+              .orderId as string
+          }
+          onPaid={() => void utils.invoices.public.invalidate({ token })}
+        />
+      ) : (
+        <p className="rounded-lg bg-ink/5 p-4 text-sm text-ink/60">
+          {inv.status === "paid"
+            ? "Paid in full. Thank you."
+            : "This invoice was cancelled."}
+        </p>
+      )}
     </Card>
   );
 }

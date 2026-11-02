@@ -1,10 +1,16 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
+import {
+  type Currency,
+  toDecimal,
+  toMinor,
+} from "../../../features/invoices/money";
 import { newId } from "../../../lib/ids";
-import { getDb, payments } from "../../db/client";
+import { getDb, invoices, payments } from "../../db/client";
 import * as paypal from "../../lib/paypal";
-import { publicInvoice } from "../invoices/invoices.service";
+import { createInvoice, publicInvoice } from "../invoices/invoices.service";
 import { account, type Posting, post } from "../ledger/ledger.service";
+import { resolveLink } from "../paymentLinks/paymentLinks.service";
 import { applyInvoicePayment, appOrigin } from "./applyPayment";
 import {
   InvoiceNotPayableError,
@@ -61,6 +67,51 @@ export async function startPaypalOrder(invoiceToken: string): Promise<{
     amountMinor: due.toString(),
     currency: invoice.currency,
   };
+}
+
+/**
+ * Paying a payment link. A link is not a bill, so one is written the moment
+ * someone decides to pay: the invoice carries the amount, the link that
+ * produced it, and from there it is an ordinary payment.
+ */
+export async function startLinkOrder(input: {
+  owner: string;
+  slug: string;
+  /** Only used when the link lets the payer choose. */
+  amount?: string;
+}) {
+  const link = await resolveLink({ owner: input.owner, slug: input.slug });
+  if (!link) throw new PaymentNotFoundError("No such payment link.");
+
+  let amountMinor: bigint;
+  try {
+    amountMinor = link.amountMinor
+      ? BigInt(link.amountMinor)
+      : toMinor(input.amount ?? "");
+  } catch {
+    throw new InvoiceNotPayableError("Enter an amount like 25.00.");
+  }
+  if (amountMinor <= 0n)
+    throw new InvoiceNotPayableError("Enter an amount like 25.00.");
+
+  const invoice = await createInvoice(input.owner, {
+    number: `LNK-${newId(8).toUpperCase()}`,
+    clientName: "Payment link",
+    clientEmail: null,
+    dueDate: new Date().toISOString().slice(0, 10),
+    notes: link.title,
+    items: [
+      {
+        description: link.title,
+        quantity: 1,
+        unitPrice: toDecimal(amountMinor),
+      },
+    ],
+    currency: link.currency as Currency,
+    recurrence: "none",
+    reference: `link:${link.slug}`,
+  });
+  return { ...(await startPaypalOrder(invoice.token)), token: invoice.token };
 }
 
 /** Captures an approved order and records the result. */
@@ -176,4 +227,44 @@ export async function capturedTotal(invoiceId: string): Promise<bigint> {
       and(eq(payments.invoiceId, invoiceId), eq(payments.status, "captured")),
     );
   return BigInt(row?.total ?? "0");
+}
+
+export type PaymentActivity = {
+  id: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  clientName: string;
+  capturedMinor: string;
+  feeMinor: string;
+  currency: string;
+  capturedAt: string;
+};
+
+/** The owner's most recent captured payments, newest first. */
+export async function recentPayments(
+  owner: string,
+  limit = 8,
+): Promise<PaymentActivity[]> {
+  const rows = await getDb()
+    .select({
+      id: payments.id,
+      invoiceId: payments.invoiceId,
+      invoiceNumber: invoices.number,
+      clientName: invoices.clientName,
+      capturedMinor: payments.capturedMinor,
+      feeMinor: payments.feeMinor,
+      currency: payments.currency,
+      capturedAt: payments.updatedAt,
+    })
+    .from(payments)
+    .innerJoin(invoices, eq(invoices.id, payments.invoiceId))
+    .where(and(eq(payments.owner, owner), eq(payments.status, "captured")))
+    .orderBy(desc(payments.updatedAt))
+    .limit(limit);
+  return rows.map((row) => ({
+    ...row,
+    capturedMinor: row.capturedMinor ?? "0",
+    feeMinor: row.feeMinor ?? "0",
+    capturedAt: row.capturedAt.toISOString(),
+  }));
 }

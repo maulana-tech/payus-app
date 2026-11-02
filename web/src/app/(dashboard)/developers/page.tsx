@@ -1,12 +1,15 @@
 "use client";
 
-import { DashboardPlaceholder } from "@/components/dashboard/DashboardPlaceholder";
+import { DashboardGuard } from "@/components/dashboard/DashboardGuard";
+import { DevelopersScreen } from "@/components/dashboard/screens/DevelopersScreen";
 
 export default function DashboardDevelopersPage() {
   return (
-    <DashboardPlaceholder
+    <DashboardGuard
       title="Developers"
-      description="API keys, the checkout API and signed webhooks."
-    />
+      description="API keys for the checkout API, and the endpoint we sign events to."
+    >
+      {() => <DevelopersScreen />}
+    </DashboardGuard>
   );
 }

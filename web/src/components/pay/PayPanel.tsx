@@ -1,12 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { toDecimal } from "../../features/invoices/money";
+import { PayPalButton, post } from "../../features/payments/PayPalButton";
 import { trpc } from "../../trpc/react";
 import { Card } from "../ui/card";
+import { Input } from "../ui/input";
 
 /**
- * Public payment page for @username, or one of their payment links. It shows
- * who is being paid and how much; the payment rail itself is not wired up.
+ * Public payment page for @username, or one of their payment links. A link
+ * with no price asks the payer for one; either way paying it writes an
+ * invoice and settles down the ordinary path.
  */
 export function PayPanel({
   username,
@@ -15,6 +19,8 @@ export function PayPanel({
   username: string;
   slug?: string;
 }) {
+  const [amount, setAmount] = useState("");
+  const [paid, setPaid] = useState(false);
   const profile = trpc.profiles.byUsername.useQuery({ username });
   const link = trpc.paymentLinks.resolve.useQuery(
     { owner: username, slug: slug ?? "" },
@@ -42,9 +48,13 @@ export function PayPanel({
       </Card>
     );
 
-  const amount = link.data?.amountMinor
+  const fixed = link.data?.amountMinor
     ? `${toDecimal(BigInt(link.data.amountMinor))} ${link.data.currency}`
     : null;
+  const openAmount = Boolean(link.data) && !link.data?.amountMinor;
+  const payable =
+    Boolean(link.data) &&
+    (!openAmount || /^\d{1,12}(\.\d{1,2})?$/.test(amount.trim()));
 
   return (
     <Card className="grid gap-4 p-6">
@@ -55,14 +65,47 @@ export function PayPanel({
           <p className="text-[15px] text-ink/70">{link.data.title}</p>
         ) : null}
       </div>
-      {amount ? <p className="text-3xl tabular-nums">{amount}</p> : null}
+      {fixed ? <p className="text-3xl tabular-nums">{fixed}</p> : null}
       {link.data?.description ? (
         <p className="text-sm text-ink/60">{link.data.description}</p>
       ) : null}
-      <p className="rounded-lg bg-ink/5 p-4 text-sm text-ink/60">
-        Checkout is being rebuilt on a new payment rail. This page already
-        resolves the username and the link; the payment step is next.
-      </p>
+      {paid ? (
+        <p className="rounded-lg bg-ink/5 p-4 text-sm text-ink/60">
+          Paid. Thank you — @{username} has been told.
+        </p>
+      ) : link.data ? (
+        <div className="grid gap-3">
+          {openAmount ? (
+            <label className="grid gap-1.5 text-sm">
+              <span className="text-ink/60">Amount to pay</span>
+              <Input
+                value={amount}
+                inputMode="decimal"
+                placeholder="25.00"
+                onChange={(event) => setAmount(event.target.value)}
+              />
+            </label>
+          ) : null}
+          <PayPalButton
+            currency={link.data.currency}
+            disabled={!payable}
+            createOrder={async () =>
+              (
+                await post("/api/payments/paypal/links", {
+                  owner: username,
+                  slug: link.data?.slug,
+                  amount: openAmount ? amount.trim() : undefined,
+                })
+              ).orderId as string
+            }
+            onPaid={() => setPaid(true)}
+          />
+        </div>
+      ) : (
+        <p className="rounded-lg bg-ink/5 p-4 text-sm text-ink/60">
+          Open one of @{username}&rsquo;s payment links to pay them.
+        </p>
+      )}
     </Card>
   );
 }

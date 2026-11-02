@@ -1,12 +1,15 @@
 "use client";
 
-import { DashboardPlaceholder } from "@/components/dashboard/DashboardPlaceholder";
+import { DashboardGuard } from "@/components/dashboard/DashboardGuard";
+import { OverviewScreen } from "@/components/dashboard/screens/OverviewScreen";
 
 export default function DashboardPage() {
   return (
-    <DashboardPlaceholder
+    <DashboardGuard
       title="Overview"
-      description="Balance, recent activity and your payment link."
-    />
+      description="What you are owed, what has been paid, and what the ledger says about both."
+    >
+      {(username) => <OverviewScreen username={username} />}
+    </DashboardGuard>
   );
 }

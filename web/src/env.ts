@@ -13,6 +13,9 @@ export const publicEnvSchema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   NEXT_PUBLIC_PRIVY_APP_ID: optionalString,
+  // The same client id as PAYPAL_CLIENT_ID; the payer's browser loads the
+  // PayPal SDK with it. Absent means this deployment cannot take payments.
+  NEXT_PUBLIC_PAYPAL_CLIENT_ID: optionalString,
 });
 
 /**
@@ -23,6 +26,7 @@ export function getPublicEnv() {
   return publicEnvSchema.parse({
     NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
+    NEXT_PUBLIC_PAYPAL_CLIENT_ID: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID,
   });
 }
 

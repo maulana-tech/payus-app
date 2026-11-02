@@ -1,12 +1,15 @@
 "use client";
 
-import { DashboardPlaceholder } from "@/components/dashboard/DashboardPlaceholder";
+import { DashboardGuard } from "@/components/dashboard/DashboardGuard";
+import { RequestsScreen } from "@/components/dashboard/screens/RequestsScreen";
 
 export default function DashboardRequestsPage() {
   return (
-    <DashboardPlaceholder
+    <DashboardGuard
       title="Requests"
-      description="Ask another @username to pay you, end-to-end encrypted."
-    />
+      description="Ask another @username to pay you. The amount and the note are sealed to the two of you."
+    >
+      {() => <RequestsScreen />}
+    </DashboardGuard>
   );
 }

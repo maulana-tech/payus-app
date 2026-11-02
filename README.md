@@ -13,13 +13,12 @@
 
 ---
 
-> **Status: no payment rail yet.** The previous one — an in-browser wallet
-> and everything built on it (send, history, point of sale, payroll, claim
-> links, receipt verification) — was removed. What remains is a working
-> application shell with no way to move money, waiting for a payment
-> provider to be wired in.
+> **Status: the rail works, the agents do not yet.** A payment goes through
+> PayPal, posts itself to a double-entry ledger and settles the invoice,
+> once, however many times the event is delivered. The agent team described
+> on the landing page is being built on top of that.
 
-## What still works
+## What works
 
 - **Login and unlock.** Privy (email, Google, passkey) for identity, then a
   passkey (PRF) or a 6-digit PIN that derives an account master **in the
@@ -32,22 +31,30 @@
   amount; one-off and recurring invoices with a public page at `/i/<token>`,
   overdue reminders and a scheduled job; payment requests between usernames,
   sealed with X25519 + AES-GCM so the server only sees who asked whom.
+- **Taking a payment.** PayPal Orders v2: the payer approves, the capture is
+  confirmed both by the browser and by webhook, and both paths converge on
+  one writer. The amounts are read back from PayPal, never taken from the
+  webhook body.
+- **A real ledger.** Double entry in integer minor units. A transaction that
+  does not balance is refused before the database is touched, and a
+  transaction id posts exactly once, so a replayed event writes nothing.
 - **Merchant API.** API keys, `POST /api/v1/checkouts`, and webhooks signed
   Stripe-style (`Payus-Signature: t=…,v1=…`) with retries and a delivery log.
 - **Embed widget.** `public/embed.js`, one script tag, no build step.
 - **Money as integers.** Minor units (cents) plus an ISO 4217 code, never
   floats.
 
-## What was deliberately left as a placeholder
+## What is not built yet
 
-The dashboard pages (overview, links, invoices, requests, developers) render
-the real shell, the auth guard and the username prompt, then a placeholder
-body — their screens were written around the old in-browser wallet. Settings
-is real:
-account type, PIN change, email notifications, sign out.
+The agents. Twelve seats are described on the landing page and five of them
+are real code running today (taking the payment, carrying the webhook,
+keeping the books, telling your server, writing the invoices). The Guardian
+— the deterministic engine that accepts or refuses a proposal — and the
+seven language-model seats above it are the work in
+[`docs/plan.md`](docs/plan.md).
 
-The public pay and invoice pages resolve the username, link and invoice and
-show the amount, then say the payment step is being rebuilt.
+Splitting a payment into pots, settlement and payouts are Phase 2 of that
+plan; the ledger accounts they will use already exist.
 
 ## Stack
 

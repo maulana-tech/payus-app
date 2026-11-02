@@ -1,12 +1,15 @@
 "use client";
 
-import { DashboardPlaceholder } from "@/components/dashboard/DashboardPlaceholder";
+import { DashboardGuard } from "@/components/dashboard/DashboardGuard";
+import { InvoicesScreen } from "@/components/dashboard/screens/InvoicesScreen";
 
 export default function DashboardInvoicesPage() {
   return (
-    <DashboardPlaceholder
+    <DashboardGuard
       title="Invoices"
-      description="One-off and recurring invoices, with a public pay link."
-    />
+      description="One-off and recurring, each with a page your client can pay on."
+    >
+      {() => <InvoicesScreen />}
+    </DashboardGuard>
   );
 }

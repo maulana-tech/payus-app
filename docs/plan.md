@@ -15,9 +15,8 @@ test, build 16 route):
   widget embed
 - Postgres + Drizzle, uang sebagai integer minor unit (`numeric(20,0)`)
 
-Yang belum ada: **jalur uang**. `invoices.reportPayment` tidak dipanggil
-siapa pun, jadi tidak ada invoice yang bisa jadi `paid`, dan 5 layar
-dashboard masih placeholder.
+Yang belum ada: **agen**. Jalur uang dan seluruh layar dashboard sudah jadi
+(lihat Fase 1 dan Fase 5); Guardian dan agen-agennya yang belum.
 
 ## 2. Keputusan yang sudah dipegang
 
@@ -141,10 +140,17 @@ Tiap agen punya 5–10 prompt uji dengan hasil yang diharapkan (lolos skema,
 ditolak Guardian saat melanggar).
 
 ### Fase 5 — 10–11 Nov · UI, hosting, laporan
-- Ganti 5 placeholder dashboard dengan layar nyata; tabel transaksi pakai
-  **AG Grid** (ini syarat hadiah sponsor, jadi harus terlihat di video)
-- Storefront builder + pratinjau live; halaman `/pay` & `/i/<token>`
-  disambung ke Orders
+- [x] **Dikerjakan lebih awal (2 Nov).** Lima placeholder dashboard diganti
+      layar nyata: overview (saldo langsung dari ledger, pembayaran
+      terakhir, invoice terbaru), invoices (buat + tandai lunas + void +
+      stop berulang), links, requests (disegel di browser), developers
+      (API key sekali tampil, webhook, log pengiriman)
+- [x] **Halaman `/i/<token>` dan `/pay/...` tersambung ke Orders.** Tombol
+      PayPal memanggil route kita; membayar sebuah link menulis invoice
+      lebih dulu, jadi jalur settlement-nya sama persis
+- [ ] Tabel transaksi pakai **AG Grid** (syarat hadiah sponsor, harus
+      terlihat di video)
+- [ ] Storefront builder + pratinjau live
 - Deploy ke **Render** + Postgres terkelola, cron invoice aktif
 - Laporan: settlement harian, rekonsiliasi, ekspor CSV/PDF
   (`lib/invoicePdf.ts`, `lib/csv.ts`, `lib/download.ts` sudah ada, tinggal
@@ -173,8 +179,8 @@ KYC, custody.
 | Hutang | Ditutup di |
 |---|---|
 | ~~`reportPayment` tanpa pemanggil~~ | ✅ Fase 1 (worker outbox + `applyInvoicePayment`) |
-| 5 layar dashboard placeholder | Fase 5 |
-| Tidak ada UI pembuatan API key (docs/api.md menjanjikan "Developers → API keys") | Fase 5 |
+| ~~5 layar dashboard placeholder~~ | ✅ 2 Nov |
+| ~~Tidak ada UI pembuatan API key~~ | ✅ 2 Nov (Developers → API keys, persis seperti docs/api.md) |
 | `features/embed/bridge.ts` yatim → iframe tak auto-resize & tak emit event | Fase 5 |
 | 13 modul yatim (`invoicePdf`, `csv`, `download`, `PaymentQrDialog`, dll.) | dipakai di Fase 5, sisanya dihapus |
 | `.gitbook.yaml` menunjuk `docs/SUMMARY.md` yang tidak ada | kapan saja |

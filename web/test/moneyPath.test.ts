@@ -59,6 +59,7 @@ vi.mock("../src/server/lib/paypal", async (importOriginal) => {
 
 describe.skipIf(!available)("money path (Postgres)", () => {
   let invoices: typeof import("../src/server/modules/invoices/invoices.service");
+  let links: typeof import("../src/server/modules/paymentLinks/paymentLinks.service");
   let payments: typeof import("../src/server/modules/payments/payments.service");
   let ledger: typeof import("../src/server/modules/ledger/ledger.service");
   let outbox: typeof import("../src/server/modules/outbox/outbox.service");
@@ -75,6 +76,9 @@ describe.skipIf(!available)("money path (Postgres)", () => {
     process.env.PAYPAL_WEBHOOK_ID = "test-webhook";
     db = await import("../src/server/db/client");
     invoices = await import("../src/server/modules/invoices/invoices.service");
+    links = await import(
+      "../src/server/modules/paymentLinks/paymentLinks.service"
+    );
     payments = await import("../src/server/modules/payments/payments.service");
     ledger = await import("../src/server/modules/ledger/ledger.service");
     outbox = await import("../src/server/modules/outbox/outbox.service");
@@ -231,6 +235,42 @@ describe.skipIf(!available)("money path (Postgres)", () => {
     await expect(
       payments.startPaypalOrder(target?.token ?? ""),
     ).rejects.toThrow(/already paid/);
+  });
+
+  it("writes an invoice when a payment link is paid", async () => {
+    await links.createLink("shop", {
+      slug: "coffee",
+      title: "Coffee",
+      description: null,
+      amount: null, // the payer chooses
+    });
+
+    await expect(
+      payments.startLinkOrder({ owner: "shop", slug: "coffee" }),
+    ).rejects.toThrow(/amount/i);
+    await expect(
+      payments.startLinkOrder({ owner: "shop", slug: "tea" }),
+    ).rejects.toThrow(/No such payment link/);
+
+    const order = await payments.startLinkOrder({
+      owner: "shop",
+      slug: "coffee",
+      amount: "7.50",
+    });
+    expect(order.amountMinor).toBe("750");
+    approve(order.orderId, "CAP-LINK", 750n, 40n);
+
+    const response = await deliver("EVT-LINK", "CAP-LINK");
+    expect(await response.json()).toMatchObject({ queued: true });
+    expect(await outbox.drainOutbox()).toMatchObject({ done: 1 });
+
+    const invoice = await invoices.publicInvoice(order.token);
+    expect(invoice).toMatchObject({
+      status: "paid",
+      paidMinor: "750",
+      reference: "link:coffee",
+    });
+    expect(await ledger.trialBalance()).toBe(0n);
   });
 
   it("retries a job that throws, then parks it", async () => {

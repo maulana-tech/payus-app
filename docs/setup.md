@@ -107,7 +107,7 @@ pnpm dev                 # http://localhost:3000
 ```
 
 Sign in, unlock with a passkey or a 6-digit PIN, and claim a username. From
-there the dashboard pages are placeholders waiting to be rebuilt; the server
+there the dashboard shows what you are owed and what the ledger says; the server
 modules behind them are live and reachable over tRPC.
 
 ## 5. Checks

@@ -733,6 +733,8 @@ body:has(.dashboard-app) {
   /* No blue in the dashboard: marks (dots, active rail, chart bars) are ink. */
   --dash-accent: var(--dash-fg);
   --dash-accent-ink: var(--dash-fg);
+  /* The one hue allowed: a failure has to be legible as a failure. */
+  --dash-err: rgb(154 59 42);
   --dash-radius: 0px;
   /* Panels stay square; controls and their hover fills keep a small radius
      so they match the rounded fields beside them. */
@@ -749,6 +751,7 @@ html[data-dash-mode="dark"] body:has(.dashboard-app) {
   --dash-line-solid: rgb(51 49 44);
   --dash-line-strong: rgb(250 247 240 / 0.2);
   --dash-tint: rgb(250 247 240 / 0.05);
+  --dash-err: rgb(224 142 122);
   color-scheme: dark;
 }
 
