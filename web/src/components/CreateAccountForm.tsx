@@ -5,6 +5,7 @@ import { Loader } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { usernameSchema } from "../server/modules/profiles/profiles.schema";
+import { OnboardingStep } from "./onboarding/Steps";
 import { useSession } from "./SessionProvider";
 import { Button } from "./ui/button";
 import {
@@ -58,11 +59,13 @@ export function CreateAccountForm({
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent appearance="linen" size="sm">
-        <DialogHeader className="px-10 text-center">
-          <DialogTitle>Create Your Account</DialogTitle>
-          <DialogDescription className="mx-auto">
-            Pick a username. We sign it with keys only your browser can derive,
-            so payers can check it really is yours.
+        <DialogHeader className="px-1">
+          <OnboardingStep step={2} />
+          <DialogTitle>Pick your username</DialogTitle>
+          <DialogDescription>
+            It is how people address money to you, and it is signed with keys
+            only your browser can derive — so a payer can check the name really
+            is yours.
           </DialogDescription>
         </DialogHeader>
 

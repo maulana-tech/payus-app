@@ -3,7 +3,11 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AccountTypeDialog } from "../src/components/AccountTypeDialog";
 import { NAV_ITEMS } from "../src/components/dashboard/navItems";
-import { hiddenFor, navFor } from "../src/features/account/accountType";
+import {
+  ACCOUNT_TYPES,
+  hiddenFor,
+  navFor,
+} from "../src/features/account/accountType";
 import {
   DASHBOARD_PATH,
   DEVELOPERS_PATH,
@@ -52,6 +56,16 @@ describe("AccountTypeDialog", () => {
     await userEvent.type(screen.getByLabelText(/Business name/), "Kopi Senja");
     await userEvent.click(next);
     expect(onChoose).toHaveBeenCalledWith("business", "Kopi Senja");
+  });
+
+  it("explains every type on its card, not just names it", () => {
+    render(<AccountTypeDialog open onChoose={vi.fn()} />);
+    for (const type of ACCOUNT_TYPES) {
+      const card = screen.getByRole("radio", { name: new RegExp(type.label) });
+      expect(card).toHaveTextContent(type.summary);
+      expect(card).toHaveTextContent(type.tools);
+      expect(card).toHaveTextContent(type.goodIf);
+    }
   });
 
   it("asks no name for a personal account", async () => {

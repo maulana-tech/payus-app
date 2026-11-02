@@ -1,6 +1,8 @@
 "use client";
 
-import { Fingerprint, KeyRound, Loader } from "lucide-react";
+import { Loader } from "lucide-react";
+import { ChoiceCard } from "./onboarding/ChoiceCard";
+import { OnboardingStep } from "./onboarding/Steps";
 import type { RecoveryMethod, RecoveryModal } from "./SessionProvider";
 import { Button } from "./ui/button";
 import {
@@ -10,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { linenInsetClass } from "./ui/glass";
 import { ToastFeedback } from "./ui/toast-feedback";
 
 /**
@@ -42,72 +43,74 @@ export function RecoveryDialog({
         if (!next && !busy) onClose();
       }}
     >
-      <DialogContent appearance="linen" size="sm" showCloseButton={!choosing}>
-        <DialogHeader className="px-6 text-center">
+      <DialogContent
+        appearance="linen"
+        size="md"
+        showCloseButton={!choosing}
+        className="max-h-[90svh] overflow-y-auto"
+      >
+        <DialogHeader className="px-1">
+          {choosing ? <OnboardingStep step={1} /> : null}
           <DialogTitle>
-            {choosing
-              ? "Protect your private balance"
-              : "Unlock with your passkey"}
+            {choosing ? "Choose how to unlock" : "Unlock with your passkey"}
           </DialogTitle>
-          <DialogDescription className="mx-auto">
+          <DialogDescription>
             {choosing
-              ? "Your payments are encrypted to keys only you hold. Choose how to restore them on another device."
-              : "Use the passkey you created for Payus. Your keys are re-derived on this device — nothing is downloaded."}
+              ? "Your account has keys that only your browser can derive. Pick how you will prove it is you on your next device."
+              : "Use the passkey you created for Payus. The keys are derived again on this device — nothing is downloaded."}
           </DialogDescription>
         </DialogHeader>
 
         {choosing ? (
-          <div className="grid gap-3">
-            <button
-              type="button"
+          <fieldset
+            className="m-0 grid gap-3 border-0 p-0"
+            aria-label="How to unlock this account"
+          >
+            <ChoiceCard
+              index={1}
+              title="Passkey"
+              note="Recommended"
+              pick={false}
               disabled={busy || !passkeySupported}
-              onClick={() => onChoose("passkey")}
-              className={`${linenInsetClass} flex min-h-20 items-center gap-4 border border-foreground/18 p-4 text-left transition-colors hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-foreground/70 disabled:cursor-not-allowed disabled:opacity-50`}
-            >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-(--dash-radius-sm) bg-foreground/10 ring-1 ring-foreground/15">
-                {busy ? (
-                  <Loader
-                    className="size-5 motion-safe:animate-spin"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <Fingerprint className="size-5" aria-hidden="true" />
-                )}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-foreground">
-                  Passkey{" "}
-                  <span className="text-xs font-medium text-foreground/60">
-                    · recommended
-                  </span>
-                </span>
-                <span className="mt-1 block text-xs leading-5 text-foreground/60">
-                  Face ID, Touch ID or your device PIN. Your keys come from the
-                  passkey itself — Payus stores nothing secret.
-                </span>
-              </span>
-            </button>
-
-            <button
-              type="button"
+              summary={
+                passkeySupported
+                  ? "Face ID, Touch ID or your device's own lock. Your keys are derived from the passkey itself, so there is nothing secret for us to store."
+                  : "This browser has no passkey support, so this option is unavailable here."
+              }
+              rows={[
+                { label: "New device", value: "Use the same passkey again." },
+                { label: "We store", value: "Only its public identifier." },
+              ]}
+              onSelect={() => onChoose("passkey")}
+            />
+            <ChoiceCard
+              index={2}
+              title="6-digit PIN"
+              pick={false}
               disabled={busy}
-              onClick={() => onChoose("pin")}
-              className={`${linenInsetClass} flex min-h-20 items-center gap-4 border border-foreground/18 p-4 text-left transition-colors hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-foreground/70 disabled:cursor-not-allowed disabled:opacity-50`}
-            >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-(--dash-radius-sm) bg-foreground/10 ring-1 ring-foreground/15">
-                <KeyRound className="size-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-foreground">
-                  6-digit PIN
-                </span>
-                <span className="mt-1 block text-xs leading-5 text-foreground/60">
-                  Your key is encrypted with a PIN you choose and backed up.
-                  Works in any browser.
-                </span>
-              </span>
-            </button>
-          </div>
+              summary="Your key is encrypted with a PIN you choose; only the encrypted copy is kept. Works in any browser, including ones without passkeys."
+              rows={[
+                { label: "New device", value: "Enter the same PIN." },
+                {
+                  label: "Careful",
+                  value: "Forget the PIN and the keys cannot be recovered.",
+                },
+              ]}
+              onSelect={() => onChoose("pin")}
+            />
+            {busy ? (
+              <p
+                className="flex items-center gap-2 text-sm text-foreground/60"
+                role="status"
+              >
+                <Loader
+                  className="size-4 motion-safe:animate-spin"
+                  aria-hidden="true"
+                />
+                Waiting for your device…
+              </p>
+            ) : null}
+          </fieldset>
         ) : (
           <Button
             className="min-h-11 w-full"
@@ -120,9 +123,7 @@ export function RecoveryDialog({
                 className="size-4 motion-safe:animate-spin"
                 aria-hidden="true"
               />
-            ) : (
-              <Fingerprint className="size-4" aria-hidden="true" />
-            )}
+            ) : null}
             {busy ? "Waiting for passkey…" : "Unlock with passkey"}
           </Button>
         )}
