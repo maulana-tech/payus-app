@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppShell } from "../components/AppShell";
-import { jetbrainsMono, urbanist } from "../components/landing/fonts";
+import {
+  cormorant,
+  jetbrainsMono,
+  urbanist,
+} from "../components/landing/fonts";
 import { PrivyAppProvider } from "../components/PrivyAppProvider";
 import { SessionProvider } from "../components/SessionProvider";
 import { Toaster } from "../components/ui/sonner";
@@ -27,7 +31,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`min-h-full font-sans ${urbanist.variable} ${jetbrainsMono.variable}`}
+      className={`min-h-full font-sans ${urbanist.variable} ${jetbrainsMono.variable} ${cormorant.variable}`}
       // The dashboard sets data-dash-mode before hydration to avoid a flash.
       suppressHydrationWarning
     >

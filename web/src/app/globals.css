@@ -180,6 +180,9 @@
     var(--font-urbanist), "Aileron", ui-sans-serif, system-ui, sans-serif;
   --font-landing-mono:
     var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", monospace;
+  /* The editorial landing's display face: light, large, set tight. */
+  --font-landing-serif:
+    var(--font-cormorant), ui-serif, Georgia, "Times New Roman", serif;
   --font-heading:
     "Aileron", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
