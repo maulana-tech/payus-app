@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { formatMinor } from "@/features/invoices/money";
 import type { RouterOutputs } from "@/server/root";
 import { trpc } from "@/trpc/react";
@@ -26,6 +27,7 @@ export function ApprovalsPanel() {
     <Panel
       title="Waiting for you"
       hint="The Guardian holds these until you say so. Nothing has moved."
+      action={<AskThePayer />}
     >
       {pending.length === 0 ? (
         <EmptyState title="Nothing to approve">
@@ -40,6 +42,65 @@ export function ApprovalsPanel() {
         </Ledger>
       )}
     </Panel>
+  );
+}
+
+/**
+ * Runs the Payer once. Whatever it answers — a proposal, a refusal with the
+ * Guardian's reason, or "nothing to do" — is shown as it came back.
+ */
+function AskThePayer() {
+  const utils = trpc.useUtils();
+  const status = trpc.agents.status.useQuery();
+  const [said, setSaid] = useState<string | null>(null);
+  const run = trpc.agents.runPayer.useMutation({
+    onSuccess: (result) => {
+      void utils.guardian.overview.invalidate();
+      void utils.ledger.summary.invalidate();
+      void utils.ledger.entries.invalidate();
+      setSaid(
+        result.act === "none"
+          ? result.reason
+          : result.proposal?.status === "executed"
+            ? `${result.reason} It was inside your limits, so it has been sent.`
+            : result.reason,
+      );
+    },
+    onError: () => setSaid(null),
+  });
+
+  if (status.data && !status.data.configured)
+    return (
+      <span className="text-sm text-(--dash-ash)">
+        Agents are off: no Claude API key on this deployment.
+      </span>
+    );
+
+  return (
+    <div className="grid justify-items-end gap-2">
+      <button
+        type="button"
+        className={dashButtonSecondary}
+        disabled={run.isPending}
+        onClick={() => {
+          setSaid(null);
+          run.mutate();
+        }}
+      >
+        {run.isPending ? "Thinking…" : "Ask the Payer"}
+      </button>
+      {said ? (
+        <p className="max-w-sm text-right text-sm text-(--dash-ash)">{said}</p>
+      ) : null}
+      {run.error ? (
+        <p
+          className="max-w-sm text-right text-sm text-(--dash-err)"
+          role="alert"
+        >
+          {run.error.message}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

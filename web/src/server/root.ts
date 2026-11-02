@@ -1,5 +1,6 @@
 import type { inferRouterOutputs } from "@trpc/server";
 import { accountsRouter } from "./modules/accounts/accounts.router";
+import { agentsRouter } from "./modules/agents/agents.router";
 import { developerRouter } from "./modules/developer/developer.router";
 import { guardianRouter } from "./modules/guardian/guardian.router";
 import { invoicesRouter } from "./modules/invoices/invoices.router";
@@ -17,6 +18,7 @@ export const appRouter = createTRPCRouter({
   invoices: invoicesRouter,
   ledger: ledgerRouter,
   guardian: guardianRouter,
+  agents: agentsRouter,
   requests: requestsRouter,
   developer: developerRouter,
   notifications: notificationsRouter,

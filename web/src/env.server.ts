@@ -29,6 +29,8 @@ export const serverEnvSchema = z.object({
   // "true" once Payouts is approved on the PayPal account. Until then a
   // release is recorded as simulated and labelled in the UI.
   PAYPAL_PAYOUTS_ENABLED: optionalString,
+  // Without it the agents are switched off; the rail works regardless.
+  ANTHROPIC_API_KEY: optionalString,
 });
 
 export function getServerEnv() {
@@ -46,6 +48,7 @@ export function getServerEnv() {
     PAYPAL_CLIENT_SECRET: process.env.PAYPAL_CLIENT_SECRET,
     PAYPAL_WEBHOOK_ID: process.env.PAYPAL_WEBHOOK_ID,
     PAYPAL_PAYOUTS_ENABLED: process.env.PAYPAL_PAYOUTS_ENABLED,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   });
 }
 

@@ -158,20 +158,33 @@ menunggu dan tidak mengirim apa pun; usulan yang kedaluwarsa tidak bisa
 disetujui; dan **usulan yang berubah setelah disetujui ditolak saat
 dijalankan**, dengan `approval.void` masuk audit log.
 
-### Fase 4 — 8–9 Nov · agen
-Urutan sesuai nilai demo:
-1. **Developer Agent (storefront)** — chat → konfigurasi JSON ber-skema →
-   render template kita (Link Store, Produk Digital, Tip, Jasa) → publish
-   `/{slug}`. Tanpa HTML bebas; harga lewat Guardian; file digital pakai
-   signed URL kedaluwarsa
-2. **Allocator** — usulkan split tiap dana masuk
-3. **Payer** — bayar tagihan jatuh tempo, kurang saldo → usulkan tarik dari
-   pos lain (lewat Guardian)
-4. **Reporter** — ringkasan + laporan settlement dari query ledger
-5. **Merchant Ops / Advisor** — kalau waktu sisa
+### Fase 4 — 2 Nov– · agen
+Urutannya kuubah dari rencana awal: **Payer lebih dulu**, bukan Developer
+Agent, karena Payer langsung memakai Guardian dan ledger yang baru jadi —
+jadi agen pertama bisa didemokan tanpa membangun apa pun yang baru di
+bawahnya.
 
-Tiap agen punya 5–10 prompt uji dengan hasil yang diharapkan (lolos skema,
-ditolak Guardian saat melanggar).
+- [x] **Payer** — membaca buku, mengusulkan rilis, berhenti. Tidak punya
+      limit sendiri sama sekali (itu urusan Guardian), tujuan wajib salah
+      satu yang kita tunjukkan padanya (**diperiksa setelah parsing**, bukan
+      diinstruksikan di prompt), dan bentuk jawabannya divalidasi dua kali:
+      structured outputs di API, lalu zod yang memutuskan apakah aplikasi ini
+      mau bertindak atasnya
+- [x] `server/lib/claude.ts` — satu-satunya tempat model dipanggil. Model
+      `claude-opus-5-5`, effort `low` untuk keputusan sesederhana ini,
+      structured outputs (bukan forced tool use, yang ditolak 400 oleh model
+      ini). Tanpa `ANTHROPIC_API_KEY` agen mati dan mengatakannya
+- [x] **Eval set Payer: 11 kasus** di `test/payerAgent.test.ts`, model
+      distub jadi jalan di tiap commit tanpa biaya — termasuk kasus yang
+      paling penting: menolak tujuan yang dikarang, menolak nominal
+      berdesimal, dan ditolak Guardian saat melebihi limit (dengan
+      penolakannya tercatat atas nama agen)
+- [ ] **Allocator** — usulkan split tiap dana masuk (butuh jenis usulan
+      kedua di Guardian: `split.change`)
+- [ ] **Developer Agent (storefront)** — chat → konfigurasi JSON ber-skema →
+      render template kita → publish `/{slug}`. Tanpa HTML bebas
+- [ ] **Reporter** — ringkasan dari query ledger
+- [ ] **Merchant Ops / Advisor** — kalau waktu sisa
 
 ### Fase 5 — 10–11 Nov · UI, hosting, laporan
 - [x] **Dikerjakan lebih awal (2 Nov).** Lima placeholder dashboard diganti

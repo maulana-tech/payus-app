@@ -50,6 +50,16 @@ Framework-free modules shared by routes, components and the server: `invoices` (
 - Auth routing: `web/src/middleware.ts` + `src/lib/auth-routes.ts` gate the dashboard routes on Privy cookies. Adding a dashboard route means adding it to `auth-routes.ts`, `navItems.ts`, `features/account/accountType.ts` **and the literal `matcher` in `middleware.ts`** — Next needs a literal there, so `test/middleware.test.ts` is what keeps the two lists in step.
 - Headers in `next.config.mjs`: everything refuses framing except `/embed/*`; `/i/*` is `no-referrer` + `noindex`. (The COOP/COEP cross-origin isolation the WASM wallet needed is gone — don't reintroduce it without a reason.)
 
+### The agents
+`server/lib/claude.ts` is the only place a model is called: `askForJson()` sets the model (`claude-opus-5-5`, thinking always on so the parameter is omitted), the effort, and **structured outputs** (`output_config.format`) — not forced tool use, which that model rejects with a 400. Without `ANTHROPIC_API_KEY` the agents are off and say so; the rail is unaffected.
+`server/modules/agents/payer.agent.ts` is the pattern every later agent should copy:
+- **The agent holds no limits of its own.** It proposes; the Guardian decides. A second copy of the limits here would be a second, drifting source of truth.
+- **Facts come from the ledger**, assembled by `payerFacts()` and spelled out by `payerPrompt()`. The model is never asked to remember a balance.
+- **The destination must be one we showed it.** That is a check after parsing, not a line in the prompt — an address the model invented never reaches the Guardian.
+- **The shape is validated twice**: the API constrains it, then zod decides whether this application will act on it. A schema the API honoured is not the same as an answer worth executing.
+- `ask` is injectable, so `test/payerAgent.test.ts` runs the whole decision path on every commit without spending anything. That file is the agent's eval set; add cases to it rather than trusting the prompt.
+- The model id and prompt version land on the proposal and in the audit log, so a decision can be traced to what produced it.
+
 ### The Guardian
 Nothing moves money without a proposal, and no proposal is decided by a model. `features/guardian/decide.ts` is a pure function — proposal + policy + context → `allow | ask | refuse` with a reason per rule — and `server/modules/guardian/` writes the proposal, records the decision, holds consent and runs it. The owner's own "Release" button goes through it, so the road the agents will take is already the one in daily use.
 - **Consent is bound to a hash.** `proposalHash(kind, payload)` is sha256 over `canonical()` (keys sorted at every depth). `approvals` is a **log**, one row per act of consent, each naming the hash it was given for; `execute()` compares the newest approval's hash with the proposal's current hash and refuses on a mismatch (`approval.void` in the audit log). Amending a proposal moves the hash and puts it back to `awaiting`.

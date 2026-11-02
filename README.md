@@ -53,13 +53,18 @@
   limits you set. Consent is bound to the hash of what you agreed to, so a
   proposal amended afterwards cannot inherit it.
 
+- **An agent that proposes, and cannot do more than that.** The Payer reads
+  the ledger and writes down what it would release. It holds no limits of its
+  own, it may only name a destination you have already paid, and the shape of
+  its answer is validated before the Guardian ever sees it.
+
 ## What is not built yet
 
-The thinking seats. Twelve are described on the landing page; six are real
-code running today — taking the payment, carrying the webhook, keeping the
-books, telling your server, writing the invoices, and the Guardian deciding
-what may move. The seven language-model seats above them are the work left
-in [`docs/plan.md`](docs/plan.md), along with approving from Telegram.
+Six more thinking seats — the Allocator, the storefront builder, the
+Reporter and the rest — are the work left in
+[`docs/plan.md`](docs/plan.md), along with approving from Telegram. Without
+an `ANTHROPIC_API_KEY` the agents are simply off, and the rail runs without
+them.
 
 Refunds after settlement. That one is a policy question — a rolling reserve,
 or letting what you are owed go negative — and it is being decided rather

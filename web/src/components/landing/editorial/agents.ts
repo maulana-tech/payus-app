@@ -148,7 +148,7 @@ export const TABLE: Seat[] = [
     name: "Payer",
     role: "Pays what is due",
     engine: "llm",
-    status: "building",
+    status: "live",
     head: [77.1, 37.2],
     epigram: "Knows which pot the bill comes out of.",
     task: "Watches what falls due and proposes paying it from the right pot. Short in one place, it proposes a move from another — and that move is a proposal too.",
