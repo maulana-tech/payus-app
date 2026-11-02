@@ -1,19 +1,9 @@
 "use client";
 
-import {
-  AllCommunityModule,
-  type ColDef,
-  colorSchemeDark,
-  colorSchemeLight,
-  type GridApi,
-  type GridReadyEvent,
-  ModuleRegistry,
-  themeQuartz,
-  type ValueFormatterParams,
-} from "ag-grid-community";
-import { AgGridReact } from "ag-grid-react";
+import type { GridApi } from "ag-grid-community";
 import { Download, Search } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { useRef, useState } from "react";
 import { formatMinor } from "@/features/invoices/money";
 import type { RouterOutputs } from "@/server/root";
 import { trpc } from "@/trpc/react";
@@ -25,108 +15,30 @@ import { EmptyState, Panel } from "./kit";
 // ledger entries, so both halves of a transaction are here — which is the
 // point: the footer adds each column up and the two totals have to agree.
 
-ModuleRegistry.registerModules([AllCommunityModule]);
+export type LedgerRow = RouterOutputs["ledger"]["entries"][number];
 
-type Row = RouterOutputs["ledger"]["entries"][number];
-
-/** The grid wears the dashboard's own tokens, so it follows light and dark. */
-const gridTheme = themeQuartz.withParams({
-  backgroundColor: "var(--dash-surface)",
-  foregroundColor: "var(--dash-fg)",
-  borderColor: "var(--dash-line-solid)",
-  chromeBackgroundColor: "var(--dash-surface)",
-  oddRowBackgroundColor: "var(--dash-surface)",
-  rowHoverColor: "var(--dash-tint)",
-  selectedRowBackgroundColor: "var(--dash-tint)",
-  headerTextColor: "var(--dash-ash)",
-  headerFontWeight: 600,
-  headerFontSize: "11px",
-  cellFontFamily: "var(--font-landing-mono)",
-  cellFontSize: "13px",
-  rowHeight: "44px",
-  wrapperBorder: false,
-  wrapperBorderRadius: "0px",
-  columnBorder: false,
-  spacing: "7px",
-});
-
-const money = (params: ValueFormatterParams<Row, string>) =>
-  !params.value || params.value === "0"
-    ? ""
-    : formatMinor(BigInt(params.value), params.data?.currency ?? "USD");
-
-const KIND_LABEL: Record<string, string> = {
-  "payment.captured": "Payment taken",
-  settlement: "Settlement",
-  payout: "Payout",
-};
+// AG Grid is ~300 kB; nothing outside this page should pay for it, and it
+// has no server rendering to do.
+const TransactionsGrid = dynamic(
+  () => import("./TransactionsGrid").then((m) => m.TransactionsGrid),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-72 motion-safe:animate-pulse bg-(--dash-tint)"
+        role="status"
+        aria-busy="true"
+        aria-label="Loading the grid"
+      />
+    ),
+  },
+);
 
 export function TransactionsScreen() {
   const entries = trpc.ledger.entries.useQuery();
   const mode = useDashMode();
-  const api = useRef<GridApi<Row> | null>(null);
+  const api = useRef<GridApi<LedgerRow> | null>(null);
   const [quickFilter, setQuickFilter] = useState("");
-
-  const columns = useMemo<ColDef<Row>[]>(
-    () => [
-      {
-        field: "createdAt",
-        headerName: "When",
-        width: 170,
-        valueFormatter: (p: ValueFormatterParams<Row, string>) =>
-          p.value ? new Date(p.value).toLocaleString() : "",
-        filter: "agDateColumnFilter",
-        sort: "desc",
-      },
-      {
-        field: "kind",
-        headerName: "Transaction",
-        width: 150,
-        valueFormatter: (p: ValueFormatterParams<Row, string>) =>
-          KIND_LABEL[p.value ?? ""] ?? p.value ?? "",
-      },
-      { field: "account", headerName: "Account", flex: 1, minWidth: 190 },
-      {
-        field: "debitMinor",
-        headerName: "Debit",
-        width: 130,
-        type: "rightAligned",
-        valueFormatter: money,
-        filter: "agNumberColumnFilter",
-      },
-      {
-        field: "creditMinor",
-        headerName: "Credit",
-        width: 130,
-        type: "rightAligned",
-        valueFormatter: money,
-        filter: "agNumberColumnFilter",
-      },
-      { field: "ref", headerName: "For", width: 190 },
-      {
-        field: "txnId",
-        headerName: "Transaction id",
-        width: 230,
-        headerTooltip:
-          "Deterministic, and the ledger's idempotency key: the same id can only be posted once.",
-      },
-    ],
-    [],
-  );
-
-  const defaultColDef = useMemo<ColDef<Row>>(
-    () => ({
-      filter: true,
-      sortable: true,
-      resizable: true,
-      suppressHeaderMenuButton: true,
-    }),
-    [],
-  );
-
-  const onGridReady = useCallback((event: GridReadyEvent<Row>) => {
-    api.current = event.api;
-  }, []);
 
   const rows = entries.data ?? [];
   const totals = rows.reduce(
@@ -186,24 +98,13 @@ export function TransactionsScreen() {
       ) : (
         <>
           <div className="border-t border-(--dash-line-solid)">
-            <AgGridReact<Row>
-              theme={
-                mode === "dark"
-                  ? gridTheme.withPart(colorSchemeDark)
-                  : gridTheme.withPart(colorSchemeLight)
-              }
-              rowData={rows}
-              columnDefs={columns}
-              defaultColDef={defaultColDef}
-              quickFilterText={quickFilter}
-              onGridReady={onGridReady}
-              pagination
-              paginationPageSize={25}
-              paginationPageSizeSelector={[25, 50, 100]}
-              domLayout="autoHeight"
-              suppressCellFocus
-              enableCellTextSelection
-              overlayNoRowsTemplate="Nothing matches that filter."
+            <TransactionsGrid
+              rows={rows}
+              quickFilter={quickFilter}
+              mode={mode}
+              onReady={(ready) => {
+                api.current = ready;
+              }}
             />
           </div>
           <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-(--dash-line-solid) px-5 py-4 text-sm">
