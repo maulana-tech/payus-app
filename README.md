@@ -74,8 +74,9 @@
 
 ## What is not built yet
 
-Three more thinking seats — the Collector, the Advisor and Merchant Ops —
-are the work left in
+Two more thinking seats — the Collector, which chases an overdue invoice,
+and the Advisor, which answers questions about the books — are the work
+left in
 [`docs/plan.md`](docs/plan.md), along with approving from Telegram. Without
 an `ANTHROPIC_API_KEY` the agents are simply off, and the rail runs without
 them.
