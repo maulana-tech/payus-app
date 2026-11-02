@@ -179,8 +179,16 @@ bawahnya.
       paling penting: menolak tujuan yang dikarang, menolak nominal
       berdesimal, dan ditolak Guardian saat melebihi limit (dengan
       penolakannya tercatat atas nama agen)
-- [ ] **Allocator** — usulkan split tiap dana masuk (butuh jenis usulan
-      kedua di Guardian: `split.change`) — **berikutnya**
+- [x] **Allocator** — mengusulkan pembagian dana masuk. Ini sekaligus
+      membuka Guardian jadi **multi-jenis**: `decide()` dan `execute()`
+      kini memilih berdasarkan `proposal.kind`, jadi jenis ketiga nanti
+      cukup menambah satu fungsi temuan dan satu fungsi penerap.
+      Aturan yang hanya bisa dilihat Guardian (total share lintas aturan)
+      tinggal di Guardian; batas per-aturan tinggal di skema agennya —
+      dan test-nya menguji keduanya di tempat yang benar.
+      Mengganti aturan **mengarsipkan** yang lama, tidak menghapusnya,
+      supaya posting lama masih bisa dibaca terhadap split yang
+      menghasilkannya. 10 eval + 4 test Guardian baru
 - [x] **Developer Agent (storefront)** — deskripsi → konfigurasi JSON
       ber-skema → template kita → halaman di `/shop/<slug>`. Tanpa HTML
       bebas: skema yang sama mengikat editor manual **dan** agen, dan

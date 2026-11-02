@@ -129,7 +129,7 @@ export const TABLE: Seat[] = [
     name: "Allocator",
     role: "Proposes the split",
     engine: "llm",
-    status: "building",
+    status: "live",
     head: [5.1, 32.5],
     epigram: "Divides the morning's takings before noon.",
     task: "Suggests how money that just landed should be divided: the platform's cut, tax set aside, what is yours to spend. It writes a proposal and nothing more.",

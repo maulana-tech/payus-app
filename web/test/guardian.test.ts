@@ -5,6 +5,7 @@ import {
   decide,
   type PayoutProposal,
   type Policy,
+  type SplitProposal,
 } from "../src/features/guardian/decide";
 
 // The Guardian is the one part of the money path that must behave the same
@@ -140,5 +141,59 @@ describe("guardian", () => {
       context({ knownRecipient: false }),
     ] as const;
     expect(decide(...args)).toEqual(decide(...args));
+  });
+});
+
+describe("guardian · split changes", () => {
+  const split = (
+    rules: { name: string; target: string; value: bigint }[],
+  ): SplitProposal => ({
+    kind: "split.change",
+    rules: rules.map((rule) => ({ ...rule, kind: "percent" as const })),
+  });
+
+  const share = (bp: bigint) => context({ currentShareBp: bp });
+
+  it("allows a small adjustment", () => {
+    const decision = decide(
+      split([{ name: "Tax", target: "tax_reserve", value: 1_200n }]),
+      policy(),
+      share(1_000n),
+    );
+    expect(decision.verdict).toBe("allow");
+  });
+
+  it("asks before a large move", () => {
+    const decision = decide(
+      split([{ name: "Tax", target: "tax_reserve", value: 3_000n }]),
+      policy(),
+      share(1_000n),
+    );
+    expect(decision.verdict).toBe("ask");
+    expect(decision.reason).toMatch(/from 10% to 30%/);
+  });
+
+  it("refuses a split that takes almost everything", () => {
+    const decision = decide(
+      split([
+        { name: "Tax", target: "tax_reserve", value: 4_000n },
+        { name: "Vault", target: "pos:vault", value: 6_000n },
+      ]),
+      policy(),
+      share(0n),
+    );
+    expect(decision.verdict).toBe("refuse");
+    expect(decision.findings.map((f) => f.rule)).toContain("split.tooMuch");
+  });
+
+  it("refuses to set the platform's own cut, or an empty split", () => {
+    expect(
+      decide(
+        split([{ name: "Fee", target: "platform_fee", value: 500n }]),
+        policy(),
+        share(0n),
+      ).verdict,
+    ).toBe("refuse");
+    expect(decide(split([]), policy(), share(0n)).verdict).toBe("refuse");
   });
 });

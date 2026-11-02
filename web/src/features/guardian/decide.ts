@@ -12,7 +12,19 @@ export type PayoutProposal = {
   destination: string;
 };
 
-export type Proposal = PayoutProposal;
+/** A change to how money arriving is divided. */
+export type SplitProposal = {
+  kind: "split.change";
+  rules: {
+    name: string;
+    target: string;
+    /** Basis points for a share, minor units for a fixed cut. */
+    kind: "percent" | "fixed";
+    value: bigint;
+  }[];
+};
+
+export type Proposal = PayoutProposal | SplitProposal;
 
 export type Policy = {
   /** Above this, a single payment is refused outright. */
@@ -42,7 +54,14 @@ export type Context = {
   knownRecipient: boolean;
   /** What the ledger says can be released right now. */
   availableMinor: bigint;
+  /** Total basis points the owner's current rules take, for a split change. */
+  currentShareBp?: bigint;
 };
+
+/** A split may not take everything: the merchant has to be left something. */
+export const MAX_SHARE_BP = 9_000n; // 90%
+/** A change larger than this is shown to the owner before it takes effect. */
+export const BIG_SHARE_MOVE_BP = 1_000n; // 10 points
 
 export type Verdict = "allow" | "ask" | "refuse";
 
@@ -125,6 +144,56 @@ function payoutFindings(
   return findings;
 }
 
+function splitFindings(
+  proposal: SplitProposal,
+  _policy: Policy,
+  context: Context,
+): Finding[] {
+  const findings: Finding[] = [];
+  const shareBp = proposal.rules
+    .filter((rule) => rule.kind === "percent")
+    .reduce((total, rule) => total + rule.value, 0n);
+
+  if (proposal.rules.length === 0)
+    findings.push({
+      rule: "split.empty",
+      verdict: "refuse",
+      reason: "A split has to say where something goes.",
+    });
+
+  if (proposal.rules.some((rule) => rule.value <= 0n))
+    findings.push({
+      rule: "split.positive",
+      verdict: "refuse",
+      reason: "Every share has to be above zero.",
+    });
+
+  if (proposal.rules.some((rule) => rule.target === "platform_fee"))
+    findings.push({
+      rule: "split.platformFee",
+      verdict: "refuse",
+      reason: "The platform's own cut is not an agent's to set.",
+    });
+
+  if (shareBp > MAX_SHARE_BP)
+    findings.push({
+      rule: "split.tooMuch",
+      verdict: "refuse",
+      reason: `That sets aside ${Number(shareBp) / 100}% of everything you take, leaving too little to live on.`,
+    });
+
+  const current = context.currentShareBp ?? 0n;
+  const moved = shareBp > current ? shareBp - current : current - shareBp;
+  if (moved > BIG_SHARE_MOVE_BP)
+    findings.push({
+      rule: "split.bigMove",
+      verdict: "ask",
+      reason: `This moves what you set aside by ${Number(moved) / 100} points, from ${Number(current) / 100}% to ${Number(shareBp) / 100}%.`,
+    });
+
+  return findings;
+}
+
 /**
  * Decides a proposal. Every rule is evaluated — not just the first to fire —
  * so the record says everything that was wrong with it, and the verdict is
@@ -135,7 +204,10 @@ export function decide(
   policy: Policy,
   context: Context,
 ): Decision {
-  const findings = payoutFindings(proposal, policy, context);
+  const findings =
+    proposal.kind === "payout"
+      ? payoutFindings(proposal, policy, context)
+      : splitFindings(proposal, policy, context);
   const verdict = findings.reduce<Verdict>(
     (worst, finding) =>
       RANK[finding.verdict] > RANK[worst] ? finding.verdict : worst,

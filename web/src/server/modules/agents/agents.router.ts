@@ -9,6 +9,7 @@ import {
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { mapGuardianError } from "../guardian/guardian.router";
 import { requireUsername } from "../profiles/profiles.service";
+import { runAllocator } from "./allocator.agent";
 import { runBuilder } from "./builder.agent";
 import { runPayer } from "./payer.agent";
 
@@ -42,6 +43,11 @@ export const agentsRouter = createTRPCRouter({
   /** Asks the Payer whether anything should be released now. */
   runPayer: protectedProcedure.mutation(async ({ ctx }) =>
     runPayer(await requireUsername(ctx.privyUserId)).catch(mapError),
+  ),
+
+  /** Asks the Allocator whether the split should change. */
+  runAllocator: protectedProcedure.mutation(async ({ ctx }) =>
+    runAllocator(await requireUsername(ctx.privyUserId)).catch(mapError),
   ),
 
   /** Asks the Builder to write a storefront from a description, as a draft. */

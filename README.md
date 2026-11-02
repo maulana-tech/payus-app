@@ -63,9 +63,13 @@
   own. It writes a draft; you publish it. Each item is paid for the same way
   an invoice is.
 
+- **An Allocator that suggests how to divide what arrives.** It proposes; the
+  Guardian decides whether the change applies now, waits for you, or is
+  refused for taking too much.
+
 ## What is not built yet
 
-Five more thinking seats — the Allocator, the Reporter and the rest — are
+Four more thinking seats — the Reporter, the Collector and the rest — are
 the work left in
 [`docs/plan.md`](docs/plan.md), along with approving from Telegram. Without
 an `ANTHROPIC_API_KEY` the agents are simply off, and the rail runs without

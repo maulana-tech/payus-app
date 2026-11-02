@@ -8,6 +8,7 @@ import {
   decide,
   type PayoutProposal,
   type Policy,
+  type SplitProposal,
 } from "../../../features/guardian/decide";
 import { newId } from "../../../lib/ids";
 import {
@@ -19,6 +20,7 @@ import {
   payouts,
   proposals,
 } from "../../db/client";
+import { activeRules, replaceRules } from "../ledger/split.service";
 import { payableMinor, releasePayout } from "../payments/payouts.service";
 import { canonical } from "./canonical";
 import {
@@ -284,6 +286,105 @@ export async function proposePayout(
   return toView(row);
 }
 
+export type SplitRulePayload = {
+  name: string;
+  target: string;
+  kind: "percent" | "fixed";
+  value: string;
+};
+
+export type ProposeSplitInput = {
+  owner: string;
+  rules: SplitRulePayload[];
+  intentKey: string;
+  proposedBy?: string;
+  model?: string | null;
+};
+
+/**
+ * Proposes a new set of split rules. Same road as a payout: the Guardian
+ * decides, consent is bound to the hash, and only then is anything written.
+ */
+export async function proposeSplitChange(
+  input: ProposeSplitInput,
+): Promise<ProposalView> {
+  const { owner } = input;
+  const current = await activeRules(owner);
+  const currentShareBp = current
+    .filter((rule) => rule.kind === "percent")
+    .reduce((total, rule) => total + rule.value, 0n);
+
+  const proposal: SplitProposal = {
+    kind: "split.change",
+    rules: input.rules.map((rule) => ({
+      name: rule.name,
+      target: rule.target,
+      kind: rule.kind,
+      value: BigInt(rule.value),
+    })),
+  };
+  const policy = await policyFor(owner);
+  const decision = decide(proposal, policy, {
+    spentTodayMinor: 0n,
+    knownRecipient: true,
+    availableMinor: 0n,
+    currentShareBp,
+  });
+
+  const payload: Record<string, unknown> = {
+    rules: input.rules,
+    intentKey: input.intentKey,
+  };
+  const hash = proposalHash("split.change", payload);
+  const open = await byHash(owner, hash);
+  if (open)
+    return open.status === "approved" ? execute(open.row) : toView(open.row);
+
+  const status =
+    decision.verdict === "refuse"
+      ? "refused"
+      : decision.verdict === "ask"
+        ? "awaiting"
+        : "approved";
+
+  const [row] = await getDb()
+    .insert(proposals)
+    .values({
+      id: newId(),
+      owner,
+      kind: "split.change",
+      payload,
+      hash,
+      status,
+      verdict: decision.verdict,
+      reason: decision.reason,
+      findings: decision.findings,
+      proposedBy: input.proposedBy ?? "owner",
+      model: input.model ?? null,
+      expiresAt:
+        decision.verdict === "ask"
+          ? new Date(Date.now() + policy.expiryMinutes * 60_000)
+          : null,
+    })
+    .returning();
+
+  await record(owner, row.id, "proposed", row.proposedBy, {
+    payload,
+    model: row.model,
+  });
+  await record(owner, row.id, "decided", "guardian", {
+    verdict: decision.verdict,
+    reason: decision.reason,
+    findings: decision.findings,
+    context: { currentShareBp: currentShareBp.toString() },
+  });
+
+  if (decision.verdict === "refuse")
+    throw new ProposalRefusedError(decision.reason, decision.findings);
+  if (decision.verdict === "allow") return execute(row);
+  return toView(row);
+}
+
 /** Records the owner's consent against this exact proposal, then runs it. */
 export async function approveProposal(
   owner: string,
@@ -401,28 +502,18 @@ async function execute(row: ProposalRow): Promise<ProposalView> {
     throw new ApprovalVoidError();
   }
 
-  const payload = row.payload as {
-    amountMinor: string;
-    destination: string;
-  };
-  const payout = await releasePayout(row.owner, {
-    amountMinor: BigInt(payload.amountMinor),
-    destination: payload.destination,
-    // The proposal is the intent: asking twice cannot pay twice.
-    intentKey: row.id,
-  });
+  const done =
+    row.kind === "split.change"
+      ? await applySplitChange(row)
+      : await applyPayout(row);
 
   const [executed] = await getDb()
     .update(proposals)
     .set({ status: "executed", updatedAt: new Date() })
     .where(eq(proposals.id, row.id))
     .returning();
-  await record(row.owner, row.id, "executed", "executor", {
-    payoutId: payout.id,
-    senderBatchId: payout.senderBatchId,
-    status: payout.status,
-  });
-  return { ...toView(executed), payoutStatus: payout.status };
+  await record(row.owner, row.id, "executed", "executor", done.detail);
+  return { ...toView(executed), payoutStatus: done.payoutStatus };
 }
 
 /** An attempt already on the record, unless it was refused. */
@@ -443,6 +534,34 @@ async function byHash(
     .orderBy(desc(proposals.createdAt))
     .limit(1);
   return row ? { row, status: row.status } : null;
+}
+
+async function applyPayout(row: ProposalRow) {
+  const payload = row.payload as { amountMinor: string; destination: string };
+  const payout = await releasePayout(row.owner, {
+    amountMinor: BigInt(payload.amountMinor),
+    destination: payload.destination,
+    // The proposal is the intent: asking twice cannot pay twice.
+    intentKey: row.id,
+  });
+  return {
+    payoutStatus: payout.status,
+    detail: {
+      payoutId: payout.id,
+      senderBatchId: payout.senderBatchId,
+      status: payout.status,
+    } as Record<string, unknown>,
+  };
+}
+
+/** Replaces the owner's rules with the approved set, in one go. */
+async function applySplitChange(row: ProposalRow) {
+  const payload = row.payload as { rules: SplitRulePayload[] };
+  await replaceRules(row.owner, payload.rules);
+  return {
+    payoutStatus: undefined,
+    detail: { rules: payload.rules } as Record<string, unknown>,
+  };
 }
 
 async function proposalRow(owner: string, id: string): Promise<ProposalRow> {

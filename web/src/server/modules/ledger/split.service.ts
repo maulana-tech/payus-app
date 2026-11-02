@@ -19,7 +19,8 @@ export type RuleInput = {
   target: string;
   kind: "percent" | "fixed";
   value: string;
-  priority: number;
+  /** Defaults to the position in the list it arrived in. */
+  priority?: number;
 };
 
 const toRule = (row: {
@@ -66,7 +67,7 @@ export async function createRule(owner: string, input: RuleInput) {
       target: input.target,
       kind: input.kind,
       value: input.value,
-      priority: input.priority,
+      priority: input.priority ?? 0,
       state: "active",
     })
     .returning();
@@ -85,6 +86,37 @@ export async function updateRule(
     .returning();
   if (!row) throw new Error("No such split rule.");
   return { ...toRule(row), state: row.state };
+}
+
+/**
+ * Swaps the owner's rules for a new set, in one transaction: the old ones
+ * are archived rather than deleted, so a past split can still be read back
+ * against the postings it produced.
+ */
+export async function replaceRules(
+  owner: string,
+  rules: RuleInput[],
+): Promise<void> {
+  const db = getDb();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(splitRules)
+      .set({ state: "archived", updatedAt: new Date() })
+      .where(and(eq(splitRules.owner, owner), eq(splitRules.state, "active")));
+    if (rules.length === 0) return;
+    await tx.insert(splitRules).values(
+      rules.map((rule, index) => ({
+        id: newId(),
+        owner,
+        name: rule.name,
+        target: rule.target,
+        kind: rule.kind,
+        value: rule.value,
+        priority: rule.priority ?? index,
+        state: "active" as const,
+      })),
+    );
+  });
 }
 
 /** The ledger account a rule's target names for this owner. */

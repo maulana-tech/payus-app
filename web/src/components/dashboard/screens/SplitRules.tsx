@@ -76,14 +76,17 @@ export function SplitRulesPanel({ rules }: { rules: Rule[] }) {
       title="How money is divided"
       hint="Applied the moment a payment is taken, before anything is owed to you."
       action={
-        <button
-          type="button"
-          className={dashButtonSecondary}
-          onClick={() => setAdding(true)}
-        >
-          <Plus aria-hidden="true" />
-          Add rule
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <AskTheAllocator />
+          <button
+            type="button"
+            className={dashButtonSecondary}
+            onClick={() => setAdding(true)}
+          >
+            <Plus aria-hidden="true" />
+            Add rule
+          </button>
+        </div>
       }
     >
       {rules.length === 0 ? (
@@ -132,6 +135,59 @@ export function SplitRulesPanel({ rules }: { rules: Rule[] }) {
         }
       />
     </Panel>
+  );
+}
+
+/**
+ * The Allocator, from the panel its answer would change. It proposes; the
+ * Guardian decides whether the change applies now or waits for the owner.
+ */
+function AskTheAllocator() {
+  const utils = trpc.useUtils();
+  const status = trpc.agents.status.useQuery();
+  const [said, setSaid] = useState<string | null>(null);
+  const run = trpc.agents.runAllocator.useMutation({
+    onSuccess: (result) => {
+      void utils.ledger.summary.invalidate();
+      void utils.guardian.overview.invalidate();
+      setSaid(
+        result.act === "none"
+          ? result.reason
+          : result.proposal?.status === "executed"
+            ? `${result.reason} It was inside your limits, so it is in effect.`
+            : `${result.reason} It is waiting for you to approve.`,
+      );
+    },
+    onError: () => setSaid(null),
+  });
+
+  if (status.data && !status.data.configured) return null;
+
+  return (
+    <div className="grid justify-items-end gap-1.5">
+      <button
+        type="button"
+        className={dashButtonSecondary}
+        disabled={run.isPending}
+        onClick={() => {
+          setSaid(null);
+          run.mutate();
+        }}
+      >
+        {run.isPending ? "Thinking…" : "Ask the Allocator"}
+      </button>
+      {said ? (
+        <p className="max-w-sm text-right text-sm text-(--dash-ash)">{said}</p>
+      ) : null}
+      {run.error ? (
+        <p
+          className="max-w-sm text-right text-sm text-(--dash-err)"
+          role="alert"
+        >
+          {run.error.message}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

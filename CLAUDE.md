@@ -52,13 +52,14 @@ Framework-free modules shared by routes, components and the server: `invoices` (
 
 ### The agents
 `server/lib/claude.ts` is the only place a model is called: `askForJson()` sets the model (`claude-opus-5-5`, thinking always on so the parameter is omitted), the effort, and **structured outputs** (`output_config.format`) — not forced tool use, which that model rejects with a 400. Without `ANTHROPIC_API_KEY` the agents are off and say so; the rail is unaffected.
-`server/modules/agents/payer.agent.ts` is the pattern every later agent should copy:
+`server/modules/agents/` holds one file per seat — `payer`, `allocator`, `builder` — and they are all the same shape:
 - **The agent holds no limits of its own.** It proposes; the Guardian decides. A second copy of the limits here would be a second, drifting source of truth.
 - **Facts come from the ledger**, assembled by `payerFacts()` and spelled out by `payerPrompt()`. The model is never asked to remember a balance.
 - **The destination must be one we showed it.** That is a check after parsing, not a line in the prompt — an address the model invented never reaches the Guardian.
 - **The shape is validated twice**: the API constrains it, then zod decides whether this application will act on it. A schema the API honoured is not the same as an answer worth executing.
 - `ask` is injectable, so `test/payerAgent.test.ts` runs the whole decision path on every commit without spending anything. That file is the agent's eval set; add cases to it rather than trusting the prompt.
 - The model id and prompt version land on the proposal and in the audit log, so a decision can be traced to what produced it.
+- Each has an eval file (`test/*Agent.test.ts`, and `test/storefront.test.ts` for the Builder) that drives the whole decision path against a stubbed model. Add a case there rather than trusting the prompt.
 
 ### Storefronts
 A storefront is **configuration, never markup**. `features/storefront/config.ts` holds the one schema; the hand editor (`screens/StorefrontScreen.tsx`) and the Builder agent are both held to it, and `components/storefront/StorefrontPanel.tsx` is the only renderer. A field that looks like markup therefore reaches the page as text — `test/storefrontRender.test.tsx` is the test behind that claim, so do not introduce `dangerouslySetInnerHTML` here.
@@ -74,7 +75,9 @@ Nothing moves money without a proposal, and no proposal is decided by a model. `
 - **A refusal is a record, not an error to swallow.** A refused proposal is written with its findings before `ProposalRefusedError` is thrown.
 - **Every rule is evaluated**, not just the first to fire, so the audit says everything that was wrong; the verdict is the harshest finding and `reason` quotes only the decisive ones.
 - `intentKey` rides in the payload and so into the hash: submitting the same attempt twice finds the first proposal instead of writing a second. The proposal id then becomes the payout's `intentKey`, which is why an approved proposal can only ever pay once.
-- `executeApproved()` is the door an executor knocks on (Phase 4's agents will), and the only place the hash check can catch a race.
+- `executeApproved()` is the door an executor knocks on, and the only place the hash check can catch a race.
+- **Proposal kinds are a union.** `decide()` dispatches on `proposal.kind` (`payout`, `split.change`) and `execute()` dispatches the same way; adding a third kind means a `*Findings` function and an `apply*` function, nothing else. Rules that only the Guardian can see — a *total* share across rules, a daily total across payments — belong here; a per-item bound belongs in the agent's own schema, and the Allocator has both for exactly that reason.
+- The Guardian guards **agents**, not the owner: `ledger.createRule` lets a person set any split by hand. That is deliberate — the owner is the authority the limits exist to serve.
 - Proposals left unanswered are closed by `expireStaleProposals()`, called from `/api/cron/outbox`.
 
 ### The money path
