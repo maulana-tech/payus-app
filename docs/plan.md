@@ -199,7 +199,14 @@ bawahnya.
       Membeli satu item menulis invoice dulu, jadi penjualan toko turun
       lewat jalur settlement yang sama. 13 test (10 layanan + eval, 3
       render)
-- [ ] **Reporter** — ringkasan dari query ledger
+- [x] **Reporter** — ringkasan dari angka ledger, dan di sinilah invarian
+      §2.2 ditegakkan secara **mekanis**, bukan lewat prompt: setiap angka
+      dalam jawabannya dibandingkan dengan daftar angka yang kita berikan,
+      dan satu angka di luar daftar membuat laporannya dibuang — termasuk
+      pengurangan yang benar, karena menghitung sendiri itu justru yang
+      tidak boleh dilakukan kursi ini. UI-nya menampilkan daftar angka itu
+      di bawah laporannya, karena laporan yang sumbernya tak terlihat cuma
+      klaim. 6 test murni
 - [ ] **Merchant Ops / Advisor** — kalau waktu sisa
 
 ### Fase 5 — 10–11 Nov · UI, hosting, laporan

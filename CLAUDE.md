@@ -59,6 +59,7 @@ Framework-free modules shared by routes, components and the server: `invoices` (
 - **The shape is validated twice**: the API constrains it, then zod decides whether this application will act on it. A schema the API honoured is not the same as an answer worth executing.
 - `ask` is injectable, so `test/payerAgent.test.ts` runs the whole decision path on every commit without spending anything. That file is the agent's eval set; add cases to it rather than trusting the prompt.
 - The model id and prompt version land on the proposal and in the audit log, so a decision can be traced to what produced it.
+- **The Reporter may not state a figure it was not given.** `reporterFacts()` builds the set of permitted figures; `unknownNumbers()` scans the answer and any number outside that set throws the report away — including a correct subtraction, because working one out is the thing this seat must not do. Single digits in prose are allowed; everything else has to have been handed over.
 - Each has an eval file (`test/*Agent.test.ts`, and `test/storefront.test.ts` for the Builder) that drives the whole decision path against a stubbed model. Add a case there rather than trusting the prompt.
 
 ### Storefronts

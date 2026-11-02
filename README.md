@@ -67,10 +67,15 @@
   Guardian decides whether the change applies now, waits for you, or is
   refused for taking too much.
 
+- **A Reporter that cannot invent a figure.** Every number it is allowed to
+  state is handed to it, and a number outside that list throws the whole
+  report away — a correct subtraction included, because working one out is
+  exactly what it must not do.
+
 ## What is not built yet
 
-Four more thinking seats — the Reporter, the Collector and the rest — are
-the work left in
+Three more thinking seats — the Collector, the Advisor and Merchant Ops —
+are the work left in
 [`docs/plan.md`](docs/plan.md), along with approving from Telegram. Without
 an `ANTHROPIC_API_KEY` the agents are simply off, and the rail runs without
 them.

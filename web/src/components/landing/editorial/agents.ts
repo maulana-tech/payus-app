@@ -167,15 +167,18 @@ export const TABLE: Seat[] = [
     name: "Reporter",
     role: "Writes the day down",
     engine: "llm",
-    status: "building",
+    status: "live",
     head: [16.2, 23],
     epigram: "Counts nothing. Explains everything.",
     task: "Turns the day's rows into a few sentences: what came in, what was set aside, what is still owed to you, what was refused and why.",
-    when: "Every morning, and on demand.",
-    chips: ["From SQL", "No recall", "Plain words"],
+    when: "On request, and every morning once you want it.",
+    chips: ["From SQL", "No arithmetic", "Checked"],
     facts: [
-      { label: "Reads", code: "select … from ledger_entries" },
-      { label: "Limit", text: "Is handed the numbers; never remembers them." },
+      { label: "Calls", code: "unknownNumbers(report, figures)" },
+      {
+        label: "Limit",
+        text: "A number it was not given throws the report away.",
+      },
     ],
   },
   {

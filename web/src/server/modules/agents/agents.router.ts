@@ -12,6 +12,7 @@ import { requireUsername } from "../profiles/profiles.service";
 import { runAllocator } from "./allocator.agent";
 import { runBuilder } from "./builder.agent";
 import { runPayer } from "./payer.agent";
+import { runReporter } from "./reporter.agent";
 
 // The agents' door. Each one writes a proposal and stops; what happens next
 // is the Guardian's decision, so these procedures return a proposal, never a
@@ -48,6 +49,11 @@ export const agentsRouter = createTRPCRouter({
   /** Asks the Allocator whether the split should change. */
   runAllocator: protectedProcedure.mutation(async ({ ctx }) =>
     runAllocator(await requireUsername(ctx.privyUserId)).catch(mapError),
+  ),
+
+  /** Asks the Reporter to say what has happened, in a few sentences. */
+  runReporter: protectedProcedure.mutation(async ({ ctx }) =>
+    runReporter(await requireUsername(ctx.privyUserId)).catch(mapError),
   ),
 
   /** Asks the Builder to write a storefront from a description, as a draft. */

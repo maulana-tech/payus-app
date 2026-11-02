@@ -18,6 +18,7 @@ import {
   StatusChip,
 } from "./kit";
 import { ReleaseDialog } from "./ReleaseDialog";
+import { ReportPanel } from "./ReportPanel";
 import { SplitRulesPanel } from "./SplitRules";
 
 // Everything on this screen is read from the ledger and the invoices
@@ -145,6 +146,8 @@ export function OverviewScreen({ username }: { username: string }) {
           )}
         </Panel>
       </div>
+
+      <ReportPanel />
 
       <ApprovalsPanel />
 
