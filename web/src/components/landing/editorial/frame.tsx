@@ -20,7 +20,17 @@ export const SECTIONS: { id: string; label: string; quiet?: boolean }[] = [
 
 /** The one call to action on the page: into the app, however far along you are. */
 export function Cta({ className }: { className?: string }) {
-  const { authenticated, connecting, username, signIn } = useSession();
+  const { authenticated, connecting, sessionReady, username, signIn } =
+    useSession();
+  // Sign-in lives behind a provider that has to load before it can do
+  // anything. If it never does, say so — a button that silently does
+  // nothing is worse than one that admits it cannot work.
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    if (sessionReady) return setStalled(false);
+    const timer = setTimeout(() => setStalled(true), 8000);
+    return () => clearTimeout(timer);
+  }, [sessionReady]);
   const body = (
     <>
       {connecting
@@ -40,14 +50,33 @@ export function Cta({ className }: { className?: string }) {
     mono,
     className,
   );
-  return authenticated ? (
-    <Link href="/dashboard" className={shell}>
-      {body}
-    </Link>
-  ) : (
-    <button type="button" onClick={() => signIn()} className={shell}>
-      {body}
-    </button>
+  if (authenticated)
+    return (
+      <Link href="/dashboard" className={shell}>
+        {body}
+      </Link>
+    );
+
+  return (
+    <span className={cn("inline-grid gap-2", className && "justify-items-end")}>
+      <button
+        type="button"
+        onClick={() => signIn()}
+        className={shell}
+        aria-describedby={stalled ? "sign-in-stalled" : undefined}
+      >
+        {body}
+      </button>
+      {stalled ? (
+        <span
+          id="sign-in-stalled"
+          className={cn(mono, "max-w-64 text-ed-cream/50")}
+        >
+          Sign-in has not loaded. If this is your deployment, check
+          NEXT_PUBLIC_PRIVY_APP_ID.
+        </span>
+      ) : null}
+    </span>
   );
 }
 
