@@ -92,9 +92,9 @@ const nextConfig = {
   distDir: localBuild ? ".next-local" : ".next",
   outputFileTracingRoot: repoRoot,
   reactStrictMode: true,
-  // pg loads optional native bindings that webpack can't statically bundle
-  // for the Node.js server runtime — require it from node_modules.
-  serverExternalPackages: ["pg"],
+  // Bundling these breaks their dynamic requires: pg's optional native
+  // bindings, and the Bedrock SDK's AWS credential chain.
+  serverExternalPackages: ["pg", "@anthropic-ai/bedrock-sdk"],
   webpack: (config) => {
     config.resolve = config.resolve || {};
     config.resolve.alias = {

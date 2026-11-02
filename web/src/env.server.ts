@@ -31,6 +31,16 @@ export const serverEnvSchema = z.object({
   PAYPAL_PAYOUTS_ENABLED: optionalString,
   // Without it the agents are switched off; the rail works regardless.
   ANTHROPIC_API_KEY: optionalString,
+  /**
+   * Which way the agents reach Claude. Left unset it follows the key: an
+   * `ANTHROPIC_API_KEY` means the first-party API. Set it to "bedrock" to go
+   * through Amazon Bedrock instead, which needs a region below and leaves
+   * credentials to the ordinary AWS chain (env vars, profile, or an IAM role
+   * with no environment variable at all).
+   */
+  ANTHROPIC_BACKEND: z.enum(["api", "bedrock"]).optional(),
+  BEDROCK_AWS_REGION: optionalString,
+  AWS_REGION: optionalString,
 });
 
 export function getServerEnv() {
@@ -49,6 +59,9 @@ export function getServerEnv() {
     PAYPAL_WEBHOOK_ID: process.env.PAYPAL_WEBHOOK_ID,
     PAYPAL_PAYOUTS_ENABLED: process.env.PAYPAL_PAYOUTS_ENABLED,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    ANTHROPIC_BACKEND: process.env.ANTHROPIC_BACKEND,
+    BEDROCK_AWS_REGION: process.env.BEDROCK_AWS_REGION,
+    AWS_REGION: process.env.AWS_REGION,
   });
 }
 

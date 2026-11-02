@@ -1,4 +1,5 @@
 import "server-only";
+import { AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
 import Anthropic from "@anthropic-ai/sdk";
 import { getServerEnv } from "../../env.server";
 
@@ -7,15 +8,21 @@ import { getServerEnv } from "../../env.server";
 // decided in a single file — and so a deployment without a key degrades to
 // an honest "not configured" instead of a half-working agent.
 
-/** Opus 5.5: thinking is always on, so the parameter is omitted entirely. */
-export const AGENT_MODEL = "claude-opus-5-5";
+/**
+ * Opus 5.5: thinking is always on, so the parameter is omitted entirely.
+ * Bedrock serves the same model under an `anthropic.` prefixed id.
+ */
+const MODEL = "claude-opus-5-5";
+export const AGENT_MODEL = MODEL;
 
 /** Bumped whenever a prompt changes, and recorded on every proposal. */
 export const PROMPT_VERSION = "2026-11-02.1";
 
 export class ClaudeNotConfiguredError extends Error {
-  constructor() {
-    super("No ANTHROPIC_API_KEY, so the agents are switched off.");
+  constructor(
+    message = "No ANTHROPIC_API_KEY and no Bedrock region, so the agents are switched off.",
+  ) {
+    super(message);
     this.name = "ClaudeNotConfiguredError";
   }
 }
@@ -34,15 +41,55 @@ export class ClaudeShapeError extends Error {
   }
 }
 
-export const claudeConfigured = () => Boolean(getServerEnv().ANTHROPIC_API_KEY);
+export type Backend = "api" | "bedrock";
 
-let client: Anthropic | undefined;
+const bedrockRegion = () => {
+  const env = getServerEnv();
+  return env.BEDROCK_AWS_REGION || env.AWS_REGION;
+};
 
-function anthropic(): Anthropic {
-  const key = getServerEnv().ANTHROPIC_API_KEY;
-  if (!key) throw new ClaudeNotConfiguredError();
-  client ??= new Anthropic({ apiKey: key });
-  return client;
+/** Which way out, following the explicit setting or the key that is present. */
+export function backend(): Backend | null {
+  const env = getServerEnv();
+  if (env.ANTHROPIC_BACKEND === "bedrock")
+    return bedrockRegion() ? "bedrock" : null;
+  return env.ANTHROPIC_API_KEY ? "api" : null;
+}
+
+/**
+ * Whether the agents have somewhere to go. On Bedrock this means a region is
+ * set, not that the credentials work: the AWS chain resolves at call time —
+ * an IAM role leaves no environment variable to check — so a credentials
+ * problem surfaces as an error on the first run rather than here.
+ */
+export const claudeConfigured = () => backend() !== null;
+
+/** Both clients expose the same `messages` surface; only the id differs. */
+type Caller = Pick<Anthropic, "messages">;
+
+let client: Caller | undefined;
+let clientBackend: Backend | undefined;
+
+function anthropic(): { caller: Caller; model: string } {
+  const which = backend();
+  if (!which)
+    throw new ClaudeNotConfiguredError(
+      getServerEnv().ANTHROPIC_BACKEND === "bedrock"
+        ? "Bedrock is selected but no region is set (BEDROCK_AWS_REGION or AWS_REGION)."
+        : undefined,
+    );
+  if (!client || clientBackend !== which) {
+    client =
+      which === "bedrock"
+        ? new AnthropicBedrockMantle({ awsRegion: bedrockRegion() })
+        : new Anthropic({ apiKey: getServerEnv().ANTHROPIC_API_KEY });
+    clientBackend = which;
+  }
+  // Bedrock namespaces the model; the first-party API does not.
+  return {
+    caller: client,
+    model: which === "bedrock" ? `anthropic.${MODEL}` : MODEL,
+  };
 }
 
 /** What every agent call returns: the parsed JSON and what produced it. */
@@ -65,8 +112,9 @@ export async function askForJson(input: {
   /** Simple decisions do not need deep thinking; this is a cost lever. */
   effort?: "low" | "medium" | "high";
 }): Promise<Completion> {
-  const response = await anthropic().messages.create({
-    model: AGENT_MODEL,
+  const { caller, model } = anthropic();
+  const response = await caller.messages.create({
+    model,
     // A decision object is a few hundred tokens; this is a deliberate cap.
     max_tokens: 4096,
     system: input.system,
