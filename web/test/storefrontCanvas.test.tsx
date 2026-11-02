@@ -35,6 +35,9 @@ vi.mock("../src/components/canvas/HtmlEditor", () => ({
 }));
 
 import { CanvasEditor } from "../src/components/canvas/CanvasEditor";
+import { storefrontInput } from "../src/features/storefront/config";
+import { toInput } from "../src/features/storefront/draft";
+import { starters } from "../src/features/storefront/starters";
 import { trpc } from "../src/trpc/react";
 import { createTestQueryClient, renderWithTRPC } from "./renderWithTRPC";
 
@@ -139,5 +142,85 @@ describe("storefront canvas", () => {
 
     await userEvent.type(screen.getByLabelText("HTML"), "<p>more</p>");
     await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
+  });
+});
+
+/** A canvas with no shops, and the sanitiser's answer already in hand. */
+function newShop() {
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(
+    getQueryKey(trpc.storefront.mine, undefined, "query"),
+    [],
+  );
+  for (const starter of starters)
+    queryClient.setQueryData(
+      getQueryKey(
+        trpc.storefront.previewHtml,
+        { html: starter.draft.html },
+        "query",
+      ),
+      { raw: starter.draft.html, clean: starter.draft.html, removed: [] },
+    );
+  return queryClient;
+}
+
+describe("starters", () => {
+  // A starting point the schema refuses is a trap, not a shortcut: the owner
+  // would meet the error on their first save and have nothing to fix it with.
+  it.each(
+    starters.map((starter) => [starter.name, starter] as const),
+  )("%s is a draft the schema accepts", (_name, starter) => {
+    const parsed = storefrontInput.safeParse(toInput(starter.draft));
+    expect(parsed.error?.issues ?? []).toEqual([]);
+    expect(parsed.success).toBe(true);
+  });
+
+  it("offers five of them, and a way past them", async () => {
+    const queryClient = newShop();
+    renderWithTRPC(<CanvasEditor id="new" />, { queryClient });
+
+    expect(screen.getByText("Start from")).toBeTruthy();
+    for (const starter of starters) expect(screen.getByText(starter.name));
+    expect(starters).toHaveLength(5);
+
+    // The canvas shows the starter being considered, through the same
+    // renderer the public gets.
+    await waitFor(() =>
+      screen.getByRole("heading", {
+        level: 1,
+        name: starters[0].draft.title,
+      }),
+    );
+
+    // Highlighting a second one moves the page with it.
+    await userEvent.click(screen.getByText(starters[2].name));
+    await waitFor(() =>
+      screen.getByRole("heading", {
+        level: 1,
+        name: starters[2].draft.title,
+      }),
+    );
+
+    // Taking it hands the draft to the editor, where it is ordinary.
+    await userEvent.click(screen.getByRole("button", { name: "Use this one" }));
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Create as draft" })
+          .hasAttribute("disabled"),
+      ).toBe(false),
+    );
+    expect(screen.getByLabelText<HTMLInputElement>("Name").value).toBe(
+      starters[2].draft.title,
+    );
+  });
+
+  it("can start from an empty page", async () => {
+    const queryClient = newShop();
+    renderWithTRPC(<CanvasEditor id="new" />, { queryClient });
+
+    await userEvent.click(screen.getByText("Start from an empty page instead"));
+    expect(screen.queryByText("Start from")).toBeNull();
+    expect(screen.getByLabelText<HTMLInputElement>("Name").value).toBe("");
   });
 });

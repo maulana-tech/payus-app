@@ -43,6 +43,7 @@ import {
   toInput,
   toPreview,
 } from "@/features/storefront/draft";
+import { starters } from "@/features/storefront/starters";
 import { palette } from "@/features/storefront/theme";
 import { trpc } from "@/trpc/react";
 import type { HtmlEditorHandle } from "./HtmlEditor";
@@ -85,6 +86,10 @@ export function CanvasEditor({ id }: { id: string }) {
   const [tab, setTab] = useState<Tab>(isNew ? "page" : "html");
   const [device, setDevice] = useState<Device>("wide");
   const [slugEdited, setSlugEdited] = useState(!isNew);
+  // A new shop opens on the starters rather than on an empty page. Choosing
+  // one only fills the draft; from then on it is an ordinary draft.
+  const [picking, setPicking] = useState(isNew);
+  const [highlight, setHighlight] = useState(0);
 
   // Seeded once the shop arrives, and never again: re-seeding would throw
   // away what is being typed every time the list refetches.
@@ -162,7 +167,10 @@ export function CanvasEditor({ id }: { id: string }) {
     );
 
   const published = store?.state === "published";
-  const path = `/shop/${draft.slug || slugify(draft.title) || "your-shop"}`;
+  // While picking, the canvas shows the starter being considered — the same
+  // renderer, so a starter is judged as the page it would become.
+  const shown = picking ? starters[highlight].draft : draft;
+  const path = `/shop/${shown.slug || slugify(shown.title) || "your-shop"}`;
 
   return (
     <div className="flex h-svh flex-col overflow-hidden bg-(--dash-bg) text-(--dash-fg)">
@@ -176,16 +184,31 @@ export function CanvasEditor({ id }: { id: string }) {
         </Link>
         <div className="min-w-0">
           <p className="flex items-center gap-2 truncate text-sm font-medium">
-            {draft.title || "New shop"}
-            <StatusChip status={published ? "live" : "draft"} />
+            {picking ? "New shop" : draft.title || "New shop"}
+            {picking ? null : (
+              <StatusChip status={published ? "live" : "draft"} />
+            )}
           </p>
           <p className="truncate text-[12px] text-(--dash-ash)">
-            {path} · {dirty ? "Unsaved changes" : saving ? "Saving…" : "Saved"}
+            {picking
+              ? "Start from one of these, or from nothing"
+              : `${path} · ${
+                  dirty ? "Unsaved changes" : saving ? "Saving…" : "Saved"
+                }`}
           </p>
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          {published ? (
+          {picking ? (
+            <button
+              type="button"
+              className={dashButtonSecondary}
+              onClick={() => setPicking(false)}
+            >
+              Start from nothing
+            </button>
+          ) : null}
+          {!picking && published ? (
             <a
               href={path}
               target="_blank"
@@ -196,7 +219,7 @@ export function CanvasEditor({ id }: { id: string }) {
               Open
             </a>
           ) : null}
-          {store ? (
+          {!picking && store ? (
             <button
               type="button"
               className={dashButtonSecondary}
@@ -208,14 +231,16 @@ export function CanvasEditor({ id }: { id: string }) {
               {published ? "Unpublish" : "Publish"}
             </button>
           ) : null}
-          <button
-            type="button"
-            className={dashButtonPrimary}
-            disabled={saving || !dirty}
-            onClick={save}
-          >
-            {saving ? "Saving…" : store ? "Save" : "Create as draft"}
-          </button>
+          {picking ? null : (
+            <button
+              type="button"
+              className={dashButtonPrimary}
+              disabled={saving || !dirty}
+              onClick={save}
+            >
+              {saving ? "Saving…" : store ? "Save" : "Create as draft"}
+            </button>
+          )}
         </div>
       </header>
 
@@ -229,41 +254,56 @@ export function CanvasEditor({ id }: { id: string }) {
         {/* Stacked on a narrow screen, side by side from `lg`: the editor
             takes a fixed slice so the page below it is never squeezed out. */}
         <section className="flex h-[55svh] min-h-0 w-full shrink-0 flex-col border-b border-(--dash-line-solid) lg:h-auto lg:w-[clamp(26rem,34vw,34rem)] lg:border-r lg:border-b-0">
-          <div className="shrink-0 border-b border-(--dash-line-solid) p-3">
-            <Segmented
-              aria-label="What to edit"
-              value={tab}
-              onChange={setTab}
-              options={[
-                { value: "page", label: "Page" },
-                { value: "items", label: "Items" },
-                { value: "html", label: "HTML" },
-                { value: "look", label: "Look" },
-              ]}
-            />
-          </div>
-
-          {tab === "html" ? (
-            <HtmlPane
-              value={draft.html}
-              onChange={(html) => patch({ html })}
-              removedFor={draft}
+          {picking ? (
+            <StarterList
+              highlight={highlight}
+              onHighlight={setHighlight}
+              onChoose={(chosen) => {
+                setDraft(chosen);
+                setPicking(false);
+                setTab("page");
+              }}
+              onBlank={() => setPicking(false)}
             />
           ) : (
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {tab === "page" ? (
-                <PageFields
-                  draft={draft}
-                  patch={patch}
-                  slugEdited={slugEdited}
-                  onSlugEdited={() => setSlugEdited(true)}
+            <>
+              <div className="shrink-0 border-b border-(--dash-line-solid) p-3">
+                <Segmented
+                  aria-label="What to edit"
+                  value={tab}
+                  onChange={setTab}
+                  options={[
+                    { value: "page", label: "Page" },
+                    { value: "items", label: "Items" },
+                    { value: "html", label: "HTML" },
+                    { value: "look", label: "Look" },
+                  ]}
                 />
-              ) : tab === "items" ? (
-                <ItemFields draft={draft} setDraft={setDraft} />
+              </div>
+
+              {tab === "html" ? (
+                <HtmlPane
+                  value={draft.html}
+                  onChange={(html) => patch({ html })}
+                  removedFor={draft}
+                />
               ) : (
-                <LookFields draft={draft} patch={patch} />
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                  {tab === "page" ? (
+                    <PageFields
+                      draft={draft}
+                      patch={patch}
+                      slugEdited={slugEdited}
+                      onSlugEdited={() => setSlugEdited(true)}
+                    />
+                  ) : tab === "items" ? (
+                    <ItemFields draft={draft} setDraft={setDraft} />
+                  ) : (
+                    <LookFields draft={draft} patch={patch} />
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
         </section>
 
@@ -296,9 +336,104 @@ export function CanvasEditor({ id }: { id: string }) {
             </div>
           </div>
 
-          <Canvas draft={draft} owner={username ?? "you"} device={device} />
+          <Canvas draft={shown} owner={username ?? "you"} device={device} />
         </section>
       </div>
+    </div>
+  );
+}
+
+/** The five shops a new one can start as, each judged on the canvas. */
+function StarterList({
+  highlight,
+  onHighlight,
+  onChoose,
+  onBlank,
+}: {
+  highlight: number;
+  onHighlight: (index: number) => void;
+  onChoose: (draft: Draft) => void;
+  onBlank: () => void;
+}) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <p className="text-[11px] font-semibold tracking-[0.14em] text-(--dash-ash) uppercase">
+        Start from
+      </p>
+      <div className="mt-3 grid gap-2">
+        {starters.map((starter, index) => {
+          const chosen = index === highlight;
+          const colours = palette(starter.draft.theme, starter.draft.accent);
+          return (
+            <div
+              key={starter.id}
+              className={`rounded-(--dash-radius) border transition-colors ${
+                chosen
+                  ? "border-(--dash-fg)"
+                  : "border-(--dash-line) hover:border-(--dash-line-strong)"
+              }`}
+            >
+              <button
+                type="button"
+                aria-pressed={chosen}
+                onClick={() => onHighlight(index)}
+                onDoubleClick={() => onChoose(starter.draft)}
+                className={`flex w-full items-center gap-3 p-3 text-left ${dashFocus}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="grid size-10 shrink-0 place-items-center rounded-xl border"
+                  style={{
+                    background: colours.page,
+                    borderColor: colours.line,
+                  }}
+                >
+                  <span
+                    className="block h-0.5 w-5 rounded-full"
+                    style={{ background: colours.accent }}
+                  />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">
+                    {starter.name}
+                  </span>
+                  <span className="block truncate text-[13px] text-(--dash-ash)">
+                    {starter.hint}
+                  </span>
+                </span>
+              </button>
+              {chosen ? (
+                <div className="flex items-center justify-between gap-3 border-t border-(--dash-line) px-3 py-2">
+                  <p className="text-[12px] text-(--dash-ash)">
+                    {starter.draft.template} · {starter.draft.theme} ·{" "}
+                    {starter.draft.lines.length} item
+                    {starter.draft.lines.length === 1 ? "" : "s"}
+                  </p>
+                  <button
+                    type="button"
+                    className={dashButtonPrimary}
+                    onClick={() => onChoose(starter.draft)}
+                  >
+                    Use this one
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={onBlank}
+        className={`mt-3 text-sm text-(--dash-ash) underline underline-offset-4 hover:text-(--dash-fg) ${dashFocus}`}
+      >
+        Start from an empty page instead
+      </button>
+      <p className="mt-4 text-sm text-(--dash-ash)">
+        Every one of these is a draft like any other: pick the nearest, then
+        change the parts that are not yours. Nothing is public until you publish
+        it.
+      </p>
     </div>
   );
 }

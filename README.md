@@ -64,7 +64,9 @@
   frame with no scripts. Four layouts, a palette to choose, quantities,
   sold-out items and bounds on what a payer may name. It writes a draft; you
   open it on a canvas — the page itself on one side, what makes it on the
-  other — and publish when it reads right.
+  other — and publish when it reads right. Or start from one of five shops
+  that already work: a coffee bar, a freelance practice, a tip jar, a warung
+  menu, a class.
   Everything a payer sends is checked against the stored item — the page is
   never the authority on what something costs.
 

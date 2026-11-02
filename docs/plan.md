@@ -232,6 +232,16 @@ bawahnya.
       `@container` dengan breakpoint `@min-[640px]:`, sehingga pratinjau
       414px menjawab seperti ponsel sungguhan. `EditorDialog` lama dihapus.
       4 test kanvas.
+- [x] **Lima toko siap pakai sebagai titik awal.** Halaman kosong adalah
+      halaman terburuk di editor, jadi `/canvas/new` membuka lima draf utuh:
+      Coffee bar (shelf · sun), Freelance work (single · paper), Tip jar
+      (tip · ink), Warung menu (menu · paper) dan Class or event
+      (single · sun) — masing-masing lengkap dengan item, harga, dan blok
+      HTML. Saat memilih, kanvas menampilkan starter itu lewat
+      `StorefrontPage` yang sama, jadi ia dinilai sebagai halaman yang akan
+      jadi. Memilih hanya mengisi editor; sesudahnya ia draf biasa. Setiap
+      starter diurai lewat `storefrontInput` di test: titik awal yang
+      ditolak skema itu jebakan, bukan jalan pintas. 7 test tambahan.
 - [x] **Reporter** — ringkasan dari angka ledger, dan di sinilah invarian
       §2.2 ditegakkan secara **mekanis**, bukan lewat prompt: setiap angka
       dalam jawabannya dibandingkan dengan daftar angka yang kita berikan,
