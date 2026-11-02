@@ -267,7 +267,8 @@ bawahnya.
       menunjuk ke variabel `--dash-*`, jadi ikut mode terang/gelap.
       Footer-nya menjumlahkan dua kolomnya dan menyatakan "Balanced" —
       inilah yang layak muncul di video
-- [ ] Storefront builder + pratinjau live
+- [x] **Storefront builder + pratinjau live** — selesai 2 Nov lewat kanvas
+      `/canvas/[id]`: pratinjau adalah halaman itu sendiri, bukan tiruan.
 - Deploy ke **Render** + Postgres terkelola, cron invoice aktif
 - Laporan: settlement harian, rekonsiliasi, ekspor CSV/PDF
   (`lib/invoicePdf.ts`, `lib/csv.ts`, `lib/download.ts` sudah ada, tinggal
