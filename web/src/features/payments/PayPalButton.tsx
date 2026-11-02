@@ -146,7 +146,7 @@ export function PayPalButton({
 
   if (!clientId)
     return (
-      <p className="rounded-lg bg-ink/5 p-4 text-sm text-ink/60">
+      <p className="rounded-lg bg-(--dash-tint) p-4 text-sm text-(--dash-ash)">
         This deployment has no PayPal client id, so the pay button is off. The
         invoice, its totals and its webhook all work.
       </p>
@@ -156,12 +156,12 @@ export function PayPalButton({
     <div className="grid gap-2">
       <div ref={container} />
       {working ? (
-        <p className="text-sm text-ink/60" role="status">
+        <p className="text-sm text-(--dash-ash)" role="status">
           Recording the payment…
         </p>
       ) : null}
       {error ? (
-        <p className="text-sm text-(--color-err)" role="alert">
+        <p className="text-sm text-(--dash-err)" role="alert">
           {error}
         </p>
       ) : null}

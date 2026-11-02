@@ -16,13 +16,13 @@ export function StorefrontPanel({ slug }: { slug: string }) {
   const [paid, setPaid] = useState<string | null>(null);
 
   if (shop.isLoading)
-    return <Card className="p-6 text-sm text-ink/60">Loading…</Card>;
+    return <Card className="p-6 text-sm text-(--dash-ash)">Loading…</Card>;
 
   if (!shop.data)
     return (
       <Card className="grid gap-2 p-6">
         <h1 className="text-lg">Nothing here</h1>
-        <p className="text-sm text-ink/60">
+        <p className="text-sm text-(--dash-ash)">
           This shop does not exist, or it has not been published yet.
         </p>
       </Card>
@@ -33,12 +33,12 @@ export function StorefrontPanel({ slug }: { slug: string }) {
   return (
     <div className="grid gap-4">
       <Card className="grid gap-2 p-6">
-        <p className="text-xs uppercase tracking-wide text-ink/50">
+        <p className="text-xs uppercase tracking-wide text-(--dash-ash)">
           @{store.owner}
         </p>
         <h1 className="text-2xl">{store.title}</h1>
         {store.blurb ? (
-          <p className="text-[15px] leading-relaxed text-ink/70">
+          <p className="text-[15px] leading-relaxed text-(--dash-ash)">
             {store.blurb}
           </p>
         ) : null}
@@ -89,24 +89,24 @@ function ProductCard({
             {formatMinor(BigInt(product.priceMinor), currency)}
           </p>
         ) : (
-          <p className="text-sm text-ink/60">You choose</p>
+          <p className="text-sm text-(--dash-ash)">You choose</p>
         )}
       </div>
       {product.description ? (
-        <p className="text-sm leading-relaxed text-ink/70">
+        <p className="text-sm leading-relaxed text-(--dash-ash)">
           {product.description}
         </p>
       ) : null}
 
       {paid ? (
-        <p className="rounded-lg bg-ink/5 p-4 text-sm text-ink/60">
+        <p className="rounded-lg bg-(--dash-tint) p-4 text-sm text-(--dash-ash)">
           Paid. Thank you — the seller has been told.
         </p>
       ) : (
         <div className="grid gap-3">
           {openAmount ? (
             <label className="grid gap-1.5 text-sm">
-              <span className="text-ink/60">Amount</span>
+              <span className="text-(--dash-ash)">Amount</span>
               <Input
                 value={amount}
                 inputMode="decimal"

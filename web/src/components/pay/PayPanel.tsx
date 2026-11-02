@@ -28,13 +28,15 @@ export function PayPanel({
   );
 
   if (profile.isLoading || (slug && link.isLoading))
-    return <Card className="p-6 text-sm text-ink/60">Loading…</Card>;
+    return <Card className="p-6 text-sm text-(--dash-ash)">Loading…</Card>;
 
   if (!profile.data)
     return (
       <Card className="grid gap-2 p-6">
         <h1 className="text-lg">No such username</h1>
-        <p className="text-sm text-ink/60">Nobody has claimed @{username}.</p>
+        <p className="text-sm text-(--dash-ash)">
+          Nobody has claimed @{username}.
+        </p>
       </Card>
     );
 
@@ -42,7 +44,7 @@ export function PayPanel({
     return (
       <Card className="grid gap-2 p-6">
         <h1 className="text-lg">Link not found</h1>
-        <p className="text-sm text-ink/60">
+        <p className="text-sm text-(--dash-ash)">
           @{username} has no active link called “{slug}”.
         </p>
       </Card>
@@ -59,25 +61,25 @@ export function PayPanel({
   return (
     <Card className="grid gap-4 p-6">
       <div className="grid gap-1">
-        <p className="text-xs uppercase tracking-wide text-ink/50">Pay</p>
+        <p className="text-xs uppercase tracking-wide text-(--dash-ash)">Pay</p>
         <h1 className="text-2xl">@{profile.data.username}</h1>
         {link.data ? (
-          <p className="text-[15px] text-ink/70">{link.data.title}</p>
+          <p className="text-[15px] text-(--dash-ash)">{link.data.title}</p>
         ) : null}
       </div>
       {fixed ? <p className="text-3xl tabular-nums">{fixed}</p> : null}
       {link.data?.description ? (
-        <p className="text-sm text-ink/60">{link.data.description}</p>
+        <p className="text-sm text-(--dash-ash)">{link.data.description}</p>
       ) : null}
       {paid ? (
-        <p className="rounded-lg bg-ink/5 p-4 text-sm text-ink/60">
+        <p className="rounded-lg bg-(--dash-tint) p-4 text-sm text-(--dash-ash)">
           Paid. Thank you — @{username} has been told.
         </p>
       ) : link.data ? (
         <div className="grid gap-3">
           {openAmount ? (
             <label className="grid gap-1.5 text-sm">
-              <span className="text-ink/60">Amount to pay</span>
+              <span className="text-(--dash-ash)">Amount to pay</span>
               <Input
                 value={amount}
                 inputMode="decimal"
@@ -102,7 +104,7 @@ export function PayPanel({
           />
         </div>
       ) : (
-        <p className="rounded-lg bg-ink/5 p-4 text-sm text-ink/60">
+        <p className="rounded-lg bg-(--dash-tint) p-4 text-sm text-(--dash-ash)">
           Open one of @{username}&rsquo;s payment links to pay them.
         </p>
       )}
