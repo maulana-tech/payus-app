@@ -1,5 +1,7 @@
 import "server-only";
-import { AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
+import AnthropicBedrock, {
+  AnthropicBedrockMantle,
+} from "@anthropic-ai/bedrock-sdk";
 import Anthropic from "@anthropic-ai/sdk";
 import { getServerEnv } from "../../env.server";
 
@@ -60,6 +62,23 @@ const bedrockRegion = () => {
   return env.BEDROCK_AWS_REGION || env.AWS_REGION;
 };
 
+/**
+ * Which id to ask Bedrock for. Two shapes exist and they are served by two
+ * different endpoints, which is measurable rather than a matter of taste:
+ *
+ *   anthropic.claude-opus-5-5        the Messages (Mantle) endpoint, us-east-1
+ *   au.anthropic.claude-opus-5-5     an inference profile, InvokeModel
+ *
+ * Outside us-east-1 the Messages endpoint answers 404 for every id, and
+ * InvokeModel answers "retry with an inference profile" for a bare one — so
+ * a region like ap-southeast-2 needs the profile form in BEDROCK_MODEL_ID.
+ */
+const bedrockModel = () =>
+  getServerEnv().BEDROCK_MODEL_ID?.trim() || `anthropic.${MODEL}`;
+
+/** A profile id names a region or the globe; a bare id names the model. */
+const isInferenceProfile = (id: string) => !id.startsWith("anthropic.");
+
 /** Which way out, following the explicit setting or the key that is present. */
 export function backend(): Backend | null {
   const env = getServerEnv();
@@ -76,8 +95,18 @@ export function backend(): Backend | null {
  */
 export const claudeConfigured = () => backend() !== null;
 
-/** Both clients expose the same `messages` surface; only the id differs. */
-type Caller = Pick<Anthropic, "messages">;
+/**
+ * The slice of a client this file actually uses. The three clients (first
+ * party, Bedrock Messages, Bedrock InvokeModel) expose wider and slightly
+ * different surfaces, so the type says only what is called here.
+ */
+type Caller = {
+  messages: {
+    create(
+      params: Anthropic.MessageCreateParamsNonStreaming,
+    ): Promise<Anthropic.Message>;
+  };
+};
 
 let client: Caller | undefined;
 let clientBackend: Backend | undefined;
@@ -90,19 +119,17 @@ function anthropic(): { caller: Caller; which: Backend; model: string } {
         ? "Bedrock is selected but no region is set (BEDROCK_AWS_REGION or AWS_REGION)."
         : undefined,
     );
+  const model = which === "bedrock" ? bedrockModel() : MODEL;
   if (!client || clientBackend !== which) {
     client =
       which === "bedrock"
-        ? new AnthropicBedrockMantle({ awsRegion: bedrockRegion() })
+        ? isInferenceProfile(model)
+          ? new AnthropicBedrock({ awsRegion: bedrockRegion() })
+          : new AnthropicBedrockMantle({ awsRegion: bedrockRegion() })
         : new Anthropic({ apiKey: getServerEnv().ANTHROPIC_API_KEY });
     clientBackend = which;
   }
-  // Bedrock namespaces the model; the first-party API does not.
-  return {
-    caller: client,
-    which,
-    model: which === "bedrock" ? `anthropic.${MODEL}` : MODEL,
-  };
+  return { caller: client, which, model };
 }
 
 /**
@@ -123,7 +150,7 @@ async function call<T>(
       throw new ClaudeAccessError(
         status === 403
           ? `Bedrock accepted the credentials but this AWS account has no access to ${model}. Grant it in the Bedrock console under Model access, in the region you configured.`
-          : `${model} is not served by Bedrock in the region you configured. Try us-east-1.`,
+          : `Bedrock does not serve ${model} in ${bedrockRegion()}. Outside us-east-1 you need an inference profile id in BEDROCK_MODEL_ID, such as au.anthropic.${MODEL} for Sydney.`,
       );
     if (status === 401 || status === 403)
       throw new ClaudeAccessError(

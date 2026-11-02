@@ -40,6 +40,11 @@ export const serverEnvSchema = z.object({
    */
   ANTHROPIC_BACKEND: z.enum(["api", "bedrock"]).optional(),
   BEDROCK_AWS_REGION: optionalString,
+  /**
+   * The exact id to ask Bedrock for. Leave unset in us-east-1; elsewhere set
+   * the inference profile, e.g. "au.anthropic.claude-opus-5-5" in Sydney.
+   */
+  BEDROCK_MODEL_ID: optionalString,
   AWS_REGION: optionalString,
 });
 
@@ -61,6 +66,7 @@ export function getServerEnv() {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     ANTHROPIC_BACKEND: process.env.ANTHROPIC_BACKEND,
     BEDROCK_AWS_REGION: process.env.BEDROCK_AWS_REGION,
+    BEDROCK_MODEL_ID: process.env.BEDROCK_MODEL_ID,
     AWS_REGION: process.env.AWS_REGION,
   });
 }
