@@ -65,4 +65,6 @@ export function isUniqueViolation(error: unknown): boolean {
   return false;
 }
 
+// Re-exported for tests that need to set up a row the services cannot.
+export { eq } from "drizzle-orm";
 export * from "./schema";

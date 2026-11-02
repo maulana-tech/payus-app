@@ -112,16 +112,16 @@ export const TABLE: Seat[] = [
     name: "Guardian",
     role: "Refuses what breaks a rule",
     engine: "code",
-    status: "building",
+    status: "live",
     head: [88.3, 27.8],
     epigram: "Not clever. Not negotiable.",
     task: "Checks every proposal against limits you set: per payment, per day, who may be paid at all, whether a price is strange for its category. An approval is bound to the hash of the proposal it approved, so changing a digit afterwards voids it.",
     when: "Between every proposal and every execution.",
     chips: ["Deterministic", "Hash-bound", "Reason logged"],
     facts: [
-      { label: "Can", text: "Accept, refuse, or ask you." },
+      { label: "Calls", code: "decide(proposal, policy, context)" },
       { label: "Cannot", text: "Write a proposal or edit one." },
-      { label: "Writes", code: "audit_log(decision, reason)" },
+      { label: "Writes", code: "audit_log(verdict, reason)" },
     ],
   },
   {
@@ -232,3 +232,22 @@ export const TABLE: Seat[] = [
 ];
 
 export const LIVE_SEATS = TABLE.filter((s) => s.status === "live").length;
+
+const WORDS = [
+  "No",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+  "Eleven",
+  "Twelve",
+] as const;
+
+/** Written out, so the headline cannot drift from the table below it. */
+export const spell = (n: number) => WORDS[n] ?? String(n);

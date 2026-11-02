@@ -34,7 +34,11 @@ export function ReleaseDialog({
   const [amount, setAmount] = useState(toDecimal(payable));
   const [destination, setDestination] = useState("");
   const [intentKey, setIntentKey] = useState(() => newId(16));
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<{
+    status: string;
+    payoutStatus?: string;
+    reason: string;
+  } | null>(null);
 
   // A fresh attempt each time the dialog is opened, and the full balance
   // offered, since that is what someone usually means by "release".
@@ -46,11 +50,16 @@ export function ReleaseDialog({
   }, [open, payable]);
 
   const release = trpc.ledger.release.useMutation({
-    onSuccess: (payout) => {
+    onSuccess: (proposal) => {
       void utils.ledger.summary.invalidate();
       void utils.ledger.entries.invalidate();
       void utils.ledger.payouts.invalidate();
-      setDone(payout.status);
+      void utils.guardian.overview.invalidate();
+      setDone({
+        status: proposal.status,
+        payoutStatus: proposal.payoutStatus,
+        reason: proposal.reason,
+      });
     },
   });
 
@@ -68,9 +77,11 @@ export function ReleaseDialog({
         {done ? (
           <div className="grid gap-4">
             <p className="text-[15px] leading-relaxed">
-              {done === "simulated"
-                ? "Recorded as a simulated payout: Payouts is not enabled on this PayPal account yet, so no money moved. The ledger shows it as payout.simulated, labelled, rather than pretending it was sent."
-                : "Sent. PayPal has the batch and the ledger has the posting."}
+              {done.status === "awaiting"
+                ? `The Guardian wants you to look at this one first: ${done.reason} It is waiting under “Waiting for you”, and nothing has moved.`
+                : done.payoutStatus === "simulated"
+                  ? "Recorded as a simulated payout: Payouts is not enabled on this PayPal account yet, so no money moved. The ledger shows it as payout.simulated, labelled, rather than pretending it was sent."
+                  : "Sent. PayPal has the batch and the ledger has the posting."}
             </p>
             <div className="flex justify-end">
               <button

@@ -50,6 +50,15 @@ Framework-free modules shared by routes, components and the server: `invoices` (
 - Auth routing: `web/src/middleware.ts` + `src/lib/auth-routes.ts` gate the dashboard routes on Privy cookies. Adding a dashboard route means adding it to `auth-routes.ts`, `navItems.ts`, `features/account/accountType.ts` **and the literal `matcher` in `middleware.ts`** — Next needs a literal there, so `test/middleware.test.ts` is what keeps the two lists in step.
 - Headers in `next.config.mjs`: everything refuses framing except `/embed/*`; `/i/*` is `no-referrer` + `noindex`. (The COOP/COEP cross-origin isolation the WASM wallet needed is gone — don't reintroduce it without a reason.)
 
+### The Guardian
+Nothing moves money without a proposal, and no proposal is decided by a model. `features/guardian/decide.ts` is a pure function — proposal + policy + context → `allow | ask | refuse` with a reason per rule — and `server/modules/guardian/` writes the proposal, records the decision, holds consent and runs it. The owner's own "Release" button goes through it, so the road the agents will take is already the one in daily use.
+- **Consent is bound to a hash.** `proposalHash(kind, payload)` is sha256 over `canonical()` (keys sorted at every depth). `approvals` is a **log**, one row per act of consent, each naming the hash it was given for; `execute()` compares the newest approval's hash with the proposal's current hash and refuses on a mismatch (`approval.void` in the audit log). Amending a proposal moves the hash and puts it back to `awaiting`.
+- **A refusal is a record, not an error to swallow.** A refused proposal is written with its findings before `ProposalRefusedError` is thrown.
+- **Every rule is evaluated**, not just the first to fire, so the audit says everything that was wrong; the verdict is the harshest finding and `reason` quotes only the decisive ones.
+- `intentKey` rides in the payload and so into the hash: submitting the same attempt twice finds the first proposal instead of writing a second. The proposal id then becomes the payout's `intentKey`, which is why an approved proposal can only ever pay once.
+- `executeApproved()` is the door an executor knocks on (Phase 4's agents will), and the only place the hash check can catch a race.
+- Proposals left unanswered are closed by `expireStaleProposals()`, called from `/api/cron/outbox`.
+
 ### The money path
 A payment is four steps, and only the last two may change what anyone is owed:
 1. **Order** — `POST /api/payments/paypal/orders` with an invoice token creates a PayPal order for what is still due and a `payments` row (`order_id` unique).

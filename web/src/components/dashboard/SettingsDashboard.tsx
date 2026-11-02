@@ -9,6 +9,7 @@ import { useSession } from "../SessionProvider";
 import { ChangeRecoveryPinDialog } from "./ChangeRecoveryPinDialog";
 import { DashboardPageHeader } from "./DashboardPageHeader";
 import { NAV_ITEMS } from "./navItems";
+import { GuardianLimits } from "./screens/GuardianLimits";
 import { dashButtonSecondary } from "./styles";
 
 /** Account, recovery and notification settings. */
@@ -67,6 +68,9 @@ export function SettingsDashboard({ username }: { username: string }) {
             </button>
           }
         />
+      </div>
+      <div className="mt-8">
+        <GuardianLimits />
       </div>
       {others.length > 0 ? (
         <section className="mt-8">

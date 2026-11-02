@@ -129,17 +129,34 @@ dengan jumlah masuk (`trialBalance() === 0n` di setiap kasus), settlement
 kedua tidak berefek, dan dua rilis dengan intent sama hanya menghasilkan satu
 batch sementara percobaan baru yang disengaja tetap bisa.
 
-### Fase 3 — 6–7 Nov · Guardian
-- `features/guardian/`: limit per transaksi & per hari, allowlist penerima,
-  penerima baru dan perubahan rekening payout butuh persetujuan,
-  "harga janggal" = di luar `[min, 3× median kategori]`
-- `proposals` + `approvals` di DB; approval menyimpan hash usulan
-- Notifikasi + persetujuan via Telegram; usulan kedaluwarsa setelah N menit
-- Audit log: usulan, model + versi prompt, keputusan Guardian, alasan
+### Fase 3 — 2–3 Nov · Guardian · **inti selesai**
+- [x] `features/guardian/decide.ts` **murni**: limit per pembayaran, limit
+      per hari (menghitung yang sudah keluar hari ini), dana tersedia
+      menurut ledger, penerima baru butuh persetujuan, dan ambang "tanyakan
+      dulu". Setiap aturan dievaluasi — bukan berhenti di yang pertama
+      kena — jadi catatannya memuat semua yang salah; vonisnya yang
+      terkeras, dan `reason` hanya mengutip yang menentukan
+- [x] Tabel `guardian_policies`, `proposals`, `approvals`, `audit_log`
+      (migrasi `0003`)
+- [x] **Persetujuan terikat hash.** `approvals` adalah **log** — satu baris
+      per tindakan setuju, masing-masing menyebut hash yang disetujuinya.
+      `execute()` membandingkan hash persetujuan terbaru dengan hash usulan
+      saat itu dan menolak kalau beda, sambil mencatat `approval.void`
+- [x] Usulan kedaluwarsa: `expireStaleProposals()` dipanggil cron outbox
+- [x] Audit log: usulan, siapa yang mengusulkan, model (siap diisi Fase 4),
+      vonis Guardian, alasan, limit dan konteks yang dipakai saat memutuskan
+- [x] Tombol "Release" pemilik **ikut lewat Guardian**, jadi jalur yang
+      nanti dipakai agen sudah dipakai sehari-hari sekarang
+- [x] UI: panel "Waiting for you" di Overview (dengan alasan Guardian) dan
+      editor limit di Settings
+- [ ] Notifikasi + persetujuan lewat **Telegram** — sesuai garis potong di
+      §5, persetujuan in-app dipakai lebih dulu. Ini sisa Fase 3
 
-**Selesai jika:** usulan melanggar aturan ditolak dengan alasan tercatat;
-usulan di atas ambang menunggu sampai disetujui/kedaluwarsa; mengubah
-nominal setelah disetujui membatalkan approval.
+**Terbukti oleh test** (19 test: 10 murni + 9 di Postgres): usulan yang
+melanggar ditolak dengan alasannya tersimpan; usulan di atas ambang
+menunggu dan tidak mengirim apa pun; usulan yang kedaluwarsa tidak bisa
+disetujui; dan **usulan yang berubah setelah disetujui ditolak saat
+dijalankan**, dengan `approval.void` masuk audit log.
 
 ### Fase 4 — 8–9 Nov · agen
 Urutan sesuai nilai demo:
@@ -188,7 +205,7 @@ ditolak Guardian saat melanggar).
 | Kalau tertinggal di | Yang dibuang |
 |---|---|
 | Fase 2 | Payout nyata → mode simulasi berlabel, demo tetap jalan |
-| Fase 3 | Guardian tetap (ini inti), approval Telegram → tombol in-app |
+| Fase 3 | ✅ sudah diambil: Guardian + tombol in-app jalan, Telegram ditunda |
 | Fase 4 | Advisor, Merchant Ops, Collections; sisakan Developer Agent + Allocator + Guardian + Reporter |
 | Fase 5 | Ekspor PDF, rekonsiliasi lanjutan; AG Grid **jangan** dibuang kalau masih mengejar hadiah sponsor |
 

@@ -1,4 +1,5 @@
 import { cronAuthorized } from "@/server/lib/cronAuth";
+import { expireStaleProposals } from "@/server/modules/guardian/guardian.service";
 import { drainOutbox } from "@/server/modules/outbox/outbox.service";
 
 // Runs queued money-path work (a confirmed PayPal capture becoming a paid
@@ -8,5 +9,9 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   if (!cronAuthorized(request))
     return Response.json({ error: "unauthorized" }, { status: 401 });
-  return Response.json(await drainOutbox());
+  const [jobs, expired] = await Promise.all([
+    drainOutbox(),
+    expireStaleProposals(),
+  ]);
+  return Response.json({ ...jobs, expired });
 }

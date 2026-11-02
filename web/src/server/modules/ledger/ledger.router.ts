@@ -1,14 +1,15 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { toMinor } from "../../../features/invoices/money";
+import { DEFAULT_CURRENCY, toMinor } from "../../../features/invoices/money";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
+import { mapGuardianError } from "../guardian/guardian.router";
+import { proposePayout } from "../guardian/guardian.service";
 import { listInvoices } from "../invoices/invoices.service";
 import { recentPayments } from "../payments/payments.service";
 import {
   listPayouts,
   PayoutRefusedError,
   payableMinor,
-  releasePayout,
 } from "../payments/payouts.service";
 import { requireUsername } from "../profiles/profiles.service";
 import { balances, entriesFor } from "./ledger.service";
@@ -132,7 +133,10 @@ export const ledgerRouter = createTRPCRouter({
     listPayouts(await owner(ctx)),
   ),
 
-  /** Sends what is owed to the merchant's PayPal address. */
+  /**
+   * Asks to send what is owed. This writes a proposal and lets the Guardian
+   * decide it — the owner's own button takes the same road the agents will.
+   */
   release: protectedProcedure
     .input(
       z.object({
@@ -143,10 +147,15 @@ export const ledgerRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) =>
-      releasePayout(await owner(ctx), {
-        amountMinor: toMinor(input.amount),
-        destination: input.destination,
-        intentKey: input.intentKey,
-      }).catch(mapError),
+      proposePayout({
+        owner: await owner(ctx),
+        payload: {
+          amountMinor: toMinor(input.amount).toString(),
+          currency: DEFAULT_CURRENCY,
+          destination: input.destination,
+          intentKey: input.intentKey,
+        },
+        proposedBy: "owner",
+      }).catch(mapGuardianError),
     ),
 });

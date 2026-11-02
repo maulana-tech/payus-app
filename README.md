@@ -48,14 +48,18 @@
 - **Money as integers.** Minor units (cents) plus an ISO 4217 code, never
   floats.
 
+- **A Guardian that is a function, not a model.** Every movement of money
+  is written as a proposal first and decided by deterministic rules against
+  limits you set. Consent is bound to the hash of what you agreed to, so a
+  proposal amended afterwards cannot inherit it.
+
 ## What is not built yet
 
-The agents. Twelve seats are described on the landing page and five of them
-are real code running today (taking the payment, carrying the webhook,
-keeping the books, telling your server, writing the invoices). The Guardian
-— the deterministic engine that accepts or refuses a proposal — and the
-seven language-model seats above it are the work in
-[`docs/plan.md`](docs/plan.md).
+The thinking seats. Twelve are described on the landing page; six are real
+code running today — taking the payment, carrying the webhook, keeping the
+books, telling your server, writing the invoices, and the Guardian deciding
+what may move. The seven language-model seats above them are the work left
+in [`docs/plan.md`](docs/plan.md), along with approving from Telegram.
 
 Refunds after settlement. That one is a policy question — a rolling reserve,
 or letting what you are owed go negative — and it is being decided rather

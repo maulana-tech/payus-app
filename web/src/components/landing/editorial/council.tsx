@@ -22,7 +22,7 @@ import {
   useState,
 } from "react";
 import { cn } from "@/lib/utils";
-import { LIVE_SEATS, type Seat, TABLE } from "./agents";
+import { LIVE_SEATS, type Seat, spell, TABLE } from "./agents";
 import { Reveal, Star, Tag, Title } from "./kit";
 import { mono } from "./styles";
 
@@ -260,7 +260,7 @@ export function Council() {
             <Reveal margin="0px">
               <p className={cn(mono, "mb-6 text-ed-cream/60")}>The table</p>
               <Title className="text-[clamp(2.5rem,5.5vw,4.75rem)]">
-                {"Twelve seats.\nFive already working."}
+                {`${spell(N)} seats.\n${spell(LIVE_SEATS)} already working.`}
               </Title>
             </Reveal>
             <Reveal

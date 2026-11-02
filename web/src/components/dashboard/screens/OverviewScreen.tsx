@@ -6,6 +6,7 @@ import { invoiceStatus } from "@/features/invoices/input";
 import { formatMinor } from "@/features/invoices/money";
 import { trpc } from "@/trpc/react";
 import { dashButtonSecondary } from "../styles";
+import { ApprovalsPanel } from "./ApprovalsPanel";
 import {
   accountLabel,
   EmptyState,
@@ -144,6 +145,8 @@ export function OverviewScreen({ username }: { username: string }) {
           )}
         </Panel>
       </div>
+
+      <ApprovalsPanel />
 
       <SplitRulesPanel rules={data?.rules ?? []} />
 

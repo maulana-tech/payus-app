@@ -416,10 +416,103 @@ export const payouts = pgTable(
   (t) => [index("payouts_by_owner").on(t.owner, t.createdAt)],
 );
 
+// ── The Guardian ─────────────────────────────────────────────────────────
+// Nothing moves money without a proposal, and no proposal is decided by a
+// model. These tables hold the limits, the proposals, the approvals bound to
+// what they approved, and the record of all of it.
+
+/** One row per owner; absent means the defaults in `features/guardian`. */
+export const guardianPolicies = pgTable("guardian_policies", {
+  owner: text("owner").primaryKey(), // username
+  perTransactionMinor: minor("per_transaction_minor").notNull(),
+  perDayMinor: minor("per_day_minor").notNull(),
+  approveAboveMinor: minor("approve_above_minor").notNull(),
+  newRecipientNeedsApproval: boolean("new_recipient_needs_approval").notNull(),
+  expiryMinutes: integer("expiry_minutes").notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export type ProposalStatus =
+  | "refused" // the Guardian said no
+  | "awaiting" // the Guardian asked the owner
+  | "approved" // the owner said yes, not carried out yet
+  | "executed"
+  | "expired"
+  | "withdrawn";
+
+export type GuardianVerdict = "allow" | "ask" | "refuse";
+
+export const proposals = pgTable(
+  "proposals",
+  {
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(),
+    kind: text("kind").notNull(), // "payout"
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    /**
+     * sha256 of the canonical proposal. An approval records the hash it
+     * approved, so amending a proposal afterwards cannot inherit consent.
+     */
+    hash: text("hash").notNull(),
+    status: text("status").$type<ProposalStatus>().notNull(),
+    verdict: text("verdict").$type<GuardianVerdict>().notNull(),
+    reason: text("reason").notNull(),
+    findings: jsonb("findings").notNull(),
+    /** "owner" today; an agent's name once agents write these. */
+    proposedBy: text("proposed_by").notNull(),
+    /** Model and prompt version behind it, when one was involved. */
+    model: text("model"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("proposals_by_owner").on(t.owner, t.createdAt),
+    index("proposals_waiting").on(t.status, t.expiresAt),
+  ],
+);
+
+/**
+ * Every act of consent, in order — a log, not a flag. Each one names the
+ * hash it was given for, so consent covers one wording of a proposal and
+ * not whatever that proposal becomes later.
+ */
+export const approvals = pgTable(
+  "approvals",
+  {
+    id: text("id").primaryKey(),
+    proposalId: text("proposal_id").notNull(),
+    hash: text("hash").notNull(),
+    approvedBy: text("approved_by").notNull(),
+    via: text("via").$type<"app" | "telegram">().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("approvals_by_proposal").on(t.proposalId, t.createdAt)],
+);
+
+/** Everything that happened to a proposal, in the order it happened. */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(),
+    proposalId: text("proposal_id"),
+    action: text("action").notNull(), // proposed · decided · approved · …
+    actor: text("actor").notNull(), // "owner", "guardian", an agent
+    detail: jsonb("detail").$type<Record<string, unknown>>(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("audit_log_by_owner").on(t.owner, t.createdAt)],
+);
+
 export type LedgerAccountRow = typeof ledgerAccounts.$inferSelect;
 export type LedgerTxnRow = typeof ledgerTxns.$inferSelect;
 export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
 export type PaymentRow = typeof payments.$inferSelect;
 export type OutboxRow = typeof outbox.$inferSelect;
 export type SplitRuleRow = typeof splitRules.$inferSelect;
+export type GuardianPolicyRow = typeof guardianPolicies.$inferSelect;
+export type ProposalRow = typeof proposals.$inferSelect;
+export type ApprovalRow = typeof approvals.$inferSelect;
 export type PayoutRow = typeof payouts.$inferSelect;
