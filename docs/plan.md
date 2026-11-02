@@ -45,33 +45,62 @@ UI**. Demo tetap utuh dan klaimnya tetap jujur.
 
 ## 4. Jadwal
 
-### Hari 0 — 1 Nov (hari ini)
+### Hari 0 — 1–2 Nov
 - [x] `git init` + commit awal
 - [x] Mongo → Postgres + Drizzle, seluruh modul diport
-- [ ] Nyalakan Postgres lokal, jalankan 4 file test DB yang sekarang skip
-      (`brew install postgresql@17 && brew services start postgresql@17 && createdb payus`)
-- [ ] Cek akses Payouts di PayPal Developer Dashboard; isi `.env.example`
-      dengan `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`
+- [x] Postgres lokal menyala (`postgresql@17` via brew, keg-only: binary-nya
+      perlu ditambahkan ke PATH), `createdb payus`, migrasi terpasang
+- [x] 4 file test DB yang dulu skip sekarang jalan — dan langsung menemukan
+      dua bug port yang tak pernah terlihat oleh typecheck:
+      `isUniqueViolation` tidak melihat kode `23505` karena Drizzle
+      membungkus error driver (jadi "nomor invoice sudah dipakai" bocor
+      sebagai error mentah), dan satu test yang angkanya sendiri tidak
+      konsisten. Keduanya diperbaiki; seluruh suite hijau tanpa skip
+- [x] `.env.example` + `docs/setup.md` berisi `PAYPAL_ENV`,
+      `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`,
+      `NEXT_PUBLIC_PAYPAL_CLIENT_ID`
+- [ ] **Masih padamu:** cek akses Payouts di PayPal Developer Dashboard dan
+      isi kredensial sandbox ke `web/.env.local`
 
-### Fase 1 — 2–3 Nov · fondasi uang
-- `server/db/schema.ts`: tabel `ledger_accounts`, `ledger_entries`
-  (`txn_id`, `account`, `debit_minor`, `credit_minor`, `ref`, `created_at`),
-  `outbox`, `webhook_events` (`event_id` unik), `split_rules`
-- `server/modules/ledger/`: `post(txnId, entries[])` dalam satu transaksi
-  Drizzle yang menolak jika Σdebit ≠ Σkredit; `balance(account)` dari entri
-- Akun wajib ada sejak awal: `pos:<user>:<nama>`, `in_flight`,
-  `platform_fee`, `tax_reserve`, `merchant_payable`, `paypal_cash`
-- `server/lib/paypal.ts`: klien OAuth2 + Orders v2 (create/capture)
-- `app/api/webhooks/paypal/route.ts`: verifikasi tanda tangan, simpan
-  `event_id` (duplikat → 200 tanpa efek), tulis ke outbox
-- Worker outbox memanggil **`invoices.reportPayment`** → inilah sambungan
-  yang menyalakan ulang webhook `checkout.paid`, email, dan status checkout
+### Fase 1 — 2 Nov · fondasi uang · **selesai**
+- [x] `server/db/schema.ts`: `ledger_accounts`, `ledger_txns` (id
+      deterministik = kunci idempotensi), `ledger_entries`
+      (`debit_minor`/`credit_minor`), `payments`, `webhook_events`
+      (`event_id` primary key), `outbox` → migrasi `0001_*.sql`
+- [x] `server/modules/ledger/`: `post()` menolak Σdebit ≠ Σkredit **sebelum**
+      menyentuh database, jadi ledger tak seimbang tidak bisa direpresentasikan;
+      `balance()` membaca ke arah normal akun (aset dan kewajiban dua-duanya
+      positif), `rawBalance()`, `balances()`, `trialBalance()`
+- [x] Id akun diturunkan lewat helper `account.*`, bukan ditulis tangan:
+      `pos:<owner>:<slug>`, `in_flight:<owner>`, `tax_reserve:<owner>`,
+      `merchant_payable:<owner>`, `platform_fee`, `paypal_cash`, `psp_fee`
+- [x] `server/lib/paypal.ts`: OAuth2 dengan cache token, Orders v2
+      create/capture (pakai `paypal-request-id`, jadi retry tidak menagih
+      dua kali), `getCapture`, verifikasi tanda tangan webhook
+- [x] `app/api/webhooks/paypal/route.ts`: setiap kiriman diverifikasi ke
+      PayPal, disimpan di bawah `event_id`, dan pekerjaan outbox ditulis
+      dalam transaksi yang sama. Kiriman ulang → `duplicate: true`, nol efek
+- [x] Worker outbox (`app/api/cron/outbox`) membaca capture **balik dari
+      PayPal** lalu memanggil `recordCapture` → `applyInvoicePayment`:
+      inilah sambungan yang menyalakan webhook merchant, notifikasi, dan
+      email penerima. "Tandai lunas" di dashboard kini lewat jalur yang sama
+- [x] Route pembayar: `POST /api/payments/paypal/orders` dan
+      `.../orders/<id>/capture`
 
-**Selesai jika:** bayar checkout sandbox → invoice `paid` → webhook merchant
-terkirim → entri ledger seimbang, dan mengirim ulang event yang sama tidak
-menggandakan apa pun.
+**Terbukti oleh test** (`test/ledger.test.ts`, `test/moneyPath.test.ts`, 14
+test di Postgres asli, hanya `server/lib/paypal.ts` yang distub): capture →
+invoice `paid` → entri ledger seimbang (`trialBalance() === 0n`); kirim ulang
+event yang sama tidak berefek; **event id baru untuk capture yang sama juga
+tidak menggandakan**; kiriman tanpa tanda tangan sah ditolak dan tidak
+disimpan; job yang gagal diulang dengan tunda bertambah lalu diparkir.
 
-### Fase 2 — 4–5 Nov · split & settlement
+Dua hal yang sengaja ditunda: `split_rules` pindah ke Fase 2 (tabel tanpa
+pemakai adalah hutang), dan tombol bayar di `/i/<token>` tetap di Fase 5 —
+artinya **pembayaran sandbox sungguhan belum pernah dijalankan**; itu
+menunggu kredensial.
+
+### Fase 2 — 3–5 Nov · split & settlement
+- Tabel `split_rules` (dipindah dari Fase 1, dibuat bersama pemakainya)
 - `features/split/`: evaluasi aturan (persen + nominal tetap, urutan
   prioritas, sisa ke pos default, sisa pembulatan dengan largest-remainder)
 - Settlement merchant: pembayaran masuk dipecah → `platform_fee`,
@@ -143,13 +172,13 @@ KYC, custody.
 
 | Hutang | Ditutup di |
 |---|---|
-| `reportPayment` tanpa pemanggil | Fase 1 (worker outbox) |
+| ~~`reportPayment` tanpa pemanggil~~ | ✅ Fase 1 (worker outbox + `applyInvoicePayment`) |
 | 5 layar dashboard placeholder | Fase 5 |
 | Tidak ada UI pembuatan API key (docs/api.md menjanjikan "Developers → API keys") | Fase 5 |
 | `features/embed/bridge.ts` yatim → iframe tak auto-resize & tak emit event | Fase 5 |
 | 13 modul yatim (`invoicePdf`, `csv`, `download`, `PaymentQrDialog`, dll.) | dipakai di Fase 5, sisanya dihapus |
 | `.gitbook.yaml` menunjuk `docs/SUMMARY.md` yang tidak ada | kapan saja |
-| Test DB belum pernah dijalankan hijau | Hari 0 |
+| ~~Test DB belum pernah dijalankan hijau~~ | ✅ Hari 0 (146 test, nol skip) |
 
 ## 7. Risiko utama
 

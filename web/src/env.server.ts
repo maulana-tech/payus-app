@@ -20,6 +20,12 @@ export const serverEnvSchema = z.object({
   RESEND_API_KEY: optionalString,
   EMAIL_FROM: optionalString,
   APP_URL: optionalString,
+  // PayPal REST. `sandbox` unless deliberately pointed at live.
+  PAYPAL_ENV: z.enum(["sandbox", "live"]).default("sandbox"),
+  PAYPAL_CLIENT_ID: optionalString,
+  PAYPAL_CLIENT_SECRET: optionalString,
+  // From the webhook you registered; without it no event is trusted.
+  PAYPAL_WEBHOOK_ID: optionalString,
 });
 
 export function getServerEnv() {
@@ -32,6 +38,10 @@ export function getServerEnv() {
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
     APP_URL: process.env.APP_URL,
+    PAYPAL_ENV: process.env.PAYPAL_ENV,
+    PAYPAL_CLIENT_ID: process.env.PAYPAL_CLIENT_ID,
+    PAYPAL_CLIENT_SECRET: process.env.PAYPAL_CLIENT_SECRET,
+    PAYPAL_WEBHOOK_ID: process.env.PAYPAL_WEBHOOK_ID,
   });
 }
 

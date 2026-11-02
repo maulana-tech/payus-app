@@ -226,6 +226,137 @@ export const notificationLogs = pgTable("notification_logs", {
   sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ── The money path ───────────────────────────────────────────────────────
+// Double-entry: every transaction has one `ledger_txns` row (its id is the
+// idempotency key) and two or more `ledger_entries` whose Σdebit = Σcredit.
+
+export type AccountKind =
+  | "pos" // one envelope of a user: pos:<owner>:<slug>
+  | "in_flight" // captured, not split yet
+  | "platform_fee"
+  | "tax_reserve"
+  | "merchant_payable"
+  | "paypal_cash" // asset: balance held at PayPal
+  | "psp_fee" // expense: what PayPal keeps
+  | "external"; // a source or sink outside this system
+
+/** A ledger account. Its id is `<kind>`, `<kind>:<owner>` or `pos:<owner>:<slug>`. */
+export const ledgerAccounts = pgTable(
+  "ledger_accounts",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").$type<AccountKind>().notNull(),
+    owner: text("owner"), // username; null for platform accounts
+    label: text("label").notNull(),
+    currency: text("currency").notNull(), // ISO 4217
+    createdAt: createdAt(),
+  },
+  (t) => [index("ledger_accounts_by_owner").on(t.owner, t.kind)],
+);
+
+/**
+ * One row per posting. The id is deterministic (e.g. `capture:<id>`), so
+ * posting the same transaction twice violates the primary key.
+ */
+export const ledgerTxns = pgTable(
+  "ledger_txns",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").notNull(), // "payment.captured", "settlement", …
+    owner: text("owner"), // the username this transaction concerns
+    ref: text("ref"), // "invoice:<id>"
+    memo: text("memo"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("ledger_txns_recent").on(t.owner, t.createdAt)],
+);
+
+export const ledgerEntries = pgTable(
+  "ledger_entries",
+  {
+    id: text("id").primaryKey(),
+    txnId: text("txn_id")
+      .notNull()
+      .references(() => ledgerTxns.id),
+    account: text("account")
+      .notNull()
+      .references(() => ledgerAccounts.id),
+    debitMinor: minor("debit_minor").notNull().default("0"),
+    creditMinor: minor("credit_minor").notNull().default("0"),
+    currency: text("currency").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("ledger_entries_by_txn").on(t.txnId),
+    index("ledger_entries_by_account").on(t.account, t.createdAt),
+  ],
+);
+
+export type PaymentStatus = "created" | "captured" | "failed";
+
+/**
+ * One attempt to pay through a provider. `orderId` is unique, so a PayPal
+ * order always maps back to exactly one invoice; `captureId` is unique, so
+ * the same capture is never counted twice.
+ */
+export const payments = pgTable(
+  "payments",
+  {
+    id: text("id").primaryKey(), // sent to the provider as custom_id
+    invoiceId: text("invoice_id").notNull(),
+    owner: text("owner").notNull(), // username being paid
+    provider: text("provider").$type<"paypal">().notNull(),
+    orderId: text("order_id").notNull().unique(),
+    captureId: text("capture_id").unique(),
+    status: text("status").$type<PaymentStatus>().notNull(),
+    amountMinor: minor("amount_minor").notNull(), // asked for
+    capturedMinor: minor("captured_minor"), // gross actually received
+    feeMinor: minor("fee_minor"), // what the provider kept
+    currency: text("currency").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("payments_by_invoice").on(t.invoiceId),
+    index("payments_by_owner").on(t.owner, t.createdAt),
+  ],
+);
+
+/**
+ * An inbound provider event, stored before it is processed. `event_id` is
+ * the primary key, so a redelivery never takes effect twice.
+ */
+export const webhookEvents = pgTable("webhook_events", {
+  eventId: text("event_id").primaryKey(),
+  provider: text("provider").notNull(), // "paypal"
+  eventType: text("event_type").notNull(),
+  payload: jsonb("payload").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type OutboxStatus = "pending" | "working" | "done" | "failed";
+
+/** Work written in the same transaction as its cause, run later by a worker. */
+export const outbox = pgTable(
+  "outbox",
+  {
+    id: text("id").primaryKey(),
+    topic: text("topic").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    status: text("status").$type<OutboxStatus>().notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    availableAt: timestamp("available_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [index("outbox_ready").on(t.status, t.availableAt)],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type ProfileRow = typeof profiles.$inferSelect;
 export type PaymentLinkRow = typeof paymentLinks.$inferSelect;
@@ -235,3 +366,8 @@ export type ApiKeyRow = typeof apiKeys.$inferSelect;
 export type WebhookRow = typeof webhooks.$inferSelect;
 export type WebhookDeliveryRow = typeof webhookDeliveries.$inferSelect;
 export type NotificationSettingsRow = typeof notificationSettings.$inferSelect;
+export type LedgerAccountRow = typeof ledgerAccounts.$inferSelect;
+export type LedgerTxnRow = typeof ledgerTxns.$inferSelect;
+export type LedgerEntryRow = typeof ledgerEntries.$inferSelect;
+export type PaymentRow = typeof payments.$inferSelect;
+export type OutboxRow = typeof outbox.$inferSelect;

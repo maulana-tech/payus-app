@@ -1,6 +1,5 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { getServerEnv } from "../../../env.server";
 import {
   invoiceId,
   invoiceInput,
@@ -12,12 +11,7 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "../../trpc";
-import { toCheckout } from "../developer/checkouts";
-import { deliverEvent } from "../developer/developer.service";
-import {
-  emailInvoiceClient,
-  notifyInvoicePaid,
-} from "../notifications/notifications.service";
+import { applyInvoicePayment } from "../payments/applyPayment";
 import { requireUsername } from "../profiles/profiles.service";
 import {
   InvoiceClosedError,
@@ -27,10 +21,8 @@ import {
 } from "./invoices.errors";
 import {
   createInvoice,
-  invoiceClientEmail,
   listInvoices,
   publicInvoice,
-  reportPayment,
   stopRecurring,
   updateInvoice,
   voidInvoice,
@@ -94,27 +86,17 @@ export const invoicesRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const owner = await requireUsername(ctx.privyUserId);
-      const result = await reportPayment(owner, input).catch(mapError);
-      if (result.becamePaid) {
-        void notifyInvoicePaid(ctx.privyUserId, result.invoice).catch(() => {});
-        // Signed webhook to the merchant's server, if they set one up.
-        void deliverEvent(
-          owner,
-          result.invoice.source === "api" ? "checkout.paid" : "invoice.paid",
-          toCheckout(
-            result.invoice,
-            (getServerEnv().APP_URL || "http://localhost:3000").replace(
-              /\/$/,
-              "",
-            ),
-          ),
-        ).catch(() => {});
-        void invoiceClientEmail(input.id)
-          .then((email) =>
-            email ? emailInvoiceClient(result.invoice, email) : undefined,
-          )
-          .catch(() => {});
-      }
+      // The owner marking an invoice paid by hand goes down the same path as
+      // a captured payment, so the merchant webhook and the emails are
+      // identical either way.
+      const result = await applyInvoicePayment(
+        owner,
+        input.id,
+        input.paidMinor,
+        {
+          privyUserId: ctx.privyUserId,
+        },
+      ).catch(mapError);
       return result.invoice;
     }),
   public: publicProcedure

@@ -110,6 +110,18 @@ export async function requireUsername(userId: string): Promise<string> {
   return profile.username;
 }
 
+/** The Privy user behind @username, for jobs that start from the username. */
+export async function userIdForUsername(
+  username: string,
+): Promise<string | null> {
+  const [row] = await getDb()
+    .select({ userId: profiles.userId })
+    .from(profiles)
+    .where(eq(profiles.username, username))
+    .limit(1);
+  return row?.userId ?? null;
+}
+
 /** True when @username exists; used before addressing a payment request. */
 export async function profileExists(username: string): Promise<boolean> {
   return Boolean(await profileByUsername(username));
