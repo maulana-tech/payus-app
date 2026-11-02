@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { accountTypeInfo } from "@/features/account/accountType";
+import { accountTypeInfo, hiddenFor } from "@/features/account/accountType";
 import { EmailNotificationsRow } from "@/features/notifications/EmailNotificationsRow";
 import { useChangeRecoveryPin } from "@/features/recovery/hooks/useChangeRecoveryPin";
 import { useSession } from "../SessionProvider";
 import { ChangeRecoveryPinDialog } from "./ChangeRecoveryPinDialog";
 import { DashboardPageHeader } from "./DashboardPageHeader";
+import { NAV_ITEMS } from "./navItems";
 import { dashButtonSecondary } from "./styles";
 
 /** Account, recovery and notification settings. */
@@ -17,6 +19,8 @@ export function SettingsDashboard({ username }: { username: string }) {
     useChangeRecoveryPin();
   const [pinDialogOpen, setPinDialogOpen] = useState(false);
   const type = accountType ? accountTypeInfo(accountType) : null;
+  // The account type orders the navigation; it never locks a page away.
+  const others = hiddenFor(accountType, NAV_ITEMS);
 
   return (
     <>
@@ -64,6 +68,40 @@ export function SettingsDashboard({ username }: { username: string }) {
           }
         />
       </div>
+      {others.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="dashboard-tile-title">Other tools</h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-(--dash-ash)">
+            Your account type decides what the navigation shows first. Nothing
+            is locked away — these are the pages it leaves out.
+          </p>
+          <div className="mt-4 grid gap-4">
+            {others.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex flex-wrap items-center justify-between gap-4 rounded-(--dash-radius) bg-(--dash-surface) p-5 ring-1 ring-(--dash-line) transition-colors hover:ring-(--dash-line-strong)"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <item.icon
+                    className="size-4 shrink-0 text-(--dash-ash)"
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-[15px] text-(--dash-fg)">
+                      {item.label}
+                    </span>
+                    <span className="mt-0.5 block text-sm text-(--dash-ash)">
+                      {item.description}
+                    </span>
+                  </span>
+                </span>
+                <span className={dashButtonSecondary}>Open</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <ChangeRecoveryPinDialog
         open={pinDialogOpen}
         onOpenChange={setPinDialogOpen}
