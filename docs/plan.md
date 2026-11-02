@@ -255,7 +255,7 @@ KYC, custody.
 | ~~`reportPayment` tanpa pemanggil~~ | ✅ Fase 1 (worker outbox + `applyInvoicePayment`) |
 | ~~5 layar dashboard placeholder~~ | ✅ 2 Nov |
 | ~~Tidak ada UI pembuatan API key~~ | ✅ 2 Nov (Developers → API keys, persis seperti docs/api.md) |
-| `features/embed/bridge.ts` yatim → iframe tak auto-resize & tak emit event | Fase 5 |
+| ~~`features/embed/bridge.ts` yatim~~ | ✅ dipasang lewat `EmbedBridge` di tiap halaman embed; `payus:paid` kini benar-benar terkirim |
 | 13 modul yatim (`invoicePdf`, `csv`, `download`, `PaymentQrDialog`, dll.) | dipakai di Fase 5, sisanya dihapus |
 | `.gitbook.yaml` menunjuk `docs/SUMMARY.md` yang tidak ada | kapan saja |
 | ~~Test DB belum pernah dijalankan hijau~~ | ✅ Hari 0 (146 test, nol skip) |

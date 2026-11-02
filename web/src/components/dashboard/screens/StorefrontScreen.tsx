@@ -11,7 +11,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { formatMinor, toDecimal } from "@/features/invoices/money";
-import { MAX_PRODUCTS } from "@/features/storefront/config";
+import {
+  ACCENTS,
+  type Accent,
+  MAX_PRODUCTS,
+  THEMES,
+  type Theme,
+} from "@/features/storefront/config";
+import { palette } from "@/features/storefront/theme";
 import type { RouterOutputs } from "@/server/root";
 import { trpc } from "@/trpc/react";
 import {
@@ -264,6 +271,8 @@ function EditorDialog({
   const [template, setTemplate] = useState<"shelf" | "tip">(
     store?.template ?? "shelf",
   );
+  const [theme, setTheme] = useState<Theme>(store?.theme ?? "paper");
+  const [accent, setAccent] = useState<Accent>(store?.accent ?? "clay");
   const [lines, setLines] = useState<Line[]>(
     store?.products.map((product) => ({
       name: product.name,
@@ -292,6 +301,8 @@ function EditorDialog({
       title,
       blurb,
       template,
+      theme,
+      accent,
       products: lines.map((line) => ({
         name: line.name,
         description: line.description,
@@ -426,11 +437,53 @@ function EditorDialog({
             ) : null}
           </fieldset>
 
+          <Field label="Look">
+            <div className="flex flex-wrap gap-2">
+              {THEMES.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={theme === option}
+                  onClick={() => setTheme(option)}
+                  className={`rounded-full border px-4 py-1.5 text-sm capitalize transition-colors ${
+                    theme === option
+                      ? "border-(--dash-fg) bg-(--dash-fg) text-(--dash-surface)"
+                      : "border-(--dash-line-strong) text-(--dash-fg)"
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Accent">
+            <div className="flex flex-wrap gap-2">
+              {ACCENTS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-label={option}
+                  aria-pressed={accent === option}
+                  onClick={() => setAccent(option)}
+                  className={`size-8 rounded-full border-2 transition-transform ${
+                    accent === option
+                      ? "scale-110 border-(--dash-fg)"
+                      : "border-transparent"
+                  }`}
+                  style={{ background: palette(theme, option).accent }}
+                />
+              ))}
+            </div>
+          </Field>
+
           <Preview
             title={title}
             blurb={blurb}
             lines={lines}
             template={template}
+            theme={theme}
+            accent={accent}
           />
 
           {error ? <ErrorNote>{error}</ErrorNote> : null}
@@ -463,12 +516,17 @@ function Preview({
   blurb,
   lines,
   template,
+  theme,
+  accent,
 }: {
   title: string;
   blurb: string;
   lines: Line[];
   template: "shelf" | "tip";
+  theme: Theme;
+  accent: Accent;
 }) {
+  const colours = palette(theme, accent);
   const price = (value: string) => {
     if (template === "tip") return "You choose";
     try {
@@ -480,23 +538,48 @@ function Preview({
     }
   };
   return (
-    <div className="rounded-(--dash-radius) border border-(--dash-line-solid) p-5">
+    <div className="grid gap-2">
       <p className="text-[11px] font-semibold tracking-[0.14em] text-(--dash-ash) uppercase">
-        How it will read
+        How it will look
       </p>
-      <p className="mt-3 text-lg">{title || "Your shop"}</p>
-      {blurb ? <p className="mt-1 text-sm text-(--dash-ash)">{blurb}</p> : null}
-      <ul className="mt-3 grid gap-1.5 border-t border-(--dash-line) pt-3 text-sm">
-        {lines.map((line, index) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: positional rows
-          <li key={index} className="flex justify-between gap-4">
-            <span className="min-w-0 truncate">{line.name || "Untitled"}</span>
-            <span className="shrink-0 tabular-nums text-(--dash-ash)">
-              {price(line.price)}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div
+        className="rounded-(--dash-radius) border border-(--dash-line-solid) p-6"
+        style={{ background: colours.page, color: colours.text }}
+      >
+        <p className="font-(family-name:--font-landing-serif) text-3xl leading-tight font-light">
+          {title || "Your shop"}
+        </p>
+        <span
+          aria-hidden="true"
+          className="mt-3 block h-px w-12"
+          style={{ background: colours.accent }}
+        />
+        {blurb ? (
+          <p className="mt-3 text-sm" style={{ color: colours.muted }}>
+            {blurb}
+          </p>
+        ) : null}
+        <ul className="mt-4 grid gap-2">
+          {lines.map((line, index) => (
+            <li
+              // biome-ignore lint/suspicious/noArrayIndexKey: positional rows
+              key={index}
+              className="flex justify-between gap-4 rounded-xl px-3 py-2.5 text-sm"
+              style={{ background: colours.surface }}
+            >
+              <span className="min-w-0 truncate">
+                {line.name || "Untitled"}
+              </span>
+              <span
+                className="shrink-0 font-medium tabular-nums"
+                style={{ color: colours.accent }}
+              >
+                {price(line.price)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

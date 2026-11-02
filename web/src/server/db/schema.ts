@@ -530,6 +530,12 @@ export const storefronts = pgTable(
     title: text("title").notNull(),
     blurb: text("blurb").notNull(),
     template: text("template").$type<StorefrontTemplate>().notNull(),
+    /** The look it wears; see `features/storefront/config.ts`. */
+    theme: text("theme")
+      .$type<"paper" | "ink" | "sun">()
+      .notNull()
+      .default("paper"),
+    accent: text("accent").notNull().default("clay"),
     products: jsonb("products").$type<StorefrontProduct[]>().notNull(),
     state: text("state").$type<"draft" | "published">().notNull(),
     /** Who wrote the current draft: "owner", or an agent's name. */

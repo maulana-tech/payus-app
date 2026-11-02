@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { EmbedBridge } from "../../../../components/embed/EmbedBridge";
 import { EmbedTheme } from "../../../../components/embed/EmbedTheme";
 import { InvoicePanel } from "../../../../components/invoices/InvoicePanel";
 
@@ -19,6 +20,7 @@ export default async function EmbedInvoicePage({
   const { theme } = await searchParams;
   return (
     <>
+      <EmbedBridge />
       <EmbedTheme theme={theme} />
       <InvoicePanel key={token} token={token} embed />
     </>

@@ -7,6 +7,24 @@ import { CURRENCIES, DEFAULT_CURRENCY, toMinor } from "../invoices/money";
 
 export const MAX_PRODUCTS = 12;
 
+/**
+ * The look a shop can wear. These are the whole vocabulary — a storefront
+ * chooses from them, it does not describe a page of its own — and they are
+ * named after what they feel like rather than what they are made of.
+ */
+export const THEMES = ["paper", "ink", "sun"] as const;
+export type Theme = (typeof THEMES)[number];
+
+export const ACCENTS = [
+  "clay",
+  "olive",
+  "indigo",
+  "plum",
+  "ochre",
+  "sea",
+] as const;
+export type Accent = (typeof ACCENTS)[number];
+
 export const slugSchema = z
   .string()
   .trim()
@@ -69,6 +87,8 @@ export const storefrontInput = z
     title: z.string().trim().min(1, "Give the shop a name.").max(80),
     blurb: z.string().trim().max(300).default(""),
     template: z.enum(["shelf", "tip"]),
+    theme: z.enum(THEMES).default("paper"),
+    accent: z.enum(ACCENTS).default("clay"),
     currency: z.enum(CURRENCIES).default(DEFAULT_CURRENCY),
     products: z.array(productInput).min(1).max(MAX_PRODUCTS),
   })
@@ -90,6 +110,8 @@ export type StorefrontView = {
   title: string;
   blurb: string;
   template: "shelf" | "tip";
+  theme: Theme;
+  accent: Accent;
   currency: string;
   state: "draft" | "published";
   writtenBy: string;

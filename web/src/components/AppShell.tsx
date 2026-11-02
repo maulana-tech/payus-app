@@ -119,11 +119,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
+  // A storefront is the merchant's page, not ours: it brings its own
+  // colours and fills the window, with only a small line of ours at the
+  // bottom. So it gets no shell at all.
+
   // Standalone public pages share one shell: back link, the cat, content.
   if (
     isPay ||
     pathname.startsWith("/i/") ||
-    pathname.startsWith("/shop/") ||
     pathname.startsWith("/unsubscribe/")
   ) {
     return (

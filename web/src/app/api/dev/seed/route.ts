@@ -137,6 +137,8 @@ export async function POST() {
         title: "Kopi Senja",
         blurb: "Single-origin beans, roasted on Fridays in Bandung.",
         template: "shelf",
+        theme: "sun",
+        accent: "ochre",
         currency: "USD",
         products: [
           {

@@ -1,5 +1,6 @@
 "use client";
 
+import { postToParent } from "@/features/embed/bridge";
 import { PayPalButton, post } from "@/features/payments/PayPalButton";
 import { cn } from "@/lib/utils";
 import { trpc } from "../../trpc/react";
@@ -71,7 +72,12 @@ export function InvoicePanel({
             (await post("/api/payments/paypal/orders", { token }))
               .orderId as string
           }
-          onPaid={() => void utils.invoices.public.invalidate({ token })}
+          onPaid={() => {
+            void utils.invoices.public.invalidate({ token });
+            // The framing site is told, so it can close the dialog or
+            // advance its own checkout.
+            if (embed) postToParent({ type: "payus:paid", invoice: token });
+          }}
         />
       ) : (
         <p className="rounded-lg bg-(--dash-tint) p-4 text-sm text-(--dash-ash)">

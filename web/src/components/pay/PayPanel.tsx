@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { postToParent } from "../../features/embed/bridge";
 import { toDecimal } from "../../features/invoices/money";
 import { PayPalButton, post } from "../../features/payments/PayPalButton";
 import { trpc } from "../../trpc/react";
@@ -15,9 +16,12 @@ import { Input } from "../ui/input";
 export function PayPanel({
   username,
   slug,
+  embed = false,
 }: {
   username: string;
   slug?: string;
+  /** Framed by a merchant's site through public/embed.js. */
+  embed?: boolean;
 }) {
   const [amount, setAmount] = useState("");
   const [paid, setPaid] = useState(false);
@@ -100,7 +104,10 @@ export function PayPanel({
                 })
               ).orderId as string
             }
-            onPaid={() => setPaid(true)}
+            onPaid={() => {
+              setPaid(true);
+              if (embed) postToParent({ type: "payus:paid", invoice: "" });
+            }}
           />
         </div>
       ) : (

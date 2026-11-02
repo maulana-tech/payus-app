@@ -28,7 +28,15 @@ import {
 const CONFIG_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["slug", "title", "blurb", "template", "products"],
+  required: [
+    "slug",
+    "title",
+    "blurb",
+    "template",
+    "theme",
+    "accent",
+    "products",
+  ],
   properties: {
     slug: {
       type: "string",
@@ -42,6 +50,17 @@ const CONFIG_SCHEMA = {
       type: "string",
       enum: ["shelf", "tip"],
       description: "shelf for things with prices, tip when the payer chooses",
+    },
+    theme: {
+      type: "string",
+      enum: ["paper", "ink", "sun"],
+      description:
+        "paper is warm and quiet, ink is dark, sun is warm and bright",
+    },
+    accent: {
+      type: "string",
+      enum: ["clay", "olive", "indigo", "plum", "ochre", "sea"],
+      description: "One colour, used for prices and buttons.",
     },
     products: {
       type: "array",
@@ -83,7 +102,9 @@ Rules you must follow:
   more. Invent nothing the description does not support: if it does not say
   what something costs, leave the price null rather than guessing.
 - Descriptions are one short sentence, in the owner's voice, no marketing
-  padding.`;
+  padding.
+- Choose a theme and an accent that suit the trade, and say nothing about
+  layout or styling beyond those two words: the page is already designed.`;
 
 export type BuilderFacts = {
   owner: string;

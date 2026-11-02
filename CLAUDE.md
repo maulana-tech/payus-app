@@ -67,6 +67,7 @@ Framework-free modules shared by routes, components and the server: `invoices` (
 
 ### Storefronts
 A storefront is **configuration, never markup**. `features/storefront/config.ts` holds the one schema; the hand editor (`screens/StorefrontScreen.tsx`) and the Builder agent are both held to it, and `components/storefront/StorefrontPanel.tsx` is the only renderer. A field that looks like markup therefore reaches the page as text — `test/storefrontRender.test.tsx` is the test behind that claim, so do not introduce `dangerouslySetInnerHTML` here.
+- **A shop chooses a look, it does not describe one.** `features/storefront/theme.ts` holds three themes and six accents as palettes; `paletteVars()` turns a choice into CSS variables and the renderer carries no colours of its own. That is the answer to "can it be prettier": make the template better, widen the vocabulary — never hand the writer markup. A storefront page is also outside `AppShell`'s chrome, because it is the merchant's page and not ours.
 - **The agent writes a draft; the owner publishes.** Putting a price in front of the public is a commercial decision, so it is not the model's. That is also why publishing needs no Guardian proposal kind.
 - Reserved and duplicate addresses are refused **by the schema**, not by a check inside the agent — a duplicate check there was written, found to be unreachable, and deleted. Put a rule where both writers pass through it.
 - `oddPrices()` compares against the median of what this merchant has charged before and **points**, rather than refusing: the owner is the one publishing.
@@ -83,6 +84,9 @@ Nothing moves money without a proposal, and no proposal is decided by a model. `
 - **Proposal kinds are a union.** `decide()` dispatches on `proposal.kind` (`payout`, `split.change`) and `execute()` dispatches the same way; adding a third kind means a `*Findings` function and an `apply*` function, nothing else. Rules that only the Guardian can see — a *total* share across rules, a daily total across payments — belong here; a per-item bound belongs in the agent's own schema, and the Allocator has both for exactly that reason.
 - The Guardian guards **agents**, not the owner: `ledger.createRule` lets a person set any split by hand. That is deliberate — the owner is the authority the limits exist to serve.
 - Proposals left unanswered are closed by `expireStaleProposals()`, called from `/api/cron/outbox`.
+
+### The embed widget
+`public/embed.js` (no build step, no dependencies — keep it that way) frames `/embed/*` and documents the events it dispatches. Those events come from `features/embed/bridge.ts`, mounted by `components/embed/EmbedBridge.tsx` on every embed page: without it the iframe never resizes and `payus:paid` never fires, which is how it sat for a while. A panel rendered with `embed` posts `payus:paid` itself when a payment lands.
 
 ### The money path
 A payment is four steps, and only the last two may change what anyone is owed:
