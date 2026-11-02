@@ -51,6 +51,8 @@ Framework-free modules shared by routes, components and the server: `invoices` (
 - Headers in `next.config.mjs`: everything refuses framing except `/embed/*`; `/i/*` is `no-referrer` + `noindex`. (The COOP/COEP cross-origin isolation the WASM wallet needed is gone — don't reintroduce it without a reason.)
 
 ### The agents
+**Bedrock's structured-output schema is a subset of JSON Schema.** Measured against `au.anthropic.claude-sonnet-4-6`: `enum`, `pattern`, `maxLength` and `type: ["string","null"]` are accepted, while **array `minItems`/`maxItems` and numeric `minimum`/`maximum` are rejected with a 400**. Keep those bounds in the zod schema — which is what decides whether an answer is acted on anyway — and say the range in the property's `description` so the model still knows it.
+
 `server/lib/claude.ts` is the only place a model is called: `askForJson()` sets the model (`claude-opus-5-5`, thinking always on so the parameter is omitted), the effort, and **structured outputs** (`output_config.format`) — not forced tool use, which that model rejects with a 400. Without `ANTHROPIC_API_KEY` the agents are off and say so; the rail is unaffected.
 `server/modules/agents/` holds one file per seat — `payer`, `allocator`, `builder` — and they are all the same shape:
 - **The agent holds no limits of its own.** It proposes; the Guardian decides. A second copy of the limits here would be a second, drifting source of truth.
@@ -60,6 +62,7 @@ Framework-free modules shared by routes, components and the server: `invoices` (
 - `ask` is injectable, so `test/payerAgent.test.ts` runs the whole decision path on every commit without spending anything. That file is the agent's eval set; add cases to it rather than trusting the prompt.
 - The model id and prompt version land on the proposal and in the audit log, so a decision can be traced to what produced it.
 - **The Reporter may not state a figure it was not given.** `reporterFacts()` builds the set of permitted figures; `unknownNumbers()` scans the answer and any number outside that set throws the report away — including a correct subtraction, because working one out is the thing this seat must not do. Single digits in prose are allowed; everything else has to have been handed over.
+- `thinking: {type: "adaptive"}` is sent explicitly, because it is not the default everywhere: Opus 5.5 always thinks and ignores it, Sonnet 4.6 does not think at all without it.
 - Each has an eval file (`test/*Agent.test.ts`, and `test/storefront.test.ts` for the Builder) that drives the whole decision path against a stubbed model. Add a case there rather than trusting the prompt.
 
 ### Storefronts

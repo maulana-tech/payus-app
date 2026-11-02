@@ -82,6 +82,36 @@ The app never trusts a webhook body for amounts. It stores the event under
 its `event_id`, queues a job, and the worker reads the capture back from
 PayPal before anything is posted to the ledger.
 
+### The agents (optional)
+
+Either route works; without one, the agents are off and say so.
+
+```sh
+# Route 1 — the first-party Claude API
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Route 2 — Amazon Bedrock
+ANTHROPIC_BACKEND=bedrock
+BEDROCK_AWS_REGION=ap-southeast-2
+BEDROCK_MODEL_ID=au.anthropic.claude-sonnet-4-6
+```
+
+Credentials for Bedrock come from the ordinary AWS chain: environment
+variables, `AWS_PROFILE`, an IAM role, or a Bedrock API key in
+`AWS_BEARER_TOKEN_BEDROCK`.
+
+Two things catch people out:
+
+- **Model ids differ by region.** The Messages endpoint serves bare ids
+  (`anthropic.claude-opus-5-5`) from **us-east-1 only**; everywhere else you
+  need an inference profile (`au.…` in Sydney, `us.…`, `global.…`), which
+  goes through a different endpoint. The app picks the right client from the
+  shape of the id.
+- **An ACTIVE profile is not access.** A profile can be listed as ACTIVE in
+  your region while the account still has no entitlement to the model behind
+  it; the call then fails with `permission_error`. Grant it in the Bedrock
+  console under **Model access**, in that region.
+
 ### Background work (recurring invoices, reminders, the money path)
 
 `CRON_SECRET` protects two routes:

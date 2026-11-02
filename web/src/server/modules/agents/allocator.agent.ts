@@ -29,7 +29,9 @@ const DECISION_SCHEMA = {
     act: { type: "string", enum: ["change", "none"] },
     rules: {
       type: "array",
-      maxItems: 6,
+      // No minItems/maxItems: Bedrock's schema validator rejects them. The
+      // real bound is the zod schema below, which is what decides whether
+      // an answer is acted on.
       items: {
         type: "object",
         additionalProperties: false,
@@ -42,10 +44,12 @@ const DECISION_SCHEMA = {
               "tax_reserve, or pos:<name> for a pot, using lowercase and hyphens",
           },
           percent: {
+            // No minimum/maximum either: Bedrock rejects numeric bounds in
+            // a structured-output schema, so the range is said in words
+            // here and enforced by zod below.
             type: "number",
-            minimum: 0.5,
-            maximum: 90,
-            description: "Share of every payment, in percent.",
+            description:
+              "Share of every payment, in percent, between 0.5 and 90.",
           },
         },
       },

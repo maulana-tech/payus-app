@@ -184,6 +184,10 @@ export async function askForJson(input: {
   const response = await call(which, model, () =>
     caller.messages.create({
       model,
+      // Explicit, because it is not the default everywhere: Opus 5.5 always
+      // thinks and treats this as a no-op, while Sonnet 4.6 does not think
+      // at all unless asked. These are decisions about money; let it think.
+      thinking: { type: "adaptive" },
       // A decision object is a few hundred tokens; this is a deliberate cap.
       max_tokens: 4096,
       system: input.system,

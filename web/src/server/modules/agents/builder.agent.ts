@@ -45,8 +45,8 @@ const CONFIG_SCHEMA = {
     },
     products: {
       type: "array",
-      minItems: 1,
-      maxItems: 12,
+      // No minItems/maxItems: Bedrock's schema validator rejects them. The
+      // real bound is the zod schema the answer is parsed with.
       items: {
         type: "object",
         additionalProperties: false,
