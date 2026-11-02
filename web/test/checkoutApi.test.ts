@@ -84,6 +84,7 @@ describe.skipIf(!available)("checkout API (Postgres)", () => {
 
   afterAll(async () => {
     server?.close();
+    await db?.closeDb();
     await temp?.dispose();
   });
 

@@ -12,6 +12,7 @@ declare global {
 }
 
 let db: Db | undefined;
+let pool: Pool | undefined;
 
 function connectionString(): string {
   const env = getServerEnv();
@@ -20,24 +21,48 @@ function connectionString(): string {
   return env.DATABASE_URL || "postgres://localhost:5432/payus";
 }
 
+function newPool(): Pool {
+  const created = new Pool({ connectionString: connectionString() });
+  // An idle client can be dropped from the other side (a restart, a failover,
+  // a dropped test database). Without this listener that becomes an uncaught
+  // exception and takes the process down.
+  created.on("error", () => {});
+  return created;
+}
+
 /** The pool is reused across HMR reloads in dev, and per process otherwise. */
 export function getDb(): Db {
   if (db) return db;
-  let pool: Pool;
   if (getServerEnv().NODE_ENV === "development") {
-    if (!global._appPgPool)
-      global._appPgPool = new Pool({ connectionString: connectionString() });
+    if (!global._appPgPool) global._appPgPool = newPool();
     pool = global._appPgPool;
   } else {
-    pool = new Pool({ connectionString: connectionString() });
+    pool = newPool();
   }
   db = drizzle(pool, { schema });
   return db;
 }
 
-/** Unique-constraint violation, for "already taken" paths. */
+/** Closes the pool. Tests call it before dropping their database. */
+export async function closeDb(): Promise<void> {
+  const open = pool;
+  db = undefined;
+  pool = undefined;
+  global._appPgPool = undefined;
+  await open?.end().catch(() => {});
+}
+
+/**
+ * Unique-constraint violation, for "already taken" paths. Drizzle wraps a
+ * driver error in its own, so the pg error code is looked for down the
+ * `cause` chain rather than only on the error it was handed.
+ */
 export function isUniqueViolation(error: unknown): boolean {
-  return (error as { code?: string } | null)?.code === "23505";
+  for (let e = error, depth = 0; e && depth < 5; depth += 1) {
+    if ((e as { code?: string }).code === "23505") return true;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 export * from "./schema";

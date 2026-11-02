@@ -10,15 +10,18 @@ const available = await postgresAvailable();
 
 describe.skipIf(!available)("account type (Postgres)", () => {
   let service: typeof import("../src/server/modules/accounts/accounts.service");
+  let db: typeof import("../src/server/db/client");
   let temp: IsolatedDb;
 
   beforeAll(async () => {
     temp = await createTestDb();
     process.env.DATABASE_URL = temp.url;
+    db = await import("../src/server/db/client");
     service = await import("../src/server/modules/accounts/accounts.service");
   });
 
   afterAll(async () => {
+    await db?.closeDb();
     await temp?.dispose();
   });
 

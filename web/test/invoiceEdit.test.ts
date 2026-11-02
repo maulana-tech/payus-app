@@ -40,6 +40,7 @@ describe.skipIf(!available)("invoice edits (Postgres)", () => {
   });
 
   afterAll(async () => {
+    await db?.closeDb();
     await temp?.dispose();
   });
 

@@ -32,6 +32,7 @@ describe.skipIf(!available)("invoice schedule (Postgres)", () => {
   });
 
   afterAll(async () => {
+    await db?.closeDb();
     await temp?.dispose();
   });
 
@@ -46,7 +47,7 @@ describe.skipIf(!available)("invoice schedule (Postgres)", () => {
       clientEmail: "ap@acme.test",
       dueDate,
       notes: "",
-      items: [{ description: "Retainer", quantity: 1, unitPrice: "1.5" }],
+      items: [{ description: "Retainer", quantity: 1, unitPrice: "150" }],
       recurrence,
     });
 
