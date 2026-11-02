@@ -237,7 +237,10 @@ function MobileTabs({
       <ul
         className="grid"
         style={{
-          gridTemplateColumns: `repeat(${items.length}, minmax(3.75rem, 1fr))`,
+          // Narrow enough that the seven tabs an account actually has fit a
+          // phone without scrolling; the bar still scrolls if a type ever
+          // shows more.
+          gridTemplateColumns: `repeat(${items.length}, minmax(3rem, 1fr))`,
         }}
       >
         {items.map(({ href, label, short, icon: Icon }) => {
@@ -250,7 +253,7 @@ function MobileTabs({
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex min-h-15 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
+                  "relative flex min-h-15 flex-col items-center justify-center gap-1 px-1 text-center text-[11px] font-medium transition-colors",
                   dashFocus,
                   active
                     ? "text-(--dash-fg)"

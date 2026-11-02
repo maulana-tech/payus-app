@@ -236,17 +236,27 @@ export function ListRow({
       )}
     >
       {lead ? <div className="shrink-0">{lead}</div> : null}
-      <div className="min-w-0 flex-1">
+      {/* A basis wide enough to read: without one the actions (which cannot
+          shrink) crush the name to "INV-" / "002" on a phone instead of
+          wrapping to their own line. */}
+      <div className="min-w-0 flex-1 basis-56">
         <div className="flex flex-wrap items-center gap-2">{title}</div>
         {meta ? (
           <p className="mt-1 truncate text-sm text-(--dash-ash)">{meta}</p>
         ) : null}
       </div>
       {trailing ? (
-        <div className="text-right text-[15px] font-medium">{trailing}</div>
+        <div className="shrink-0 text-right text-[15px] font-medium">
+          {trailing}
+        </div>
       ) : null}
       {actions ? (
-        <div className="flex shrink-0 items-center gap-3">{actions}</div>
+        // Wrapping, not `shrink-0`: five controls on a phone are wider than
+        // the screen, and a row that cannot wrap pushes the whole page
+        // sideways instead.
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {actions}
+        </div>
       ) : null}
     </div>
   );

@@ -32,7 +32,10 @@ export function Segmented<V extends string>({
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledBy}
       className={cn(
-        "m-0 flex h-10 w-full min-w-0 gap-1 rounded-full border border-(--dash-line-strong) p-1",
+        // No `min-w-0`: inside a flex row this pill would otherwise be
+        // squeezed under its own labels and truncate them to "O…", "Pa…".
+        // It keeps its labels and wraps to its own line instead.
+        "m-0 flex h-10 w-full max-w-full gap-1 rounded-full border border-(--dash-line-strong) p-1",
         className,
       )}
     >
@@ -47,7 +50,10 @@ export function Segmented<V extends string>({
             title={o.title}
             onClick={() => onChange(o.value)}
             className={cn(
-              "h-full min-w-0 flex-1 truncate rounded-full px-3 text-xs font-semibold tracking-[0.06em] whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+              // No `truncate` here either: `overflow: hidden` drops the
+              // label's min-content width to zero, which is what let the
+              // pill shrink to "O…" in the first place.
+              "h-full flex-1 rounded-full px-3 text-xs font-semibold tracking-[0.06em] whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40",
               dashFocus,
               active
                 ? "bg-(--dash-fg) text-(--dash-surface)"

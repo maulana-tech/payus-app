@@ -119,7 +119,7 @@ function DescribeIt() {
   return (
     <Panel
       title="Describe it instead"
-      hint="Say what you sell and the Builder writes the draft. It fills in our template; it never writes a page."
+      hint="Say what you sell and the Builder writes the draft: our template, filled in, with one block of prose that is sanitised on the way in."
     >
       <form
         className="grid gap-3 p-5"

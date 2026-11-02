@@ -525,8 +525,10 @@ export type StorefrontTemplate = "shelf" | "menu" | "single" | "tip";
 
 /**
  * A page a merchant can send people to. The agent that writes one fills in
- * this configuration — it never writes markup, so a storefront cannot carry
- * anything the renderer was not built to show.
+ * this configuration, so a storefront cannot carry anything the renderer was
+ * not built to show — with one exception, `html_raw`, which is the author's
+ * own prose. `html_clean` beside it is what renders, and it is the only
+ * thing that ever does.
  */
 export const storefronts = pgTable(
   "storefronts",

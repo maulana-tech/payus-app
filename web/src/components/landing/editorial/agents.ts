@@ -189,9 +189,9 @@ export const TABLE: Seat[] = [
     status: "live",
     head: [83.2, 33.6],
     epigram: "Describe the shop; walk into it.",
-    task: "Turns a conversation into a storefront: products, prices, a page at your own address. It fills in a template we wrote — it does not write pages of its own.",
+    task: "Turns a conversation into a storefront: products, prices, a page at your own address. It fills in a template we wrote, and the one block of HTML it may write is sanitised on the way in and rendered where nothing can run.",
     when: "When you ask for a shop.",
-    chips: ["Schema only", "No free HTML", "Signed files"],
+    chips: ["Schema only", "Sanitised HTML", "Owner publishes"],
     facts: [
       { label: "Writes", code: "storefront_config (validated)" },
       {
