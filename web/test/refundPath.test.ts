@@ -176,7 +176,7 @@ describe.skipIf(!available)("refund path (Postgres)", () => {
   }
 
   it("takes a full refund back out of the pots it went into", async () => {
-    const { invoice, captureId, paymentId } = await paidInvoice(
+    const { invoice, paymentId } = await paidInvoice(
       "rita",
       "INV-R1",
       "100.00",
