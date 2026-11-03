@@ -141,3 +141,23 @@ function verify(secret, rawBody, header) {
 
 Treat events as at-least-once: use `data.id` or `data.reference` to ignore
 duplicates.
+
+## The library
+
+`@payus/js` (in `packages/js`) is the same two things with the mistakes
+taken out: no dependencies, amounts never floats, and `constructEvent`
+*throws* rather than returning null, because the one error worth preventing
+is acting on an event nobody verified.
+
+```ts
+import { Payus, constructEvent } from "@payus/js";
+
+const payus = new Payus({ apiKey: process.env.PAYUS_SECRET_KEY!, baseUrl });
+const checkout = await payus.createCheckout({ amount: "25.00", reference: "order_1042" });
+
+// …and in your webhook route, with the raw body, not a parsed object:
+const event = await constructEvent(secret, raw, request.headers.get("payus-signature"));
+```
+
+Its tests verify a signature produced by *this server's* own signer, so the
+two cannot drift apart. `packages/js/README.md` has the rest.

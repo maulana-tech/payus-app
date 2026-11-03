@@ -6,10 +6,12 @@
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "build:local": "pnpm --filter web build:local",
-    "lint": "pnpm --filter web lint"
+    "lint": "pnpm --filter web lint",
+    "build:sdk": "pnpm --filter @payus/js build"
   },
   "workspaces": [
-    "web"
+    "web",
+    "packages/*"
   ],
   "dependencies": {
     "@fontsource/aileron": "^5.2.5"
