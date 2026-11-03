@@ -346,8 +346,8 @@ KYC, custody.
 | ~~5 layar dashboard placeholder~~ | ✅ 2 Nov |
 | ~~Tidak ada UI pembuatan API key~~ | ✅ 2 Nov (Developers → API keys, persis seperti docs/api.md) |
 | ~~`features/embed/bridge.ts` yatim~~ | ✅ dipasang lewat `EmbedBridge` di tiap halaman embed; `payus:paid` kini benar-benar terkirim |
-| 13 modul yatim (`invoicePdf`, `csv`, `download`, `PaymentQrDialog`, dll.) | dipakai di Fase 5, sisanya dihapus |
-| `.gitbook.yaml` menunjuk `docs/SUMMARY.md` yang tidak ada | kapan saja |
+| ~~13 modul yatim (`invoicePdf`, `csv`, `download`, `PaymentQrDialog`, dll.)~~ | ✅ 3 Nov — `invoicePdf`/`csv`/`download` dipakai laporan settlement, `PaymentQrDialog` dipasang di halaman Links; `tooltip`, `coin-icon`, `sidebar`, `sticky-banner` dihapus, begitu juga dependensi `gsap`, `@gsap/react`, `@lucasmarkes/hairline` yang tak pernah diimpor |
+| ~~`.gitbook.yaml` menunjuk `docs/SUMMARY.md` yang tidak ada~~ | ✅ 3 Nov — `docs/README.md` + `docs/SUMMARY.md` ditulis |
 | ~~Test DB belum pernah dijalankan hijau~~ | ✅ Hari 0 (146 test, nol skip) |
 
 ## 7. Risiko utama

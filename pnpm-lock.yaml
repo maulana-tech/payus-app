@@ -43,18 +43,12 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.15
         version: 6.43.15
-      '@gsap/react':
-        specifier: ^2.1.2
-        version: 2.1.2(gsap@3.15.0)(react@19.2.7)
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.81.0(react@19.2.7))(zod@4.4.3)
       '@lezer/highlight':
         specifier: ^1.2.5
         version: 1.2.5
-      '@lucasmarkes/hairline':
-        specifier: 0.5.0
-        version: 0.5.0(react@19.2.7)
       '@noble/ciphers':
         specifier: ^2.2.0
         version: 2.2.0
@@ -106,9 +100,6 @@ importers:
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(pg@8.23.1)
-      gsap:
-        specifier: ^3.15.0
-        version: 3.15.0
       jspdf:
         specifier: ^4.2.1
         version: 4.2.1
@@ -1277,12 +1268,6 @@ packages:
     peerDependencies:
       viem: 2.52.0
 
-  '@gsap/react@2.1.2':
-    resolution: {integrity: sha512-JqliybO1837UcgH2hVOM4VO+38APk3ECNrsuSM4MuXp+rbf+/2IG2K1YJiqfTcXQHH7XlA0m3ykniFYstfq0Iw==}
-    peerDependencies:
-      gsap: ^3.12.5
-      react: '>=17'
-
   '@hcaptcha/loader@2.4.2':
     resolution: {integrity: sha512-+Pf0Vin6iJlJj5u/mq6XMgbJT1mi/Sg5LWHxxqO4YHt2YvdZgecp5V2sbC6vRaNPJUqQGk2HOu1K/i12mqs5vw==}
 
@@ -1561,14 +1546,6 @@ packages:
 
   '@lit/reactive-element@2.1.2':
     resolution: {integrity: sha512-pbCDiVMnne1lYUIaYNN5wrwQXDtHaYtg7YEFPeW+hws6U47WeFvISGUWekPGKWOP1ygrs0ef0o1VJMk1exos5A==}
-
-  '@lucasmarkes/hairline@0.5.0':
-    resolution: {integrity: sha512-anXxRq2vRoBtjwt8q6CAlwcfpqVNmJIlM0HOaGpJFG6BNJVbjIoqD8m0JaFdYActPx6drUTpsaey55+ajWJ4pA==}
-    peerDependencies:
-      react: '>=18'
-    peerDependenciesMeta:
-      react:
-        optional: true
 
   '@marijn/find-cluster-break@1.0.4':
     resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
@@ -5060,9 +5037,6 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
-
-  gsap@3.15.0:
-    resolution: {integrity: sha512-dMW4CWBTUK1AEEDeZc1g4xpPGIrSf9fJF960qbTZmN/QwZIWY5wgliS6JWl9/25fpTGJrMRtSjGtOmPnfjZB+A==}
 
   h3@1.15.11:
     resolution: {integrity: sha512-L3THSe2MPeBwgIZVSH5zLdBBU90TOxarvhK9d04IDY2AmVS8j2Jz2LIWtwsGOU3lu2I5jCN7FNvVfY2+XyF+mg==}
@@ -9027,11 +9001,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@gsap/react@2.1.2(gsap@3.15.0)(react@19.2.7)':
-    dependencies:
-      gsap: 3.15.0
-      react: 19.2.7
-
   '@hcaptcha/loader@2.4.2': {}
 
   '@hcaptcha/react-hcaptcha@1.17.4(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
@@ -9292,10 +9261,6 @@ snapshots:
   '@lit/reactive-element@2.1.2':
     dependencies:
       '@lit-labs/ssr-dom-shim': 1.6.0
-
-  '@lucasmarkes/hairline@0.5.0(react@19.2.7)':
-    optionalDependencies:
-      react: 19.2.7
 
   '@marijn/find-cluster-break@1.0.4': {}
 
@@ -14596,8 +14561,6 @@ snapshots:
   gopd@1.2.0: {}
 
   graceful-fs@4.2.11: {}
-
-  gsap@3.15.0: {}
 
   h3@1.15.11:
     dependencies:

@@ -1,7 +1,7 @@
 "use client";
 
-import { Archive, ExternalLink, Plus, RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { Archive, ExternalLink, Plus, QrCode, RotateCcw } from "lucide-react";
+import { useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import type { RouterOutputs } from "@/server/root";
 import { trpc } from "@/trpc/react";
+import { PaymentQrDialog } from "../PaymentQrDialog";
 import {
   dashButtonPrimary,
   dashButtonSecondary,
@@ -103,6 +104,10 @@ type Link = RouterOutputs["paymentLinks"]["mine"][number];
 
 function LinkRow({ link, username }: { link: Link; username: string }) {
   const utils = trpc.useUtils();
+  // A link is usually sent to a phone, and the shortest way to a phone is
+  // a code on a screen someone is already looking at.
+  const [showQr, setShowQr] = useState(false);
+  const qrButton = useRef<HTMLButtonElement | null>(null);
   const setArchived = trpc.paymentLinks.setArchived.useMutation({
     onSuccess: () => void utils.paymentLinks.mine.invalidate(),
   });
@@ -129,6 +134,15 @@ function LinkRow({ link, username }: { link: Link; username: string }) {
         actions={
           <>
             <CopyButton value={`${origin()}${path}`} label="Link" />
+            <button
+              ref={qrButton}
+              type="button"
+              className={dashIconButton}
+              aria-label={`QR code for ${link.title}`}
+              onClick={() => setShowQr(true)}
+            >
+              <QrCode aria-hidden="true" />
+            </button>
             <a
               href={path}
               target="_blank"
@@ -161,6 +175,12 @@ function LinkRow({ link, username }: { link: Link; username: string }) {
       {setArchived.error ? (
         <ErrorNote>{setArchived.error.message}</ErrorNote>
       ) : null}
+      <PaymentQrDialog
+        open={showQr}
+        onOpenChange={setShowQr}
+        url={`${origin()}${path}`}
+        triggerRef={qrButton}
+      />
     </div>
   );
 }
