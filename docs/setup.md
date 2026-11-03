@@ -130,6 +130,29 @@ Two things catch people out:
   it; the call then fails with `permission_error`. Grant it in the Bedrock
   console under **Model access**, in that region.
 
+### Approvals on Telegram (optional)
+
+Create a bot with [@BotFather](https://t.me/BotFather), put its token in
+`TELEGRAM_BOT_TOKEN`, choose any long string for `TELEGRAM_WEBHOOK_SECRET`,
+and point Telegram at the route:
+
+```sh
+curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+  -d url="https://<your-host>/api/webhooks/telegram" \
+  -d secret_token="$TELEGRAM_WEBHOOK_SECRET"
+```
+
+Then open **Settings → Approvals on Telegram**, press *Link a chat*, and send
+the bot the `/start <code>` it gives you. The code works once and only for
+that account. After that, anything the Guardian holds arrives in the chat
+with Approve and Refuse on it.
+
+A chat can do no more than you can: the buttons call the same
+`approveProposal` / `refuseProposal` the dashboard calls, so the hash check,
+the expiry and the audit trail are identical — the trail just records
+`via: "telegram"`. Without a token the feature is off and the settings row
+says so.
+
 ### Background work (recurring invoices, reminders, the money path)
 
 `CRON_SECRET` protects two routes:

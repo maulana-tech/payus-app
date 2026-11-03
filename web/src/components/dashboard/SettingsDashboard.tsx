@@ -11,6 +11,7 @@ import { DashboardPageHeader } from "./DashboardPageHeader";
 import { NAV_ITEMS } from "./navItems";
 import { GuardianLimits } from "./screens/GuardianLimits";
 import { dashButtonSecondary } from "./styles";
+import { TelegramRow } from "./TelegramRow";
 
 /** Account, recovery and notification settings. */
 export function SettingsDashboard({ username }: { username: string }) {
@@ -55,6 +56,7 @@ export function SettingsDashboard({ username }: { username: string }) {
           }
         />
         <EmailNotificationsRow />
+        <TelegramRow />
         <Row
           label="Session"
           value="Sign out of this browser."

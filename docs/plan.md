@@ -157,8 +157,15 @@ batch sementara percobaan baru yang disengaja tetap bisa.
       nanti dipakai agen sudah dipakai sehari-hari sekarang
 - [x] UI: panel "Waiting for you" di Overview (dengan alasan Guardian) dan
       editor limit di Settings
-- [ ] Notifikasi + persetujuan lewat **Telegram** — sesuai garis potong di
-      §5, persetujuan in-app dipakai lebih dulu. Ini sisa Fase 3
+- [x] **Notifikasi + persetujuan lewat Telegram — selesai 3 Nov.** Chat
+      dibuktikan lewat kode sekali pakai (`/start <kode>`); kita tidak
+      pernah mengambil chat id dari isi pesan. Tombol Approve/Refuse
+      memanggil `approveProposal`/`refuseProposal` yang sama persis dengan
+      tombol di dashboard, jadi cek hash, kedaluwarsa, dan jejak audit
+      identik — bedanya cuma tercatat `via: "telegram"`. Pengiriman
+      diverifikasi lewat header rahasia, dan kalau bot mati, usulan tetap
+      tercatat (efek sampingnya tidak pernah di-await dan tidak boleh
+      melempar). 6 test Postgres
 
 **Terbukti oleh test** (19 test: 10 murni + 9 di Postgres): usulan yang
 melanggar ditolak dengan alasannya tersimpan; usulan di atas ambang

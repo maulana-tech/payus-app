@@ -8,12 +8,14 @@ import {
   publicProcedure,
 } from "../../trpc";
 import { usernameSchema } from "../profiles/profiles.schema";
+import { requireUsername } from "../profiles/profiles.service";
 import {
   disableByUnsubscribeToken,
   findSettings,
   upsertNotificationSettings,
 } from "./notifications.repository";
 import { notifyPaymentPing, sendTestEmail } from "./notifications.service";
+import { linkCode, telegramStatus, unlinkTelegram } from "./telegram.service";
 
 const updateSettingsInput = z
   .object({
@@ -46,6 +48,20 @@ const limited = (key: string, limit: number, windowMs: number) => {
 };
 
 export const notificationsRouter = createTRPCRouter({
+  /** Whether approvals can reach a chat, and the code to make them. */
+  telegram: protectedProcedure.query(async ({ ctx }) =>
+    telegramStatus(await requireUsername(ctx.privyUserId)),
+  ),
+
+  telegramCode: protectedProcedure.mutation(async ({ ctx }) => ({
+    code: await linkCode(await requireUsername(ctx.privyUserId)),
+  })),
+
+  telegramUnlink: protectedProcedure.mutation(async ({ ctx }) => {
+    await unlinkTelegram(await requireUsername(ctx.privyUserId));
+    return { linked: false };
+  }),
+
   getSettings: protectedProcedure.query(async ({ ctx }) => {
     const settings = await findSettings(ctx.privyUserId);
     return {

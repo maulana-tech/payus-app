@@ -64,6 +64,13 @@
       "when": 1793667527116,
       "tag": "0008_hot_jimmy_woo",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793668302055,
+      "tag": "0009_volatile_catseye",
+      "breakpoints": true
     }
   ]
 }

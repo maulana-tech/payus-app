@@ -18,6 +18,10 @@ export const serverEnvSchema = z.object({
   PRIVY_APP_ID: optionalString,
   PRIVY_APP_SECRET: optionalString,
   RESEND_API_KEY: optionalString,
+  /** The bot that carries approvals. Without it, Telegram is simply off. */
+  TELEGRAM_BOT_TOKEN: optionalString,
+  /** Sent back by Telegram as X-Telegram-Bot-Api-Secret-Token. */
+  TELEGRAM_WEBHOOK_SECRET: optionalString,
   EMAIL_FROM: optionalString,
   APP_URL: optionalString,
   // PayPal REST. `sandbox` unless deliberately pointed at live.
@@ -56,6 +60,8 @@ export function getServerEnv() {
     PRIVY_APP_ID: process.env.PRIVY_APP_ID,
     PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
+    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+    TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
     EMAIL_FROM: process.env.EMAIL_FROM,
     APP_URL: process.env.APP_URL,
     PAYPAL_ENV: process.env.PAYPAL_ENV,

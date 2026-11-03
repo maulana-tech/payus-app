@@ -21,6 +21,7 @@ import {
   proposals,
 } from "../../db/client";
 import { activeRules, replaceRules } from "../ledger/split.service";
+import { askOnTelegram } from "../notifications/telegram.service";
 import { payableMinor, releasePayout } from "../payments/payouts.service";
 import { canonical } from "./canonical";
 import {
@@ -283,7 +284,7 @@ export async function proposePayout(
   if (decision.verdict === "refuse")
     throw new ProposalRefusedError(decision.reason, decision.findings);
   if (decision.verdict === "allow") return execute(row);
-  return toView(row);
+  return waitingFor(owner, toView(row));
 }
 
 export type SplitRulePayload = {
@@ -382,7 +383,18 @@ export async function proposeSplitChange(
   if (decision.verdict === "refuse")
     throw new ProposalRefusedError(decision.reason, decision.findings);
   if (decision.verdict === "allow") return execute(row);
-  return toView(row);
+  return waitingFor(owner, toView(row));
+}
+
+/**
+ * A proposal that is now waiting for the owner. Telling them is a side
+ * effect and is treated like one: it is never awaited into the caller's
+ * result and never allowed to throw, because the dashboard already holds
+ * the proposal whatever a chat bot does.
+ */
+function waitingFor(owner: string, proposal: ProposalView): ProposalView {
+  void askOnTelegram(owner, proposal);
+  return proposal;
 }
 
 /** Records the owner's consent against this exact proposal, then runs it. */

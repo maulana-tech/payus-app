@@ -399,6 +399,22 @@ export const splitRules = pgTable(
  * own refund id, so a webhook redelivery and a retry both land on the same
  * row and the ledger is touched once.
  */
+/**
+ * A Telegram chat an owner approves from. One row per owner: the code is
+ * what they send the bot to prove the chat is theirs, and it stops working
+ * the moment it is used.
+ */
+export const telegramLinks = pgTable("telegram_links", {
+  owner: text("owner").primaryKey(),
+  /** Single use. Null once the chat is linked. */
+  code: text("code").unique(),
+  /** Telegram's chat id, as a string: they are larger than an int. */
+  chatId: text("chat_id").unique(),
+  linkedAt: timestamp("linked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
 export type RefundStatus = "pending" | "completed" | "failed";
 
 export const refunds = pgTable(
