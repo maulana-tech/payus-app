@@ -14,6 +14,10 @@ import { createRule, listRules } from "@/server/modules/ledger/split.service";
 import { createLink } from "@/server/modules/paymentLinks/paymentLinks.service";
 import { recordCapture } from "@/server/modules/payments/payments.service";
 import {
+  listRefunds,
+  recordRefund,
+} from "@/server/modules/payments/refunds.service";
+import {
   createStorefront,
   listStorefronts,
   setPublished,
@@ -96,6 +100,23 @@ export async function POST() {
       currency: paid.currency,
     });
 
+    // Part of it came back. The demo is more honest with a refund in it:
+    // it shows the split being reversed in proportion, and gives the
+    // settlement report and the Advisor something real to read.
+    if ((await listRefunds(owner)).length === 0)
+      await recordRefund(
+        {
+          refundId: `DEMOREF-${paid.id}`,
+          captureId: `DEMOCAP-${paid.id}`,
+          status: "COMPLETED",
+          grossMinor: 20_000n,
+          feeReturnedMinor: 0n,
+          netMinor: 20_000n,
+          currency: paid.currency,
+        },
+        { source: "owner", reason: "Two days of the retainer unused" },
+      );
+
     await createInvoice(owner, {
       number: "INV-002",
       clientName: "Blue Harbour",
@@ -115,7 +136,7 @@ export async function POST() {
       items: [line("Support, September", "400")],
       recurrence: "monthly",
     });
-    made.push("3 invoices, one of them paid through the rail");
+    made.push("3 invoices, one paid through the rail and partly refunded");
   }
 
   try {

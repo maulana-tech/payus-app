@@ -153,6 +153,28 @@ the expiry and the audit trail are identical — the trail just records
 `via: "telegram"`. Without a token the feature is off and the settings row
 says so.
 
+### Looking around without any keys
+
+The dashboard needs an identity provider, which is a lot to set up just to
+see the screens. So there is a demo account:
+
+```sh
+echo 'NEXT_PUBLIC_DEMO_USER=demo' >> web/.env.local
+pnpm dev
+curl -X POST http://localhost:3000/api/dev/seed
+```
+
+You are now signed in as `@demo`, with split rules, three invoices (one paid
+through the rail and partly refunded), a payment link, a published shop at
+`/shop/kopi-senja`, and a proposal the Guardian is holding. The seed is
+idempotent — run it again and it adds only what is missing.
+
+Two guards keep this where it belongs: the username has to be set
+deliberately, and `NODE_ENV` has to be `development`, which a production
+build hard-codes to `production`. `/api/dev/seed` answers 404 anywhere else,
+and the real authentication checks are not loosened — the demo session
+carries a genuine username claim and genuine keys.
+
 ### Deploying
 
 `render.yaml` is a blueprint for [Render](https://render.com): the web

@@ -151,6 +151,11 @@ pnpm --filter web db:migrate
 pnpm dev
 ```
 
+To look around without setting up an identity provider, add
+`NEXT_PUBLIC_DEMO_USER=demo` to `web/.env.local` and `POST /api/dev/seed`
+— development only, and [`docs/setup.md`](docs/setup.md) says why that is
+safe.
+
 To deploy it, `render.yaml` is a blueprint for Render (web service, Postgres
 and the two schedules) and the `Dockerfile` runs anywhere else. Migrations are
 applied before the server accepts a request, and `/api/health` answers 200
