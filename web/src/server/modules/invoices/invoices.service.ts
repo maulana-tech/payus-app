@@ -12,6 +12,7 @@ import {
   lt,
   lte,
   ne,
+  sql,
 } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { invoiceTotal } from "../../../features/invoices/input";
@@ -326,13 +327,35 @@ export async function claimDueReminders(
         isNull(invoices.reminderSentAt),
       ),
       invoices.dueDate,
-      { reminderSentAt: now },
+      { reminderSentAt: now, remindersSent: 1 },
     );
     const row = claimed?.after;
     if (!row?.clientEmail) break;
     out.push({ invoice: toView(row), clientEmail: row.clientEmail });
   }
   return out;
+}
+
+/**
+ * Records that this client has been asked once more. Counting is the whole
+ * of the Collector's limit, so it is written here and not left to the UI.
+ */
+export async function markChased(
+  owner: string,
+  id: string,
+  now = new Date(),
+): Promise<InvoiceView> {
+  const [row] = await getDb()
+    .update(invoices)
+    .set({
+      reminderSentAt: now,
+      remindersSent: sql`${invoices.remindersSent} + 1`,
+      updatedAt: now,
+    })
+    .where(and(eq(invoices.id, id), eq(invoices.owner, owner)))
+    .returning();
+  if (!row) throw new InvoiceNotFoundError();
+  return toView(row);
 }
 
 export async function stopRecurring(owner: string, id: string) {

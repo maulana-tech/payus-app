@@ -1,0 +1,1 @@
+ALTER TABLE "invoices" ADD COLUMN "reminders_sent" integer DEFAULT 0 NOT NULL;

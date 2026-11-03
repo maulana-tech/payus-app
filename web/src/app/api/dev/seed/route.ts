@@ -108,7 +108,8 @@ export async function POST() {
     await createInvoice(owner, {
       number: "INV-003",
       clientName: "Rivet & Co",
-      clientEmail: null,
+      // An address, so the Collector has somewhere to write in the demo.
+      clientEmail: "accounts@rivet.example",
       dueDate: day(-11),
       notes: "Monthly support",
       items: [line("Support, September", "400")],

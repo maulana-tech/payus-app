@@ -21,6 +21,7 @@ import {
   dashButtonSecondary,
   dashIconButton,
 } from "../styles";
+import { ChaseDialog } from "./ChaseDialog";
 import {
   CopyButton,
   EmptyState,
@@ -132,6 +133,7 @@ export function InvoicesScreen() {
 function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
   const utils = trpc.useUtils();
   const [refunding, setRefunding] = useState(false);
+  const [chasing, setChasing] = useState(false);
   const refresh = () => {
     void utils.invoices.list.invalidate();
     void utils.ledger.summary.invalidate();
@@ -220,6 +222,15 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
                 Stop
               </button>
             ) : null}
+            {status === "overdue" ? (
+              <button
+                type="button"
+                className={dashButtonSecondary}
+                onClick={() => setChasing(true)}
+              >
+                Chase
+              </button>
+            ) : null}
             {BigInt(invoice.paidMinor) > 0n ? (
               <button
                 type="button"
@@ -233,6 +244,12 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
         }
       />
       {error ? <ErrorNote>{error}</ErrorNote> : null}
+      <ChaseDialog
+        open={chasing}
+        onOpenChange={setChasing}
+        invoiceId={invoice.id}
+        invoiceNumber={invoice.number}
+      />
       <RefundDialog
         open={refunding}
         onOpenChange={setRefunding}

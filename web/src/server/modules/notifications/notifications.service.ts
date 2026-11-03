@@ -208,3 +208,33 @@ export async function sendTestEmail(userId: string): Promise<boolean> {
   });
   return res.ok;
 }
+
+/**
+ * A letter the Collector drafted and the owner chose to send. Unlike the
+ * automatic reminder this one is not deduplicated by invoice: the owner may
+ * deliberately write a second and a third time, and the Collector's own
+ * limit is what stops it going further.
+ */
+export async function emailCollectorLetter(input: {
+  invoice: InvoiceView;
+  clientEmail: string;
+  subject: string;
+  body: string;
+}): Promise<boolean> {
+  const env = getServerEnv();
+  if (!env.RESEND_API_KEY) return false;
+  const appUrl = env.APP_URL || "http://localhost:3000";
+  const content = {
+    title: input.subject,
+    message: input.body,
+    actionLabel: `Pay invoice ${input.invoice.number}`,
+    actionUrl: `${appUrl}/i/${input.invoice.token}`,
+  };
+  await sendEmail({
+    to: input.clientEmail,
+    subject: input.subject,
+    html: buildEmailHtml(content),
+    text: buildEmailText(content),
+  });
+  return true;
+}

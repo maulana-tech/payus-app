@@ -258,7 +258,21 @@ bawahnya.
       tidak boleh dilakukan kursi ini. UI-nya menampilkan daftar angka itu
       di bawah laporannya, karena laporan yang sumbernya tak terlihat cuma
       klaim. 6 test murni
-- [ ] **Merchant Ops / Advisor** — kalau waktu sisa
+- [x] **Collector** — surat susulan untuk invoice yang diam, dalam suaramu.
+      Yang bukan urusan model: **apakah menulis sama sekali**. `stopReason()`
+      murni dan itulah seluruh isi "tahu kapan berhenti" — lunas, tidak ada
+      sisa, tidak ada alamat, belum jatuh tempo, baru ditanya dalam 7 hari,
+      atau sudah ditanya 3 kali. Draftnya diperiksa dengan cek Reporter
+      (tautan bayar dibuang dulu, karena URL mengandung angka yang bukan
+      klaim soal uang) dan wajib memuat tautan itu. Ia tidak pernah
+      mengirim; pemilik yang mengirim, dan di situlah hitungannya naik.
+      6 test
+- [x] **Advisor** — menjawab pertanyaan soal uangmu. Ia **tidak menulis
+      query**: ia memilih satu dari enam milik kita lewat `enum` lalu
+      lookup `Map`, kita yang menjalankannya dengan lingkup pemilik, dan
+      baris-barisnya ditampilkan di bawah jawaban. Angka di luar baris itu
+      membuang jawabannya. Tidak punya jalur tulis apa pun. 5 test
+      **Dua kursi terakhir terisi: 12 dari 12.**
 
 ### Fase 5 — 10–11 Nov · UI, hosting, laporan
 - [x] **Dikerjakan lebih awal (2 Nov).** Lima placeholder dashboard diganti

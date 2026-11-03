@@ -115,6 +115,11 @@ export const invoices = pgTable(
     seriesNumber: text("series_number"), // number of the first of the series
     seriesIndex: integer("series_index"), // 1 for the first invoice
     reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
+    /**
+     * How many times this client has been asked. The Collector stops at
+     * three: past that it is a conversation for a person, not a letter.
+     */
+    remindersSent: integer("reminders_sent").notNull().default(0),
     paidMinor: minor("paid_minor").notNull(),
     paidReportedAt: timestamp("paid_reported_at", { withTimezone: true }),
     createdAt: createdAt(),

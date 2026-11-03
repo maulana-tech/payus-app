@@ -57,6 +57,13 @@
       "when": 1793667367482,
       "tag": "0007_clever_iron_man",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793667527116,
+      "tag": "0008_hot_jimmy_woo",
+      "breakpoints": true
     }
   ]
 }

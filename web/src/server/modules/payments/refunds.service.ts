@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { DEFAULT_CURRENCY } from "../../../features/invoices/money";
 import { reversal, type Share } from "../../../features/refunds/reverse";
 import { newId } from "../../../lib/ids";
@@ -321,6 +321,17 @@ async function byRefundId(refundId: string) {
     .where(eq(refunds.refundId, refundId))
     .limit(1);
   return row ?? null;
+}
+
+/** Everything this owner has given back, newest first. */
+export async function listRefunds(owner: string): Promise<RefundView[]> {
+  const rows = await getDb()
+    .select()
+    .from(refunds)
+    .where(eq(refunds.owner, owner))
+    .orderBy(desc(refunds.createdAt))
+    .limit(20);
+  return rows.map(toView);
 }
 
 /** What was given back against one invoice, for the invoice screens. */

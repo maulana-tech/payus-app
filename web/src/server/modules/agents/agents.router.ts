@@ -9,9 +9,22 @@ import {
 } from "../../lib/claude";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { mapGuardianError } from "../guardian/guardian.router";
+import {
+  invoiceClientEmail,
+  listInvoices,
+  markChased,
+} from "../invoices/invoices.service";
+import { emailCollectorLetter } from "../notifications/notifications.service";
+import { appOrigin } from "../payments/applyPayment";
 import { requireUsername } from "../profiles/profiles.service";
+import { runAdvisor } from "./advisor.agent";
 import { runAllocator } from "./allocator.agent";
 import { runBuilder } from "./builder.agent";
+import {
+  chaseable,
+  NothingToChaseError,
+  runCollector,
+} from "./collector.agent";
 import { runPayer } from "./payer.agent";
 import { runReporter } from "./reporter.agent";
 
@@ -20,6 +33,8 @@ import { runReporter } from "./reporter.agent";
 // payment.
 
 function mapError(e: unknown): never {
+  if (e instanceof NothingToChaseError)
+    throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
   if (e instanceof ClaudeNotConfiguredError)
     throw new TRPCError({
       code: "PRECONDITION_FAILED",
@@ -58,6 +73,72 @@ export const agentsRouter = createTRPCRouter({
   runReporter: protectedProcedure.mutation(async ({ ctx }) =>
     runReporter(await requireUsername(ctx.privyUserId)).catch(mapError),
   ),
+
+  /**
+   * The overdue invoices, each with the reason a letter is not due where
+   * there is one. Deciding that is code's job, not the Collector's.
+   */
+  chaseable: protectedProcedure.query(async ({ ctx }) =>
+    chaseable(await requireUsername(ctx.privyUserId)),
+  ),
+
+  /** Asks the Collector for the next letter. It drafts; you send. */
+  runCollector: protectedProcedure
+    .input(z.object({ invoiceId: z.string().min(8).max(24) }).strict())
+    .mutation(async ({ ctx, input }) =>
+      runCollector(await requireUsername(ctx.privyUserId), input.invoiceId, {
+        appUrl: appOrigin(),
+      }).catch(mapError),
+    ),
+
+  /**
+   * Sends a letter the owner has read. The text is whatever is in the box
+   * by then — theirs to edit — and the count of how often this client has
+   * been asked goes up here, which is what the Collector stops on.
+   */
+  sendChase: protectedProcedure
+    .input(
+      z
+        .object({
+          invoiceId: z.string().min(8).max(24),
+          subject: z.string().trim().min(1).max(160),
+          body: z.string().trim().min(1).max(2000),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const owner = await requireUsername(ctx.privyUserId);
+      const invoice = (await listInvoices(owner)).find(
+        (row) => row.id === input.invoiceId,
+      );
+      if (!invoice)
+        throw new TRPCError({ code: "NOT_FOUND", message: "No such invoice." });
+      const clientEmail = await invoiceClientEmail(invoice.id);
+      if (!clientEmail)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That invoice has no client address to write to.",
+        });
+      const sent = await emailCollectorLetter({
+        invoice,
+        clientEmail,
+        subject: input.subject,
+        body: input.body,
+      });
+      // Counted either way: the owner has decided this client was asked,
+      // and the limit exists to protect the client, not the mailer.
+      await markChased(owner, invoice.id);
+      return { sent, to: clientEmail };
+    }),
+
+  /** Asks the Advisor a question; it picks one of our queries to answer it. */
+  runAdvisor: protectedProcedure
+    .input(z.object({ question: z.string().trim().min(3).max(300) }).strict())
+    .mutation(async ({ ctx, input }) =>
+      runAdvisor(await requireUsername(ctx.privyUserId), input.question).catch(
+        mapError,
+      ),
+    ),
 
   /** Asks the Builder to write a storefront from a description, as a draft. */
   runBuilder: protectedProcedure

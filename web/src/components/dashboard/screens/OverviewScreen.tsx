@@ -7,6 +7,7 @@ import { formatMinor } from "@/features/invoices/money";
 import { trpc } from "@/trpc/react";
 import { dashButtonSecondary } from "../styles";
 import { ApprovalsPanel } from "./ApprovalsPanel";
+import { AskPanel } from "./AskPanel";
 import {
   accountLabel,
   EmptyState,
@@ -148,6 +149,8 @@ export function OverviewScreen({ username }: { username: string }) {
       </div>
 
       <ReportPanel />
+
+      <AskPanel />
 
       <ApprovalsPanel />
 
