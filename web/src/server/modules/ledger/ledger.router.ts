@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { DEFAULT_CURRENCY, toMinor } from "../../../features/invoices/money";
+import { probePayoutsAccess } from "../../lib/paypal";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { mapGuardianError } from "../guardian/guardian.router";
 import { proposePayout } from "../guardian/guardian.service";
@@ -131,6 +132,18 @@ export const ledgerRouter = createTRPCRouter({
 
   payouts: protectedProcedure.query(async ({ ctx }) =>
     listPayouts(await owner(ctx)),
+  ),
+
+  /**
+   * Whether PayPal will actually let this account send money, asked of
+   * PayPal rather than assumed from a flag. The release dialog says so
+   * before the owner presses the button, not after.
+   */
+  payoutsAccess: protectedProcedure.query(() =>
+    probePayoutsAccess().catch((error: unknown) => ({
+      state: "unknown" as const,
+      reason: error instanceof Error ? error.message : String(error),
+    })),
   ),
 
   /**

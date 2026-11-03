@@ -78,6 +78,24 @@ delivery with PayPal and answers 400 when it cannot. To receive webhooks on a
 laptop, put a tunnel in front of it (`cloudflared tunnel --url
 http://localhost:3000`) and register that hostname.
 
+Subscribe the same webhook to **Payment capture refunded** as well, which is
+what tells the ledger a refund happened when it was issued from PayPal's own
+dashboard rather than from here.
+
+### Payouts (sending money out)
+
+Payouts is a separate permission on a PayPal app, and an app that does not
+have it fails only when you try to send. So the app asks instead: set
+`PAYPAL_PAYOUTS_ENABLED=true`, open **Release** on the dashboard, and the
+dialog says what PayPal answered — approved, refused (with PayPal's own
+words), or not configured. Behind it is a free probe: reading a payout batch
+id that cannot exist, where a 404 means the permission is there and a 403
+means it is not.
+
+Until it is approved, a release is still recorded — as `payout.simulated`,
+labelled everywhere it appears — so the books stay true and the claim stays
+honest.
+
 The app never trusts a webhook body for amounts. It stores the event under
 its `event_id`, queues a job, and the worker reads the capture back from
 PayPal before anything is posted to the ledger.

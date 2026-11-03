@@ -245,6 +245,70 @@ export function payoutsEnabled(): boolean {
   return paypalConfigured() && getServerEnv().PAYPAL_PAYOUTS_ENABLED === "true";
 }
 
+export type PayoutsAccess =
+  /** No keys at all: nothing to ask. */
+  | { state: "not_configured" }
+  /** Keys, but `PAYPAL_PAYOUTS_ENABLED` is not set, so we never try. */
+  | { state: "off" }
+  /** PayPal let the call through: the permission is on this account. */
+  | { state: "approved" }
+  /** PayPal refused the call itself, which is the answer we came for. */
+  | { state: "denied"; reason: string }
+  | { state: "unknown"; reason: string };
+
+/**
+ * Whether this PayPal account may send payouts, asked without sending one.
+ * Reading a batch id that cannot exist costs nothing and separates the two
+ * answers cleanly: a 404 (or a complaint about the id) means the call got
+ * past authorisation, while a 401/403 is the permission being refused.
+ *
+ * Worth having because the alternative — find out on the owner's first real
+ * release — reads as our failure, and because "approved" is otherwise a
+ * claim nobody can check.
+ */
+export async function probePayoutsAccess(): Promise<PayoutsAccess> {
+  if (!paypalConfigured()) return { state: "not_configured" };
+  if (!payoutsEnabled()) return { state: "off" };
+  try {
+    await call(`/v1/payments/payouts/${PROBE_BATCH}`);
+    // A batch under this id would be a surprise, but it answers the question.
+    return { state: "approved" };
+  } catch (error) {
+    if (!(error instanceof PaypalApiError))
+      return {
+        state: "unknown",
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    if (error.status === 404 || error.status === 400)
+      return { state: "approved" };
+    if (error.status === 401 || error.status === 403)
+      return { state: "denied", reason: paypalMessage(error) };
+    return { state: "unknown", reason: paypalMessage(error) };
+  }
+}
+
+/** A batch id of the right shape that no account will ever have issued. */
+const PROBE_BATCH = "PAYUS_PROBE_0000000000";
+
+/** PayPal's own words, when it bothered to send any. */
+function paypalMessage(error: PaypalApiError): string {
+  try {
+    const body = JSON.parse(error.body) as {
+      message?: string;
+      error_description?: string;
+      name?: string;
+    };
+    return (
+      body.message ??
+      body.error_description ??
+      body.name ??
+      error.body.slice(0, 200)
+    );
+  } catch {
+    return error.body.slice(0, 200) || `HTTP ${error.status}`;
+  }
+}
+
 export type PayoutResult = {
   batchId: string;
   status: string;

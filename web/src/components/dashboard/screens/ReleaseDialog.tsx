@@ -49,6 +49,12 @@ export function ReleaseDialog({
     setDone(null);
   }, [open, payable]);
 
+  // Asked of PayPal, not of our own flag, and only while the dialog is open.
+  const access = trpc.ledger.payoutsAccess.useQuery(undefined, {
+    enabled: open,
+    staleTime: 5 * 60_000,
+  });
+
   const release = trpc.ledger.release.useMutation({
     onSuccess: (proposal) => {
       void utils.ledger.summary.invalidate();
@@ -118,6 +124,7 @@ export function ReleaseDialog({
                 required
               />
             </Field>
+            <PayoutsAccessNote access={access.data} />
             {release.error ? (
               <ErrorNote>{release.error.message}</ErrorNote>
             ) : null}
@@ -141,5 +148,31 @@ export function ReleaseDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * What PayPal said when we asked whether this account may send payouts. The
+ * honest cases are the useful ones: a release that will be recorded as
+ * simulated should say so before it is pressed, not after.
+ */
+function PayoutsAccessNote({
+  access,
+}: {
+  access: { state: string; reason?: string } | undefined;
+}) {
+  if (!access || access.state === "approved") return null;
+  const text =
+    access.state === "off"
+      ? "Payouts is switched off for this deployment (PAYPAL_PAYOUTS_ENABLED), so this will be recorded as a simulated payout: the ledger moves, no money does."
+      : access.state === "not_configured"
+        ? "There are no PayPal keys here, so this will be recorded as a simulated payout."
+        : access.state === "denied"
+          ? `PayPal will not let this account send payouts: ${access.reason ?? "permission refused"}. Ask for Payouts on the app in the PayPal Developer Dashboard; until then a release is recorded as simulated.`
+          : `Could not check with PayPal whether payouts are allowed: ${access.reason ?? "unknown"}.`;
+  return (
+    <p className="rounded-(--dash-radius) border border-(--dash-line-strong) px-4 py-3 text-sm text-(--dash-ash)">
+      {text}
+    </p>
   );
 }
