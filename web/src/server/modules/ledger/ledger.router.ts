@@ -14,10 +14,20 @@ import {
 } from "../payments/payouts.service";
 import { requireUsername } from "../profiles/profiles.service";
 import { balances, entriesFor } from "./ledger.service";
+import { settlementFor } from "./reports.service";
 import { createRule, listRules, planSplit, updateRule } from "./split.service";
 
 // What the money screens read and write. Every number here comes from the
 // ledger or from the invoices themselves — nothing is cached or guessed.
+
+/** Every minor-unit field of a report row, as strings. */
+const asStrings = <T extends Record<string, unknown>>(row: T) =>
+  Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [
+      key,
+      typeof value === "bigint" ? value.toString() : value,
+    ]),
+  ) as { [K in keyof T]: T[K] extends bigint ? string : T[K] };
 
 const target = z
   .string()
@@ -128,6 +138,39 @@ export const ledgerRouter = createTRPCRouter({
         mapError,
       );
       return { ...rule, value: rule.value.toString() };
+    }),
+
+  /**
+   * The day-by-day settlement, and whether it reconciles. Both halves of
+   * every posting are counted, so this is the ledger's own account of the
+   * period rather than a summary kept alongside it.
+   */
+  settlement: protectedProcedure
+    .input(
+      z
+        .object({
+          from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        })
+        .strict()
+        .refine((range) => range.from <= range.to, {
+          message: "The first day has to come before the last.",
+        }),
+    )
+    .query(async ({ ctx, input }) => {
+      const report = await settlementFor(await owner(ctx), input);
+      // bigint does not cross tRPC; minor units go as strings, as everywhere.
+      return {
+        ...report,
+        days: report.days.map(asStrings),
+        totals: asStrings(report.totals),
+        reconciliation: {
+          ...report.reconciliation,
+          cashMovementMinor: report.reconciliation.cashMovementMinor.toString(),
+          expectedMinor: report.reconciliation.expectedMinor.toString(),
+          differenceMinor: report.reconciliation.differenceMinor.toString(),
+        },
+      };
     }),
 
   payouts: protectedProcedure.query(async ({ ctx }) =>

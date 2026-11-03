@@ -292,9 +292,16 @@ bawahnya.
 - [x] **Storefront builder + pratinjau live** — selesai 2 Nov lewat kanvas
       `/canvas/[id]`: pratinjau adalah halaman itu sendiri, bukan tiruan.
 - Deploy ke **Render** + Postgres terkelola, cron invoice aktif
-- Laporan: settlement harian, rekonsiliasi, ekspor CSV/PDF
-  (`lib/invoicePdf.ts`, `lib/csv.ts`, `lib/download.ts` sudah ada, tinggal
-  disambung)
+- [x] **Laporan settlement + rekonsiliasi — selesai 3 Nov.** Panel di
+  `/transactions`: rentang tanggal, satu baris per hari (diterima, biaya,
+  direfund, disisihkan, milikmu, dirilis — payout simulasi dihitung
+  terpisah), dan satu kalimat rekonsiliasi yang membandingkan **pergerakan
+  akun kas PayPal itu sendiri** dengan apa yang seharusnya menurut
+  kategori-kategori itu. Kalau beda, selisihnya ditampilkan, bukan
+  disembunyikan — artinya ada posting yang laporan ini belum paham.
+  Aritmetikanya murni di `features/reports/settlement.ts`, dan layar, CSV,
+  serta PDF membaca objek laporan yang sama sehingga tidak bisa berbeda
+  diam-diam. 5 test
 
 ### 12 Nov · kirim
 - Video YouTube publik < 3 menit; momen **Guardian menolak** ditaruh di
