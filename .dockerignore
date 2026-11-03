@@ -1,0 +1,17 @@
+# Everything the image does not need, and a few things it must never have.
+.git
+.github
+**/node_modules
+**/.next
+**/.next-local
+**/.turbo
+**/dist
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+.DS_Store
+docs
+*.md
+!packages/js/README.md

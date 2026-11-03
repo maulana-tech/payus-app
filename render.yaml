@@ -1,0 +1,122 @@
+# Render blueprint: the app, its database, and the two schedules it needs.
+#
+# `render blueprint launch`, or point Render at this file. Everything marked
+# `sync: false` is a secret you paste once in the dashboard; nothing secret
+# lives in this repository.
+
+databases:
+  - name: payus-db
+    databaseName: payus
+    plan: free
+    postgresMajorVersion: "17"
+
+services:
+  - type: web
+    name: payus
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # The container applies migrations before it serves anything, so a
+    # deploy cannot answer requests against a schema it does not have.
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: payus-db
+          property: connectionString
+      - key: APP_URL
+        fromService:
+          type: web
+          name: payus
+          property: host
+      - key: CRON_SECRET
+        generateValue: true
+      # Inlined into the browser bundle at build time, which is why the
+      # Dockerfile declares them as ARG.
+      - key: NEXT_PUBLIC_PRIVY_APP_ID
+        sync: false
+      - key: NEXT_PUBLIC_PAYPAL_CLIENT_ID
+        sync: false
+      - key: PRIVY_APP_ID
+        sync: false
+      - key: PRIVY_APP_SECRET
+        sync: false
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      # Until Payouts is approved on the PayPal app, a release is recorded
+      # as `payout.simulated` and labelled as such.
+      - key: PAYPAL_PAYOUTS_ENABLED
+        value: "false"
+      # The agents. Leave empty and they are off, and say so.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_BACKEND
+        sync: false
+      - key: BEDROCK_AWS_REGION
+        sync: false
+      - key: BEDROCK_MODEL_ID
+        sync: false
+      - key: AWS_BEARER_TOKEN_BEDROCK
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+
+  # The money path's queue: a confirmed capture becoming a paid invoice,
+  # and a stale proposal expiring. Minutes matter here.
+  - type: cron
+    name: payus-outbox
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "* * * * *"
+    dockerCommand: node /app/web/scripts/cron.mjs outbox
+    envVars:
+      - key: RUN_MIGRATIONS
+        value: "false"
+      - key: APP_URL
+        fromService:
+          type: web
+          name: payus
+          property: host
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: payus
+          envVarKey: CRON_SECRET
+
+  # Recurring invoices and overdue reminders.
+  - type: cron
+    name: payus-invoices
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    schedule: "0 1 * * *"
+    dockerCommand: node /app/web/scripts/cron.mjs invoices
+    envVars:
+      - key: RUN_MIGRATIONS
+        value: "false"
+      - key: APP_URL
+        fromService:
+          type: web
+          name: payus
+          property: host
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: payus
+          envVarKey: CRON_SECRET

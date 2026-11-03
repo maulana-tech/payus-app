@@ -125,6 +125,13 @@ Optional, and off without `TELEGRAM_BOT_TOKEN`. A chat proves itself with a sing
 ### Reports
 `features/reports/settlement.ts` is pure and owns the arithmetic; `modules/ledger/reports.service.ts` only fetches the period's entries. The screen (`SettlementPanel`), the CSV and the PDF (`lib/settlementPdf.ts`) all render the one report object, so none of them can drift from the others. The line that earns the feature is the reconciliation: the `paypal_cash` account's own movement is compared against what taken − fees − refunds − payouts says it should have been, and when they differ the difference is **shown**, because a posting the report has no category for is exactly what you want to hear about. A simulated payout is counted separately from a real one everywhere it appears.
 
+### Deployment
+`Dockerfile` (three stages) + `render.yaml` (web service, Postgres, two cron containers) + `docker-entrypoint.sh`. The runtime stage carries the Next **standalone** bundle only: because `outputFileTracingRoot` is the repository, that bundle lands as `/app/node_modules` + `/app/web/server.js`.
+
+Two consequences that have already bitten once, so do not undo them:
+- **`scripts/migrate.mjs` uses `pg` and nothing else.** drizzle-orm's migrator is *not* in the traced bundle — the app imports the query builder, not the migrator — so a script that used it worked locally and died in the container. Ours keeps drizzle's own bookkeeping exactly (`drizzle.__drizzle_migrations`, one row per file, keyed by the sha256 of the file's contents, the journal's timestamp), and `test/migrations.test.ts` migrates a database with *drizzle's* migrator and then asks ours what is left to do. The answer has to be nothing.
+- **`NEXT_PUBLIC_*` is build-time.** Next inlines it, so the two public ids are `ARG`s in the Dockerfile. A build with a bogus `NEXT_PUBLIC_PRIVY_APP_ID` fails while prerendering `/`, because the provider calls Privy during the export — the fix is a real id, not making pages dynamic.
+
 ### The SDK (`packages/js`)
 `@payus/js` is dependency-free and uses `fetch` + Web Crypto, so it runs on Node 18+, Bun, Deno and the edge runtimes. Built with `pnpm build:sdk` from the repo root. `web/test/sdk.test.ts` verifies a signature made by the server's own `signWebhook` — a client library that agrees only with itself is how this goes wrong, so the test imports both sides. `constructEvent` throws instead of returning null on purpose, and `getCheckout` encodes the id rather than pasting it into a URL.
 

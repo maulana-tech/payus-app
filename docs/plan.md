@@ -298,7 +298,17 @@ bawahnya.
       inilah yang layak muncul di video
 - [x] **Storefront builder + pratinjau live** — selesai 2 Nov lewat kanvas
       `/canvas/[id]`: pratinjau adalah halaman itu sendiri, bukan tiruan.
-- Deploy ke **Render** + Postgres terkelola, cron invoice aktif
+- [x] **Deploy — selesai 3 Nov.** `Dockerfile` tiga tahap (hanya bundel
+  standalone yang ikut ke runtime, jalan sebagai user non-root),
+  `render.yaml` (web service + Postgres 17 + dua cron), `/api/health` yang
+  200 hanya kalau database ikut menjawab, dan entrypoint yang menjalankan
+  migrasi **sebelum** server menerima request. Satu jebakan yang sudah
+  terbukti: migrator drizzle-orm tidak ikut ke bundel hasil tracing, jadi
+  `scripts/migrate.mjs` sekarang memakai `pg` saja sambil mempertahankan
+  pembukuan drizzle persis — ada test yang memigrasi database pakai
+  migrator drizzle lalu bertanya ke milik kita apa yang tersisa; jawabannya
+  harus kosong. Image-nya sudah dibangun dan dijalankan sungguhan di sini:
+  migrasi dari nol, health 200, halaman tersaji, cron 401 tanpa secret.
 - [x] **Laporan settlement + rekonsiliasi — selesai 3 Nov.** Panel di
   `/transactions`: rentang tanggal, satu baris per hari (diterima, biaya,
   direfund, disisihkan, milikmu, dirilis — payout simulasi dihitung

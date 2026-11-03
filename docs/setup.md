@@ -153,6 +153,43 @@ the expiry and the audit trail are identical — the trail just records
 `via: "telegram"`. Without a token the feature is off and the settings row
 says so.
 
+### Deploying
+
+`render.yaml` is a blueprint for [Render](https://render.com): the web
+service, a Postgres 17 database, and the two schedules. Point Render at the
+repository and it creates all four; the secrets are the entries marked
+`sync: false`, which you paste once.
+
+Anywhere else, the `Dockerfile` is self-contained:
+
+```sh
+docker build -t payus \
+  --build-arg NEXT_PUBLIC_PRIVY_APP_ID=... \
+  --build-arg NEXT_PUBLIC_PAYPAL_CLIENT_ID=... .
+
+docker run -p 3000:3000 \
+  -e DATABASE_URL=postgres://... \
+  -e APP_URL=https://pay.example.com \
+  -e CRON_SECRET=... payus
+```
+
+Three things worth knowing:
+
+- **The two `NEXT_PUBLIC_*` values are needed at build time**, not at run
+  time: Next inlines them into the browser bundle. They are public ids, not
+  secrets. Render passes a service's environment variables to the Docker
+  build as build arguments, which is why the Dockerfile declares them as
+  `ARG`; if your host does not, pass them with `--build-arg`.
+- **Migrations run before the server accepts a request.** The entrypoint
+  applies them and only then starts Next, so a deploy cannot serve a build
+  against a schema it does not have. Set `RUN_MIGRATIONS=false` to take that
+  into your own hands.
+- **`/api/health`** answers 200 only when the database answers too; it is the
+  health check path in the blueprint.
+
+Afterwards, point the two webhooks at the new host: PayPal at
+`/api/webhooks/paypal`, Telegram at `/api/webhooks/telegram`.
+
 ### Background work (recurring invoices, reminders, the money path)
 
 `CRON_SECRET` protects two routes:
@@ -162,9 +199,10 @@ says so.
 | `GET /api/cron/invoices` | issues due recurring invoices, sends overdue reminders | daily |
 | `GET /api/cron/outbox` | runs queued money-path work (a confirmed capture becoming a paid invoice) | every minute |
 
-`web/vercel.json` schedules the first one. The outbox route needs a schedule
-of its own on the host (a Render cron job, or anything that can curl a URL
-every minute). Locally you can call either by hand:
+`render.yaml` schedules both — as containers that share the app's image and
+call the routes with `web/scripts/cron.mjs`, so a missed run shows up as a
+failed job rather than a quiet success. (`web/vercel.json` schedules only
+the first, for a Vercel deploy.) Locally you can call either by hand:
 
 ```sh
 curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/invoices
