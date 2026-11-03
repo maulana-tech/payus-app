@@ -44,11 +44,16 @@ export async function POST(request: Request) {
       .onConflictDoNothing()
       .returning({ eventId: webhookEvents.eventId });
     if (!stored) return { duplicate: true, queued: false };
-    // Only a completed capture moves money today; the rest is recorded so
-    // the history is complete and a later phase can pick it up.
-    const captureId = event.resource?.id;
-    if (eventType === "PAYMENT.CAPTURE.COMPLETED" && captureId) {
-      await enqueue(topics.captureCompleted, { captureId }, tx);
+    // Money moves on two of these: a capture and a refund. The body is only
+    // a hint in both cases — the worker reads the amounts back from PayPal.
+    // Everything else is stored so the history is complete.
+    const resourceId = event.resource?.id;
+    if (eventType === "PAYMENT.CAPTURE.COMPLETED" && resourceId) {
+      await enqueue(topics.captureCompleted, { captureId: resourceId }, tx);
+      return { duplicate: false, queued: true };
+    }
+    if (eventType === "PAYMENT.CAPTURE.REFUNDED" && resourceId) {
+      await enqueue(topics.refundCompleted, { refundId: resourceId }, tx);
       return { duplicate: false, queued: true };
     }
     return { duplicate: false, queued: false };

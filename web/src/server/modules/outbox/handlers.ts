@@ -1,7 +1,8 @@
 import "server-only";
-import { getCapture } from "../../lib/paypal";
+import { getCapture, getRefund } from "../../lib/paypal";
 import { settleCapture } from "../ledger/settlement.service";
 import { recordCapture } from "../payments/payments.service";
+import { recordRefund } from "../payments/refunds.service";
 import { topics } from "./topics";
 
 // One handler per topic. A handler must be safe to run again: the worker
@@ -21,6 +22,13 @@ export const handlers: Record<string, Handler> = {
   // capture itself, so a forged or stale body cannot move money.
   [topics.captureCompleted]: async (payload) =>
     recordCapture(await getCapture(str(payload, "captureId"))),
+
+  // Same rule as a capture: PayPal's own record of the refund is the only
+  // thing trusted for the amounts.
+  [topics.refundCompleted]: async (payload) =>
+    recordRefund(await getRefund(str(payload, "refundId")), {
+      source: "paypal",
+    }),
 
   // Settling again is harmless: the posting id comes from the capture.
   [topics.settleCapture]: async (payload) =>

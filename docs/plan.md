@@ -120,9 +120,17 @@ menunggu kredensial.
       ditandai `failed` dan **ledger tidak disentuh sama sekali**
 - [x] UI: panel "How money is divided" (dengan pratinjau memakai mesin yang
       sama persis dengan server) dan tombol "Release" di Overview
-- [ ] **Jalur refund — masih menunggu keputusanmu.** Ini satu-satunya bagian
-      Fase 2 yang tidak kukerjakan, karena pilihannya (rolling reserve vs
-      `merchant_payable` negatif) adalah kebijakan, bukan mekanika
+- [x] **Jalur refund — selesai 3 Nov.** Keputusannya: **membalik split
+      secara proporsional**, bukan rolling reserve. Pajak yang disisihkan
+      atas penjualan yang dibatalkan bukan pajak; rolling reserve menahan
+      uang setiap merchant demi kejadian yang jarang. `merchant_payable`
+      boleh negatif, dan itu bacaan yang jujur kalau uangnya sudah terlanjur
+      ditarik. Bagiannya dibaca dari **entri ledger settlement itu sendiri**,
+      bukan dihitung ulang dari aturan hari ini. Tiga kunci agar tidak
+      dobel: `refund_id` PayPal, `(payment_id, intent_key)`, dan posting
+      `refund:<refundId>`. Masuk lewat tombol Refund atau webhook
+      `PAYMENT.CAPTURE.REFUNDED`. Invoice-nya kembali `pending`.
+      6 test aritmetika + 4 test Postgres
 
 **Terbukti oleh test:** satu pembayaran menghasilkan entri yang totalnya sama
 dengan jumlah masuk (`trialBalance() === 0n` di setiap kasus), settlement

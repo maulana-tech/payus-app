@@ -7,6 +7,8 @@ export const topics = {
   captureCompleted: "paypal.capture.completed",
   /** A capture that was recorded but whose split did not get written. */
   settleCapture: "ledger.settle.capture",
+  /** Money went back to a payer; the amounts are read back from PayPal. */
+  refundCompleted: "paypal.capture.refunded",
 } as const;
 
 export type Topic = (typeof topics)[keyof typeof topics];

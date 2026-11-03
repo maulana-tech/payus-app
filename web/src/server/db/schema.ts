@@ -389,6 +389,48 @@ export const splitRules = pgTable(
   (t) => [index("split_rules_by_owner").on(t.owner, t.priority)],
 );
 
+/**
+ * Money given back to a payer. One row per PayPal refund, keyed by PayPal's
+ * own refund id, so a webhook redelivery and a retry both land on the same
+ * row and the ledger is touched once.
+ */
+export type RefundStatus = "pending" | "completed" | "failed";
+
+export const refunds = pgTable(
+  "refunds",
+  {
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(),
+    paymentId: text("payment_id").notNull(),
+    invoiceId: text("invoice_id").notNull(),
+    captureId: text("capture_id").notNull(),
+    /** PayPal's refund id. The reason a replay changes nothing. */
+    refundId: text("refund_id").notNull().unique(),
+    /** Gross handed back to the payer. */
+    amountMinor: minor("amount_minor").notNull(),
+    /** What PayPal gave back of its own fee, which is often nothing. */
+    feeReturnedMinor: minor("fee_returned_minor").notNull(),
+    currency: text("currency").notNull(),
+    /** Who asked: the owner here, or PayPal's dashboard. */
+    source: text("source").$type<"owner" | "paypal">().notNull(),
+    /**
+     * The attempt this came from, when it started here. A retry of one
+     * attempt finds this row instead of asking PayPal for a second refund.
+     */
+    intentKey: text("intent_key"),
+    reason: text("reason"),
+    status: text("status").$type<RefundStatus>().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("refunds_by_owner").on(t.owner, t.createdAt),
+    index("refunds_by_capture").on(t.captureId),
+    index("refunds_by_invoice").on(t.invoiceId),
+    uniqueIndex("refunds_one_per_attempt").on(t.paymentId, t.intentKey),
+  ],
+);
+
 export type PayoutStatus = "pending" | "paid" | "failed" | "simulated";
 
 /**

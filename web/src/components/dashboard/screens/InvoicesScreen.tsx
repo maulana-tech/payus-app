@@ -31,6 +31,7 @@ import {
   Panel,
   StatusChip,
 } from "./kit";
+import { RefundDialog } from "./RefundDialog";
 
 type Filter = "open" | "paid" | "all";
 const FILTERS: { value: Filter; label: string }[] = [
@@ -130,6 +131,7 @@ export function InvoicesScreen() {
 
 function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
   const utils = trpc.useUtils();
+  const [refunding, setRefunding] = useState(false);
   const refresh = () => {
     void utils.invoices.list.invalidate();
     void utils.ledger.summary.invalidate();
@@ -218,10 +220,26 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
                 Stop
               </button>
             ) : null}
+            {BigInt(invoice.paidMinor) > 0n ? (
+              <button
+                type="button"
+                className={dashButtonSecondary}
+                onClick={() => setRefunding(true)}
+              >
+                Refund
+              </button>
+            ) : null}
           </>
         }
       />
       {error ? <ErrorNote>{error}</ErrorNote> : null}
+      <RefundDialog
+        open={refunding}
+        onOpenChange={setRefunding}
+        invoiceId={invoice.id}
+        invoiceNumber={invoice.number}
+        currency={invoice.currency}
+      />
     </div>
   );
 }

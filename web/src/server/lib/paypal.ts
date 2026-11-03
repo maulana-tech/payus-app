@@ -236,6 +236,100 @@ export async function getCapture(captureId: string): Promise<Capture> {
   );
 }
 
+export type Refund = {
+  refundId: string;
+  /** The capture this gave money back out of. */
+  captureId: string | null;
+  status: string;
+  /** Handed back to the payer. */
+  grossMinor: bigint;
+  /** What PayPal returned of its own fee — frequently zero. */
+  feeReturnedMinor: bigint;
+  /** What actually leaves the balance: gross minus the fee returned. */
+  netMinor: bigint;
+  currency: string;
+};
+
+type RefundResource = {
+  id: string;
+  status: string;
+  amount?: { currency_code: string; value: string };
+  seller_payable_breakdown?: {
+    gross_amount?: { currency_code: string; value: string };
+    paypal_fee?: { currency_code: string; value: string };
+    net_amount?: { currency_code: string; value: string };
+  };
+  links?: { rel?: string; href?: string }[];
+};
+
+/** The provider's numbers, turned into minor units exactly once. */
+export function toRefund(
+  resource: RefundResource,
+  captureId?: string | null,
+): Refund {
+  const gross =
+    resource.seller_payable_breakdown?.gross_amount ?? resource.amount;
+  if (!gross) throw new Error(`Refund ${resource.id} carries no amount`);
+  const fee = resource.seller_payable_breakdown?.paypal_fee;
+  const grossMinor = toMinor(gross.value);
+  const feeReturnedMinor = fee ? toMinor(fee.value) : 0n;
+  const net = resource.seller_payable_breakdown?.net_amount;
+  return {
+    refundId: resource.id,
+    captureId: captureId ?? captureFromLinks(resource.links) ?? null,
+    status: resource.status,
+    grossMinor,
+    feeReturnedMinor,
+    netMinor: net ? toMinor(net.value) : grossMinor - feeReturnedMinor,
+    currency: gross.currency_code,
+  };
+}
+
+/** A refund names its capture only in its links, so that is where we look. */
+function captureFromLinks(
+  links: { rel?: string; href?: string }[] | undefined,
+): string | null {
+  for (const link of links ?? []) {
+    const match = link.href?.match(/\/v2\/payments\/captures\/([^/?]+)/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+/**
+ * Gives money back. `requestId` is PayPal's idempotency key, so the same
+ * attempt twice returns the first refund instead of refunding twice —
+ * which is the whole reason the caller passes one.
+ */
+export async function refundCapture(input: {
+  captureId: string;
+  /** Leave out for the whole remaining amount. */
+  amountMinor?: bigint;
+  currency: string;
+  requestId: string;
+  note?: string;
+}): Promise<Refund> {
+  const body: Record<string, unknown> = {};
+  if (input.amountMinor !== undefined)
+    body.amount = {
+      value: toDecimal(input.amountMinor),
+      currency_code: input.currency,
+    };
+  if (input.note) body.note_to_payer = input.note.slice(0, 255);
+  const resource = await call<RefundResource>(
+    `/v2/payments/captures/${input.captureId}/refund`,
+    { method: "POST", requestId: input.requestId, body },
+  );
+  return toRefund(resource, input.captureId);
+}
+
+/** Reads a refund back from PayPal; a webhook body is never the source. */
+export async function getRefund(refundId: string): Promise<Refund> {
+  return toRefund(
+    await call<RefundResource>(`/v2/payments/refunds/${refundId}`),
+  );
+}
+
 /**
  * Payouts needs its own approval on a PayPal account, so it is opt-in: until
  * `PAYPAL_PAYOUTS_ENABLED` is set, a release is recorded as simulated and

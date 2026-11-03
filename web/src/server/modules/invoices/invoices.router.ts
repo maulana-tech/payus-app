@@ -6,12 +6,19 @@ import {
   invoiceToken,
   invoiceUpdateInput,
 } from "../../../features/invoices/input";
+import { toMinor } from "../../../features/invoices/money";
 import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "../../trpc";
 import { applyInvoicePayment } from "../payments/applyPayment";
+import {
+  listRefundsForInvoice,
+  RefundRefusedError,
+  refundablePayments,
+  startRefund,
+} from "../payments/refunds.service";
 import { requireUsername } from "../profiles/profiles.service";
 import {
   InvoiceClosedError,
@@ -37,6 +44,8 @@ function mapError(e: unknown): never {
     throw new TRPCError({ code: "CONFLICT", message: e.message });
   if (e instanceof InvoiceNotFoundError)
     throw new TRPCError({ code: "NOT_FOUND", message: e.message });
+  if (e instanceof RefundRefusedError)
+    throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
   throw e;
 }
 
@@ -99,6 +108,46 @@ export const invoicesRouter = createTRPCRouter({
       ).catch(mapError);
       return result.invoice;
     }),
+  /** What was taken against this invoice, and what is still refundable. */
+  refundable: protectedProcedure
+    .input(z.object({ id: invoiceId }).strict())
+    .query(async ({ ctx, input }) => {
+      const owner = await requireUsername(ctx.privyUserId);
+      return {
+        payments: await refundablePayments(owner, input.id),
+        refunds: await listRefundsForInvoice(owner, input.id),
+      };
+    }),
+
+  /**
+   * Gives money back. The owner's own action: the Guardian guards what the
+   * agents propose, not what the person whose money it is decides.
+   */
+  refund: protectedProcedure
+    .input(
+      z
+        .object({
+          paymentId: z.string().min(8).max(32),
+          /** Leave out for everything still refundable on that payment. */
+          amount: z
+            .string()
+            .regex(/^\d{1,12}(\.\d{1,2})?$/)
+            .optional(),
+          reason: z.string().trim().max(200).optional(),
+          /** Held by the form for one attempt, so a retry cannot pay twice. */
+          intentKey: z.string().min(8).max(64),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) =>
+      startRefund(await requireUsername(ctx.privyUserId), {
+        paymentId: input.paymentId,
+        amountMinor: input.amount ? toMinor(input.amount) : undefined,
+        reason: input.reason,
+        intentKey: input.intentKey,
+      }).catch(mapError),
+    ),
+
   public: publicProcedure
     .input(z.object({ token: invoiceToken }).strict())
     .query(({ input }) => publicInvoice(input.token)),
