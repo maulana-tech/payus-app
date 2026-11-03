@@ -15,8 +15,9 @@ test, build 16 route):
   widget embed
 - Postgres + Drizzle, uang sebagai integer minor unit (`numeric(20,0)`)
 
-Yang belum ada: **agen**. Jalur uang dan seluruh layar dashboard sudah jadi
-(lihat Fase 1 dan Fase 5); Guardian dan agen-agennya yang belum.
+Yang belum ada waktu itu: **agen**. Sejak 3 Nov semuanya sudah ada —
+dua belas kursi, enam kode deterministik dan enam yang berpikir — jadi
+kalimat di atas tinggal catatan titik awal.
 
 ## 2. Keputusan yang sudah dipegang
 
@@ -30,17 +31,17 @@ Yang belum ada: **agen**. Jalur uang dan seluruh layar dashboard sudah jadi
 5. **Persetujuan terikat isi usulan** (hash penerima+nominal+pos sumber),
    supaya usulan tak bisa berubah setelah disetujui.
 
-## 3. Dua keputusan yang masih menunggu (blocking)
+## 3. Dua keputusan yang tadinya blocking — keduanya sudah diputus
 
-| Item | Kenapa blocking | Batas putus |
+| Item | Putusan | Kapan |
 |---|---|---|
-| Akses **Payouts** di sandbox PayPal | F-04, F-08, F-12 dan separuh laporan bergantung padanya | Hari 0 |
-| Kebijakan **refund setelah settlement** | menentukan apakah butuh rolling reserve atau `merchant_payable` negatif | Hari 2 |
+| Akses **Payouts** di sandbox PayPal | Tidak ditunggu. Fallback berlabel dipakai, dan aplikasinya kini **bertanya ke PayPal** apakah izinnya ada (probe 404 vs 403) sehingga jawabannya muncul sebelum tombol ditekan, bukan sesudah | 3 Nov |
+| Kebijakan **refund setelah settlement** | **Proporsional**: refund keluar dari pot-pot yang menerimanya, dibaca dari entri ledger settlement itu sendiri. Bukan rolling reserve — itu menahan uang setiap merchant demi kejadian yang jarang. `merchant_payable` boleh negatif | 3 Nov |
 
-Fallback kalau Payouts tidak tersedia: settlement dicatat sebagai
-`merchant_payable` di ledger + tombol "release" yang memanggil Payouts bila
-ada, dan bila tidak, mencatat `payout.simulated` **dengan label eksplisit di
-UI**. Demo tetap utuh dan klaimnya tetap jujur.
+Fallback Payouts yang dipakai: settlement dicatat sebagai `merchant_payable`
+di ledger + tombol "release" yang memanggil Payouts bila ada, dan bila tidak,
+mencatat `payout.simulated` **dengan label eksplisit di UI**. Demo tetap utuh
+dan klaimnya tetap jujur.
 
 ## 4. Jadwal
 

@@ -13,10 +13,13 @@
 
 ---
 
-> **Status: the rail works, the agents do not yet.** A payment goes through
-> PayPal, posts itself to a double-entry ledger and settles the invoice,
-> once, however many times the event is delivered. The agent team described
-> on the landing page is being built on top of that.
+> **Status: the rail works and all twelve seats are filled.** A payment goes
+> through PayPal, posts itself to a double-entry ledger and settles the
+> invoice, once, however many times the event is delivered. Six of the seats
+> are deterministic code and six are Claude; every one of the six that thinks
+> writes a proposal and stops, and a Guardian that is a plain function
+> decides. Payouts are recorded as simulated until PayPal approves the
+> permission on the account — labelled as such everywhere, never pretended.
 
 ## What works
 
@@ -79,23 +82,62 @@
   report away — a correct subtraction included, because working one out is
   exactly what it must not do.
 
-## What is not built yet
+- **A Collector that knows when to stop.** It drafts the follow-up for an
+  invoice that has gone quiet, in your voice. Whether to write at all is not
+  its decision: settled, no address, not yet overdue, asked inside the last
+  week, or asked three times already are all settled in code before the model
+  is reached. It drafts; you send.
 
-Two more thinking seats — the Collector, which chases an overdue invoice,
-and the Advisor, which answers questions about the books — are the work
-left in
-[`docs/plan.md`](docs/plan.md), along with approving from Telegram. Without
-an `ANTHROPIC_API_KEY` the agents are simply off, and the rail runs without
-them.
+- **An Advisor that does not write the query.** Ask it something about your
+  money and it picks one of six queries we wrote, we run it scoped to you,
+  and the rows it read are shown under the answer. It has no write path of
+  any kind, and a figure that is not in those rows throws the answer away.
 
-Refunds after settlement. That one is a policy question — a rolling reserve,
-or letting what you are owed go negative — and it is being decided rather
-than guessed at.
+- **Refunds that come out of the pots the money went into.** Tax set aside on
+  a sale that was undone is not tax, so a refund reverses the split in
+  proportion — read back from the settlement's own ledger entries, not
+  recomputed from today's rules. Three refunds of a third add up to the
+  capture exactly. The invoice is owed again, and no second receipt is sent.
+
+- **Settlement and reconciliation.** The period by day — taken, fees,
+  refunded, set aside, yours, released — and one line comparing the PayPal
+  cash account's own movement against what those categories say it should
+  have been. When they differ, the difference is shown, because a posting the
+  report has no category for is the thing worth hearing about. Same numbers
+  on screen, in the CSV and in the PDF.
+
+- **Approvals in a chat.** Link a Telegram chat with a single-use code and
+  what the Guardian holds arrives there with the buttons to decide it. The
+  buttons call the same functions the dashboard's do, so the hash check, the
+  expiry and the audit trail are identical.
+
+- **A library for your own server.** [`@payus/js`](packages/js) — no
+  dependencies, `fetch` and Web Crypto only, amounts never floats, and
+  `constructEvent` throws rather than returning null, because acting on an
+  unverified event is the one mistake worth designing against.
+
+## What is deliberately not here
+
+Yield and treasury, subscriptions, multi-currency, KYC, custody. An embedded
+wallet: Payus moves money between PayPal accounts and a ledger, and holding
+someone's funds is a different promise.
+
+Without a model configured (`ANTHROPIC_API_KEY`, or Bedrock) the six thinking
+seats are simply off and say so; the rail runs without them.
+
+## Built with AI
+
+Claude Code (Opus) wrote most of this repository alongside its author: the
+commits, the tests and the documents are the record of that work. At runtime
+the six thinking seats call Claude through the Anthropic API or Amazon
+Bedrock — `web/src/server/lib/claude.ts` is the only place a model is
+reached, and `docs/plan.md` has the measurements behind the model choice.
 
 ## Stack
 
 Next.js 15 (App Router) · React 19 · tRPC 11 · Postgres (Drizzle ORM) ·
-Privy · Tailwind v4 · Biome · Vitest.
+Privy · PayPal Orders v2 & Payouts · Claude (Anthropic API or Bedrock) ·
+Tailwind v4 · AG Grid · CodeMirror · Biome · Vitest.
 
 ## Run it
 
@@ -108,6 +150,11 @@ cp web/.env.example web/.env.local   # Privy app id + DATABASE_URL
 pnpm --filter web db:migrate
 pnpm dev
 ```
+
+To deploy it, `render.yaml` is a blueprint for Render (web service, Postgres
+and the two schedules) and the `Dockerfile` runs anywhere else. Migrations are
+applied before the server accepts a request, and `/api/health` answers 200
+only when the database answers too.
 
 ## License
 
