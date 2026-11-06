@@ -17,6 +17,6 @@ export const dashIconButton = `flex size-9 shrink-0 items-center justify-center 
 
 /** Hairline frame whose children become sharp cells divided by 1px lines. */
 export const dashLedger =
-  "dash-ledger grid gap-px overflow-hidden border border-(--dash-line-solid) bg-(--dash-line-solid)";
+  "dash-ledger grid min-w-0 gap-px overflow-hidden border border-(--dash-line-solid) bg-(--dash-line-solid)";
 
 export const dashCell = "min-w-0 bg-(--dash-surface)";

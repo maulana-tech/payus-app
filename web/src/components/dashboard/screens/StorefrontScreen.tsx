@@ -35,11 +35,11 @@ const origin = () =>
 export function StorefrontScreen() {
   return (
     <div className="grid gap-4">
-      <DescribeIt />
-
+      {/* The list comes first: it is the subject of the page, and it gives
+          "Describe it instead" something to be instead of. */}
       <Panel
         title="Your shops"
-        hint="A page of things people can pay for, at an address you choose."
+        hint="Published shops are live at their address; a draft is yours alone until you publish it."
         action={
           <Link href="/canvas/new" className={dashButtonPrimary}>
             <Plus aria-hidden="true" />
@@ -49,6 +49,8 @@ export function StorefrontScreen() {
       >
         <StoreList />
       </Panel>
+
+      <DescribeIt />
     </div>
   );
 }

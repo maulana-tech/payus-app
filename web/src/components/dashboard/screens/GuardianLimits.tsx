@@ -69,7 +69,7 @@ export function GuardianLimits() {
         }}
       >
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Refuse above" hint="Per payment">
+          <Field label="Refuse above" hint="Per payment, USD">
             <Input
               value={perPayment}
               inputMode="decimal"
@@ -77,7 +77,7 @@ export function GuardianLimits() {
               required
             />
           </Field>
-          <Field label="Refuse above" hint="Per day">
+          <Field label="Refuse above" hint="Per day, USD">
             <Input
               value={perDay}
               inputMode="decimal"
@@ -85,7 +85,7 @@ export function GuardianLimits() {
               required
             />
           </Field>
-          <Field label="Ask me above">
+          <Field label="Ask me above" hint="USD">
             <Input
               value={approveAbove}
               inputMode="decimal"

@@ -12,11 +12,15 @@ import { DitherField } from "../landing/DitherField";
 type DashboardMode = "light" | "dark";
 const STORAGE_KEY = "payus.dashboard.mode";
 
-// Dither colours per mode: paper + signal blue, or ink + a deep blue that
-// stays quiet behind light text.
+// Both colours come from the same family as the page, so the field reads as
+// paper grain rather than a pattern: the base is --dash-bg exactly (a base
+// that misses by a shade turns the whole dither visible), and the second
+// colour is the hairline tone. The blue that used to sit here contradicted
+// the dashboard's own rule — marks are ink, never hue — and in dark mode it
+// put a visible texture behind body text.
 const DITHER = {
-  light: { light: "#faf7f0", dark: "#5ea6e5" },
-  dark: { light: "#151310", dark: "#1c5f94" },
+  light: { light: "#f5f3ea", dark: "#e3e1d5" },
+  dark: { light: "#20261a", dark: "#2d3322" },
 } as const;
 
 // Runs before hydration so the saved (or system) mode paints without a flash.

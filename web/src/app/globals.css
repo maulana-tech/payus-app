@@ -719,16 +719,20 @@ body:has(.theme-product) [data-slot="dialog-content"][data-appearance="glass"] {
    paper on ink. Tokens live on <body> so dialogs and menus, which portal
    outside the wrapper, follow too. */
 body:has(.dashboard-app) {
-  --dash-bg: rgb(250 247 240);
-  --dash-surface: rgb(255 253 248);
-  --dash-fg: rgb(21 19 16);
-  --dash-ash: rgb(107 101 90);
-  --dash-line: rgb(21 19 16 / 0.1);
+  /* The landing's two colours, swapped: its cream ground (--color-ed-cream)
+     becomes the paper here, and its ink ground (--color-ed-dark-2) becomes
+     the type. One family across both surfaces, so moving from the landing
+     into the dashboard is the same room with the lights on. */
+  --dash-bg: #f5f3ea;
+  --dash-surface: #fbfaf3;
+  --dash-fg: #20261a;
+  --dash-ash: #5f6354;
+  --dash-line: rgb(32 38 26 / 0.1);
   /* The same hairline flattened onto the surface, for edges that sit over the
      dither field, where a translucent line would show the pattern through. */
-  --dash-line-solid: rgb(232 230 225);
-  --dash-line-strong: rgb(21 19 16 / 0.2);
-  --dash-tint: rgb(21 19 16 / 0.04);
+  --dash-line-solid: #e3e1d5;
+  --dash-line-strong: rgb(32 38 26 / 0.2);
+  --dash-tint: rgb(32 38 26 / 0.04);
   /* #5EA6E5 is 2.5:1 on paper: right for a dot or rule, wrong for a word. */
   /* No blue in the dashboard: marks (dots, active rail, chart bars) are ink. */
   --dash-accent: var(--dash-fg);
@@ -743,15 +747,18 @@ body:has(.dashboard-app) {
 }
 
 html[data-dash-mode="dark"] body:has(.dashboard-app) {
-  --dash-bg: rgb(21 19 16);
-  --dash-surface: rgb(29 27 22);
-  --dash-fg: rgb(250 247 240);
-  --dash-ash: rgb(168 160 146);
-  --dash-line: rgb(250 247 240 / 0.1);
-  --dash-line-solid: rgb(51 49 44);
-  --dash-line-strong: rgb(250 247 240 / 0.2);
-  --dash-tint: rgb(250 247 240 / 0.05);
-  --dash-err: rgb(224 142 122);
+  /* Dark mode is the landing's own ground: --color-ed-dark-2 behind,
+     --color-ed-dark for panels, --color-ed-cream for type, and the
+     landing's hairline (--color-ed-line) unchanged. */
+  --dash-bg: #20261a;
+  --dash-surface: #262b1c;
+  --dash-fg: #f5f3ea;
+  --dash-ash: #9ca08c;
+  --dash-line: rgb(245 243 234 / 0.16);
+  --dash-line-solid: #343a29;
+  --dash-line-strong: rgb(245 243 234 / 0.28);
+  --dash-tint: rgb(245 243 234 / 0.05);
+  --dash-err: rgb(226 148 126);
   color-scheme: dark;
 }
 
@@ -854,6 +861,24 @@ body:has(.dashboard-app) :is(input[type="checkbox"], input[type="radio"]) {
 body:has(.dashboard-app) .dash-ledger [data-slot="card"] {
   border-radius: 0;
   box-shadow: none;
+}
+
+/* A ledger cell may never widen the ledger. Grid items default to
+   `min-width: auto`, which is their min-content width — and one line of
+   nowrap text (every `truncate` is nowrap) then measures the whole string.
+   That widened the track for every panel on the screen, and the page was
+   clipped rather than scrolled. Cells carry `min-w-0` themselves, but a
+   call site that wraps one in a plain <div> would lose it, so the rule
+   lives here where no call site can forget it. */
+.dash-ledger > * {
+  min-width: 0;
+}
+
+/* Prose in the dashboard sits inside max-widths that regularly left a single
+   word alone on the last line ("keys.", "a test."). `pretty` only changes
+   where the break falls, never the words. */
+body:has(.dashboard-app) :is(p, li) {
+  text-wrap: pretty;
 }
 
 body:has(.dashboard-app) :is([data-slot="button"], [data-slot="badge"]) {

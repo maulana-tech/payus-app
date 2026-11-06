@@ -41,20 +41,21 @@ export function LinksScreen({ username }: { username: string }) {
 
   return (
     <div className="grid gap-4">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          className={dashButtonPrimary}
-          onClick={() => setCreating(true)}
-        >
-          <Plus aria-hidden="true" />
-          New link
-        </button>
-      </div>
-
+      {/* The button belongs in the panel header, as it does on every other
+          screen: on its own row it left a band of empty page above the list. */}
       <Panel
         title="Active"
-        hint={`Anyone with the address can pay you. Yours start with ${origin()}/pay/${username}/`}
+        hint={`Anyone holding the address can pay. Yours all begin ${origin()}/pay/${username}/`}
+        action={
+          <button
+            type="button"
+            className={dashButtonPrimary}
+            onClick={() => setCreating(true)}
+          >
+            <Plus aria-hidden="true" />
+            New link
+          </button>
+        }
       >
         {links.isLoading ? (
           <div className="px-5 py-12 text-center text-sm text-(--dash-ash)">
@@ -120,7 +121,9 @@ function LinkRow({ link, username }: { link: Link; username: string }) {
         title={
           <>
             <span className="font-medium">{link.title}</span>
-            <StatusChip status={link.state} />
+            {/* Inside the "Active" panel every row is active; the chip only
+                earns its place where the state is the exception. */}
+            {archived ? <StatusChip status={link.state} /> : null}
           </>
         }
         meta={`${path}${link.description ? ` · ${link.description}` : ""}`}

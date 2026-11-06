@@ -518,14 +518,15 @@ export function Field({
   hint?: string;
   children: React.ReactNode;
 }) {
+  // The hint carries no extra opacity: ash on surface is 4.9:1, and 70% of
+  // that is 3.3:1 — under the 4.5:1 an 11px label needs. Lowercase and
+  // normal tracking already separate the hint from the label.
   return (
     <Label className="grid gap-1.5">
       <span className="text-[11px] font-semibold tracking-[0.14em] text-(--dash-ash) uppercase">
         {label}
         {hint ? (
-          <span className="ml-2 tracking-normal normal-case opacity-70">
-            {hint}
-          </span>
+          <span className="ml-2 tracking-normal normal-case">{hint}</span>
         ) : null}
       </span>
       {children}

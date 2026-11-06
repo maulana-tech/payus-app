@@ -35,7 +35,9 @@ export function Segmented<V extends string>({
         // No `min-w-0`: inside a flex row this pill would otherwise be
         // squeezed under its own labels and truncate them to "O…", "Pa…".
         // It keeps its labels and wraps to its own line instead.
-        "m-0 flex h-10 w-full max-w-full gap-1 rounded-full border border-(--dash-line-strong) p-1",
+        // h-11 on a phone so each choice is a 36px target; the desktop keeps
+        // the 40px control height the other buttons use.
+        "m-0 flex h-11 w-full max-w-full gap-1 rounded-full border border-(--dash-line-strong) p-1 sm:h-10",
         className,
       )}
     >

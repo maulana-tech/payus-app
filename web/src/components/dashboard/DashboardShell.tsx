@@ -206,12 +206,6 @@ function RailLink({
             {badge > 99 ? "99+" : badge}
           </span>
         ) : null}
-        {active ? (
-          <span
-            className="absolute -left-[9px] h-4 w-0.5 rounded-full bg-(--dash-accent)"
-            aria-hidden="true"
-          />
-        ) : null}
         <span className="pointer-events-none absolute left-full z-50 ml-4 rounded-(--dash-radius-sm) bg-(--dash-fg) px-2.5 py-1 text-[11px] font-semibold tracking-[0.12em] whitespace-nowrap text-(--dash-surface) uppercase opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
           {label}
           {showBadge ? ` (${badge})` : null}

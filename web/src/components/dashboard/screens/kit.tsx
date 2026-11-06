@@ -27,7 +27,12 @@ export function Panel({
   return (
     <section
       className={cn(
-        "rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface)",
+        // min-w-0 is load-bearing: as a grid item the default is
+        // `min-width: auto`, so one unbreakable line inside (a truncated
+        // meta line is `white-space: nowrap`, and nowrap text has a
+        // min-content width of the whole string) widens the track for every
+        // panel on the screen, and the page is clipped, not scrolled.
+        "min-w-0 rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface)",
         className,
       )}
     >
@@ -153,7 +158,10 @@ export function CopyButton({
     <button
       type="button"
       className={cn(
-        "inline-flex items-center gap-1.5 text-[13px] font-medium text-(--dash-ash) transition-colors hover:text-(--dash-fg)",
+        // -my-2 keeps the row's rhythm while the padding lifts the hit area
+        // from 20px to 36px: at 20px this was the smallest target on the
+        // screen, well under the 24px floor.
+        "inline-flex items-center gap-1.5 -my-2 py-2 text-[13px] font-medium text-(--dash-ash) transition-colors hover:text-(--dash-fg)",
         dashFocus,
         className,
       )}
@@ -254,7 +262,7 @@ export function ListRow({
         // Wrapping, not `shrink-0`: five controls on a phone are wider than
         // the screen, and a row that cannot wrap pushes the whole page
         // sideways instead.
-        <div className="flex flex-wrap items-center justify-end gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
           {actions}
         </div>
       ) : null}
