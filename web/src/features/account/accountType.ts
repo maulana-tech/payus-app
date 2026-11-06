@@ -17,7 +17,7 @@ export type AccountTypeInfo = {
   label: string;
   /** One plain sentence: what you do with this account. */
   summary: string;
-  /** What the dashboard puts first for this type. */
+  /** What the dashboard opens with for this type, in words not nouns. */
   tools: string;
   /** The line that helps someone recognise themselves in it. */
   goodIf: string;
@@ -29,7 +29,7 @@ export const ACCOUNT_TYPES: readonly AccountTypeInfo[] = [
     label: "Personal",
     summary:
       "Ask someone to pay you back, or take money from anyone with a link.",
-    tools: "Requests, links",
+    tools: "Asking a person to pay you, and a link anyone can pay",
     goodIf: "You split bills more often than you bill anyone.",
   },
   {
@@ -37,7 +37,7 @@ export const ACCOUNT_TYPES: readonly AccountTypeInfo[] = [
     label: "Freelancer or creator",
     summary:
       "Bill clients by the job, let the invoice remind them, and hear the moment it is paid.",
-    tools: "Invoices, links, requests",
+    tools: "Invoices that chase themselves, plus links and requests",
     goodIf: "You work job to job and want the paperwork to write itself.",
   },
   {
@@ -45,7 +45,7 @@ export const ACCOUNT_TYPES: readonly AccountTypeInfo[] = [
     label: "Business",
     summary:
       "Sell from your own site, and reconcile what lands against what you billed.",
-    tools: "Invoices, links, developer keys",
+    tools: "Invoices, a shop page, and API keys for your own checkout",
     goodIf:
       "Your own software creates the checkout and listens for the webhook.",
   },

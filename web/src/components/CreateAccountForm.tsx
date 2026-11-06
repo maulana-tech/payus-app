@@ -5,7 +5,7 @@ import { Loader } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { usernameSchema } from "../server/modules/profiles/profiles.schema";
-import { OnboardingStep } from "./onboarding/Steps";
+import { OnboardingSettled, OnboardingStep } from "./onboarding/Steps";
 import { useSession } from "./SessionProvider";
 import { Button } from "./ui/button";
 import {
@@ -32,7 +32,7 @@ export function CreateAccountForm({
   onClaimed: (username: string) => void;
   error?: string | null;
 }) {
-  const { claimUsername, signIn } = useSession();
+  const { claimUsername, signIn, recoveryMethod } = useSession();
   const {
     register,
     handleSubmit,
@@ -69,6 +69,22 @@ export function CreateAccountForm({
           </DialogDescription>
         </DialogHeader>
 
+        <OnboardingSettled
+          items={
+            recoveryMethod
+              ? [
+                  {
+                    label: "Unlocks with",
+                    value:
+                      recoveryMethod === "passkey"
+                        ? "A passkey on this device"
+                        : "A 6-digit PIN",
+                  },
+                ]
+              : []
+          }
+        />
+
         <form className="grid gap-3" onSubmit={onSubmit}>
           <div className="grid gap-2">
             <label className="text-sm font-medium" htmlFor="username">
@@ -87,7 +103,9 @@ export function CreateAccountForm({
               }}
             />
             <span className="text-xs text-muted-foreground">
-              3-20 characters. Letters, numbers, underscore.
+              3-20 characters. Letters, numbers, underscore. It is signed to
+              your keys when you claim it, so it stays yours and cannot be
+              changed afterwards.
             </span>
           </div>
 

@@ -251,7 +251,7 @@ function MobileTabs({
                   dashFocus,
                   active
                     ? "text-(--dash-fg)"
-                    : "text-(--dash-fg)/50 hover:text-(--dash-fg)",
+                    : "text-(--dash-ash) hover:text-(--dash-fg)",
                 )}
               >
                 {active ? (

@@ -41,7 +41,7 @@ export function ChoiceCard({
     <>
       <span className="flex items-start justify-between gap-4">
         <span className="min-w-0">
-          <span className="block text-[11px] font-semibold tracking-[0.18em] text-foreground/40 tabular-nums">
+          <span className="block text-[11px] font-semibold tracking-[0.18em] text-foreground/70 tabular-nums">
             {String(index).padStart(2, "0")}
           </span>
           <span className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
@@ -49,7 +49,7 @@ export function ChoiceCard({
               {title}
             </span>
             {note ? (
-              <span className="text-[11px] font-semibold tracking-[0.14em] text-foreground/45 uppercase">
+              <span className="text-[11px] font-semibold tracking-[0.14em] text-foreground/70 uppercase">
                 {note}
               </span>
             ) : null}
@@ -82,7 +82,7 @@ export function ChoiceCard({
               key={row.label}
               className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-3"
             >
-              <span className="text-[10px] font-semibold tracking-[0.16em] text-foreground/40 uppercase">
+              <span className="text-[10px] font-semibold tracking-[0.16em] text-foreground/70 uppercase">
                 {row.label}
               </span>
               <span className="text-[13px] leading-5 text-foreground/75">

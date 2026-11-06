@@ -36,6 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     accountType,
     accountTypeResolved,
     chooseAccountType,
+    recoveryMethod,
   } = useSession();
   const pathname = usePathname();
   const isPay = pathname.startsWith("/pay");
@@ -77,6 +78,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         !usernameModalOpen
       }
       onChoose={chooseAccountType}
+      username={username}
+      recoveryMethod={recoveryMethod}
     />
   );
 

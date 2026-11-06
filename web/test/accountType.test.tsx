@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AccountTypeDialog } from "../src/components/AccountTypeDialog";
 import { NAV_ITEMS } from "../src/components/dashboard/navItems";
+import { ONBOARDING_STEPS } from "../src/components/onboarding/Steps";
 import {
   ACCOUNT_TYPES,
   hiddenFor,
@@ -52,8 +53,17 @@ describe("account type navigation", () => {
 describe("AccountTypeDialog", () => {
   it("waits for a choice, then saves the business name with it", async () => {
     const onChoose = vi.fn().mockResolvedValue(undefined);
-    render(<AccountTypeDialog open onChoose={onChoose} />);
-    const next = screen.getByRole("button", { name: "Continue" });
+    render(
+      <AccountTypeDialog
+        open
+        onChoose={onChoose}
+        username="demo"
+        recoveryMethod="pin"
+      />,
+    );
+    const next = screen.getByRole("button", {
+      name: /Finish and open my dashboard/,
+    });
     expect(next).toBeDisabled();
 
     await userEvent.click(screen.getByRole("radio", { name: /Business/ }));
@@ -63,7 +73,14 @@ describe("AccountTypeDialog", () => {
   });
 
   it("explains every type on its card, not just names it", () => {
-    render(<AccountTypeDialog open onChoose={vi.fn()} />);
+    render(
+      <AccountTypeDialog
+        open
+        onChoose={vi.fn()}
+        username="demo"
+        recoveryMethod="pin"
+      />,
+    );
     for (const type of ACCOUNT_TYPES) {
       const card = screen.getByRole("radio", { name: new RegExp(type.label) });
       expect(card).toHaveTextContent(type.summary);
@@ -72,12 +89,40 @@ describe("AccountTypeDialog", () => {
     }
   });
 
+  // Onboarding used to show three anonymous dashes and a count. Naming the
+  // steps, and showing back what is already settled, is what tells someone
+  // how much of this there is left.
+  it("names every step and shows what is already decided", () => {
+    render(
+      <AccountTypeDialog
+        open
+        onChoose={vi.fn()}
+        username="demo"
+        recoveryMethod="pin"
+      />,
+    );
+    for (const label of ONBOARDING_STEPS) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByText("@demo")).toBeInTheDocument();
+    expect(screen.getByText("A 6-digit PIN")).toBeInTheDocument();
+  });
+
   it("asks no name for a personal account", async () => {
     const onChoose = vi.fn().mockResolvedValue(undefined);
-    render(<AccountTypeDialog open onChoose={onChoose} />);
+    render(
+      <AccountTypeDialog
+        open
+        onChoose={onChoose}
+        username="demo"
+        recoveryMethod="pin"
+      />,
+    );
     await userEvent.click(screen.getByRole("radio", { name: /Personal/ }));
     expect(screen.queryByLabelText(/Business name/)).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /Finish and open my dashboard/ }),
+    );
     expect(onChoose).toHaveBeenCalledWith("personal", null);
   });
 });

@@ -7,7 +7,8 @@ import {
   type AccountType,
 } from "../features/account/accountType";
 import { ChoiceCard } from "./onboarding/ChoiceCard";
-import { OnboardingStep } from "./onboarding/Steps";
+import { OnboardingSettled, OnboardingStep } from "./onboarding/Steps";
+import type { RecoveryMethod } from "./SessionProvider";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -27,9 +28,14 @@ import { ToastFeedback } from "./ui/toast-feedback";
 export function AccountTypeDialog({
   open,
   onChoose,
+  username,
+  recoveryMethod,
 }: {
   open: boolean;
   onChoose: (type: AccountType, businessName: string | null) => Promise<void>;
+  /** Shown back as settled; both earlier answers are already on the server. */
+  username: string | null;
+  recoveryMethod: RecoveryMethod | null;
 }) {
   const [selected, setSelected] = useState<AccountType | null>(null);
   const [businessName, setBusinessName] = useState("");
@@ -64,12 +70,30 @@ export function AccountTypeDialog({
       >
         <DialogHeader className="px-1">
           <OnboardingStep step={3} />
-          <DialogTitle>How will you use Payus?</DialogTitle>
+          <DialogTitle>Last one: how will you use Payus?</DialogTitle>
           <DialogDescription>
-            This orders your navigation, nothing else. Every page stays
-            reachable from Settings, and you can change this later.
+            It decides what your navigation shows first and nothing else. No
+            page is locked away, no feature is withheld, and Settings changes it
+            whenever you like.
           </DialogDescription>
         </DialogHeader>
+
+        <OnboardingSettled
+          items={[
+            ...(recoveryMethod
+              ? [
+                  {
+                    label: "Unlocks with",
+                    value:
+                      recoveryMethod === "passkey"
+                        ? "A passkey on this device"
+                        : "A 6-digit PIN",
+                  },
+                ]
+              : []),
+            ...(username ? [{ label: "You are", value: `@${username}` }] : []),
+          ]}
+        />
 
         <div className="grid gap-3" role="radiogroup" aria-label="Account type">
           {ACCOUNT_TYPES.map(({ type, label, summary, tools, goodIf }, i) => (
@@ -79,8 +103,8 @@ export function AccountTypeDialog({
               title={label}
               summary={summary}
               rows={[
-                { label: "You get", value: tools },
-                { label: "Good if", value: goodIf },
+                { label: "Opens with", value: tools },
+                { label: "Pick this if", value: goodIf },
               ]}
               selected={selected === type}
               disabled={busy}
@@ -93,7 +117,7 @@ export function AccountTypeDialog({
           <div className="grid gap-2">
             <label className="text-sm font-medium" htmlFor="business-name">
               Business name{" "}
-              <span className="font-normal text-foreground/50">(optional)</span>
+              <span className="font-normal text-foreground/70">(optional)</span>
             </label>
             <Input
               appearance="linen"
@@ -122,7 +146,7 @@ export function AccountTypeDialog({
               aria-hidden="true"
             />
           ) : null}
-          {busy ? "Saving…" : "Continue"}
+          {busy ? "Saving…" : "Finish and open my dashboard"}
         </Button>
 
         <ToastFeedback
