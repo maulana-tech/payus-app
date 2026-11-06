@@ -22,7 +22,12 @@ import type { LedgerRow } from "./TransactionsScreen";
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 /** The grid wears the dashboard's own tokens, so it follows light and dark. */
-const gridTheme = themeQuartz.withParams({
+// The colour-scheme part has to go on BEFORE our params, not after: applied
+// last it puts its own near-white back over them, which is how the grid came
+// to sit on #fafafa while every panel around it was cream — and why axe could
+// only report the header contrast as "needs review" rather than measure it
+// (the mixed result arrives as `color(srgb …)`, which it cannot parse).
+const PARAMS = {
   backgroundColor: "var(--dash-surface)",
   foregroundColor: "var(--dash-fg)",
   borderColor: "var(--dash-line-solid)",
@@ -30,6 +35,7 @@ const gridTheme = themeQuartz.withParams({
   oddRowBackgroundColor: "var(--dash-surface)",
   rowHoverColor: "var(--dash-tint)",
   selectedRowBackgroundColor: "var(--dash-tint)",
+  headerBackgroundColor: "var(--dash-surface)",
   headerTextColor: "var(--dash-ash)",
   headerFontWeight: 600,
   headerFontSize: "11px",
@@ -40,7 +46,10 @@ const gridTheme = themeQuartz.withParams({
   wrapperBorderRadius: "0px",
   columnBorder: false,
   spacing: "7px",
-});
+} as const;
+
+const lightTheme = themeQuartz.withPart(colorSchemeLight).withParams(PARAMS);
+const darkTheme = themeQuartz.withPart(colorSchemeDark).withParams(PARAMS);
 
 const money = (params: ValueFormatterParams<LedgerRow, string>) =>
   !params.value || params.value === "0"
@@ -129,11 +138,7 @@ export function TransactionsGrid({
 
   return (
     <AgGridReact<LedgerRow>
-      theme={
-        mode === "dark"
-          ? gridTheme.withPart(colorSchemeDark)
-          : gridTheme.withPart(colorSchemeLight)
-      }
+      theme={mode === "dark" ? darkTheme : lightTheme}
       rowData={rows}
       columnDefs={columns}
       defaultColDef={defaultColDef}

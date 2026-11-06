@@ -881,6 +881,15 @@ body:has(.dashboard-app) :is(p, li) {
   text-wrap: pretty;
 }
 
+/* The grid leaves its header transparent and lets the scrolling body show
+   through. The colour that results is right, but nothing paints it, so a
+   contrast checker walking up from the header text finds no background and
+   can only answer "needs review". Painting the row states what is already
+   true, and makes the 5.9:1 measurable instead of merely correct. */
+body:has(.dashboard-app) .ag-header {
+  background: var(--dash-surface);
+}
+
 body:has(.dashboard-app) :is([data-slot="button"], [data-slot="badge"]) {
   border-radius: 999px;
 }

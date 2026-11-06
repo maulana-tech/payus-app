@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Copy } from "lucide-react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
 import { formatMinor } from "@/features/invoices/money";
 import { cn } from "@/lib/utils";
@@ -50,15 +50,28 @@ export function Panel({
   );
 }
 
-/** A hairline grid: every child becomes a sharp cell. */
+/**
+ * A hairline grid: every child becomes a sharp cell.
+ *
+ * Set `--row-actions` in `style` to reserve one width for every row's
+ * controls. Without it each row's amount stops wherever that row's buttons
+ * happen to start, and a column of money reads as a ragged edge — which on
+ * a ledger is the one thing it must not do.
+ */
 export function Ledger({
   children,
   className,
+  style,
 }: {
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
 }) {
-  return <div className={cn(dashLedger, className)}>{children}</div>;
+  return (
+    <div className={cn(dashLedger, className)} style={style}>
+      {children}
+    </div>
+  );
 }
 
 export function Cell({
@@ -126,6 +139,9 @@ const CHIP: Record<string, string> = {
   // A shop is live or it is a draft; "active/archived" read as neither.
   live: OPEN,
   draft: QUIET,
+  // Quieter than "overdue" on purpose: an invoice can be both, and the
+  // late one is the one that needs reading first.
+  "part paid": QUIET,
   declined: QUIET,
   cancelled: QUIET,
 };
@@ -262,7 +278,7 @@ export function ListRow({
         // Wrapping, not `shrink-0`: five controls on a phone are wider than
         // the screen, and a row that cannot wrap pushes the whole page
         // sideways instead.
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-3 sm:w-[var(--row-actions,auto)]">
           {actions}
         </div>
       ) : null}

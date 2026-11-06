@@ -1,7 +1,17 @@
 "use client";
 
-import { ExternalLink, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  Check,
+  ExternalLink,
+  Link2,
+  MessageSquare,
+  MoreHorizontal,
+  Plus,
+  RotateCcw,
+  Trash2,
+  XCircle,
+} from "lucide-react";
+import { type CSSProperties, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +19,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { invoiceStatus, suggestNextNumber } from "@/features/invoices/input";
@@ -23,7 +40,6 @@ import {
 } from "../styles";
 import { ChaseDialog } from "./ChaseDialog";
 import {
-  CopyButton,
   EmptyState,
   ErrorNote,
   Ledger,
@@ -113,7 +129,12 @@ export function InvoicesScreen() {
             moment it is paid.
           </EmptyState>
         ) : (
-          <Ledger className="border-0 border-t border-(--dash-line-solid)">
+          <Ledger
+            className="border-0 border-t border-(--dash-line-solid)"
+            // Wide enough for "Mark paid" and the menu; every row reserves
+            // it, so every amount stops at the same place.
+            style={{ "--row-actions": "12.5rem" } as CSSProperties}
+          >
             {shown.map((invoice) => (
               <InvoiceRow key={invoice.id} invoice={invoice} />
             ))}
@@ -146,7 +167,25 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
     onSuccess: refresh,
   });
   const status = invoiceStatus(invoice.status, invoice.dueDate);
+  const paid = BigInt(invoice.paidMinor);
+  // Both marks can be true at once: an invoice is late *and* part paid, and
+  // reading only "overdue" beside a number that has already moved is what
+  // made the row confusing.
+  const partPaid =
+    invoice.status === "pending" &&
+    paid > 0n &&
+    paid < BigInt(invoice.totalMinor);
   const url = `${origin()}/i/${invoice.token}`;
+  const [copied, setCopied] = useState(false);
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
   const error =
     markPaid.error?.message ??
     voidInvoice.error?.message ??
@@ -159,6 +198,7 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
           <>
             <span className="font-medium">{invoice.number}</span>
             <StatusChip status={status} />
+            {partPaid ? <StatusChip status="part paid" /> : null}
             {invoice.recurrence !== "none" ? (
               <span className="text-[11px] font-semibold tracking-[0.1em] text-(--dash-ash) uppercase">
                 {invoice.recurrence}
@@ -174,72 +214,86 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
         trailing={
           <Money minor={invoice.totalMinor} currency={invoice.currency} />
         }
+        // One pill and one menu, always — five controls of equal weight made
+        // the destructive one (an unlabelled bin) the hardest to notice, and
+        // a row whose buttons change width moves the amount beside it.
         actions={
           <>
-            <CopyButton value={url} label="Link" />
-            <a
-              href={`/i/${invoice.token}`}
-              target="_blank"
-              rel="noreferrer"
-              className={dashIconButton}
-              aria-label={`Open the pay page for ${invoice.number}`}
-            >
-              <ExternalLink aria-hidden="true" />
-            </a>
             {invoice.status === "pending" ? (
-              <>
-                <button
-                  type="button"
-                  className={dashButtonSecondary}
-                  disabled={markPaid.isPending}
-                  onClick={() =>
-                    markPaid.mutate({
-                      id: invoice.id,
-                      paidMinor: invoice.totalMinor,
-                    })
+              <button
+                type="button"
+                className={dashButtonSecondary}
+                disabled={markPaid.isPending}
+                onClick={() =>
+                  markPaid.mutate({
+                    id: invoice.id,
+                    paidMinor: invoice.totalMinor,
+                  })
+                }
+              >
+                <Check aria-hidden="true" />
+                Mark paid
+              </button>
+            ) : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={dashIconButton}
+                aria-label={`More for ${invoice.number}`}
+              >
+                <MoreHorizontal aria-hidden="true" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-56">
+                <DropdownMenuItem onSelect={() => void copyLink()}>
+                  <Link2 aria-hidden="true" />
+                  {copied ? "Link copied" : "Copy the pay link"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    window.open(`/i/${invoice.token}`, "_blank", "noreferrer")
                   }
                 >
-                  Mark paid
-                </button>
-                <button
-                  type="button"
-                  className={dashIconButton}
-                  aria-label={`Void ${invoice.number}`}
-                  disabled={voidInvoice.isPending}
-                  onClick={() => voidInvoice.mutate({ id: invoice.id })}
-                >
-                  <Trash2 aria-hidden="true" />
-                </button>
-              </>
-            ) : null}
-            {invoice.recurrence !== "none" ? (
-              <button
-                type="button"
-                className={dashButtonSecondary}
-                disabled={stopRecurring.isPending}
-                onClick={() => stopRecurring.mutate({ id: invoice.id })}
-              >
-                Stop
-              </button>
-            ) : null}
-            {status === "overdue" ? (
-              <button
-                type="button"
-                className={dashButtonSecondary}
-                onClick={() => setChasing(true)}
-              >
-                Chase
-              </button>
-            ) : null}
-            {BigInt(invoice.paidMinor) > 0n ? (
-              <button
-                type="button"
-                className={dashButtonSecondary}
-                onClick={() => setRefunding(true)}
-              >
-                Refund
-              </button>
-            ) : null}
+                  <ExternalLink aria-hidden="true" />
+                  Open the pay page
+                </DropdownMenuItem>
+                {status === "overdue" ? (
+                  <DropdownMenuItem onSelect={() => setChasing(true)}>
+                    <MessageSquare aria-hidden="true" />
+                    Ask the Collector to chase
+                  </DropdownMenuItem>
+                ) : null}
+                {BigInt(invoice.paidMinor) > 0n ? (
+                  <DropdownMenuItem onSelect={() => setRefunding(true)}>
+                    <RotateCcw aria-hidden="true" />
+                    Refund part or all of it
+                  </DropdownMenuItem>
+                ) : null}
+                {invoice.recurrence !== "none" ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={stopRecurring.isPending}
+                      onSelect={() => stopRecurring.mutate({ id: invoice.id })}
+                    >
+                      <XCircle aria-hidden="true" />
+                      Stop issuing this {invoice.recurrence}
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+                {invoice.status === "pending" ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={voidInvoice.isPending}
+                      onSelect={() => voidInvoice.mutate({ id: invoice.id })}
+                    >
+                      <Trash2 aria-hidden="true" />
+                      Void {invoice.number}
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
       />
