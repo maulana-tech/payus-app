@@ -99,7 +99,16 @@ export function SettlementPanel({ owner }: { owner: string }) {
             </p>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* Seven columns do not fit a phone, so this scrolls — and a
+                  scrollable box with nothing focusable inside it cannot be
+                  reached by keyboard at all. tabIndex makes it a stop; the
+                  label says what the arrow keys are moving. */}
+              <section
+                className="overflow-x-auto"
+                aria-label="Settlement by day"
+                // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region is a tab stop by WAI-ARIA, and axe fails it without one
+                tabIndex={0}
+              >
                 <table className="w-full text-right text-sm tabular-nums">
                   <thead>
                     <tr className="text-[11px] tracking-[0.1em] text-(--dash-ash) uppercase">
@@ -177,7 +186,7 @@ export function SettlementPanel({ owner }: { owner: string }) {
                     </tr>
                   </tbody>
                 </table>
-              </div>
+              </section>
 
               <p
                 className={`text-sm ${
