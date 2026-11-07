@@ -1,4 +1,5 @@
 import {
+  AGENTS_PATH,
   DASHBOARD_PATH,
   DEVELOPERS_PATH,
   INVOICES_PATH,
@@ -58,7 +59,13 @@ export function accountTypeInfo(type: AccountType): AccountTypeInfo {
 // Dashboard routes each type shows, in navigation order. The rest stay
 // reachable from Settings ("Other tools"); nothing is locked away.
 const NAV: Record<AccountType, readonly string[]> = {
-  personal: [DASHBOARD_PATH, REQUESTS_PATH, LINKS_PATH, SETTINGS_PATH],
+  personal: [
+    DASHBOARD_PATH,
+    REQUESTS_PATH,
+    LINKS_PATH,
+    AGENTS_PATH,
+    SETTINGS_PATH,
+  ],
   freelancer: [
     DASHBOARD_PATH,
     INVOICES_PATH,
@@ -66,6 +73,7 @@ const NAV: Record<AccountType, readonly string[]> = {
     LINKS_PATH,
     STOREFRONT_PATH,
     REQUESTS_PATH,
+    AGENTS_PATH,
     SETTINGS_PATH,
   ],
   business: [
@@ -75,6 +83,7 @@ const NAV: Record<AccountType, readonly string[]> = {
     STOREFRONT_PATH,
     LINKS_PATH,
     DEVELOPERS_PATH,
+    AGENTS_PATH,
     SETTINGS_PATH,
   ],
 };

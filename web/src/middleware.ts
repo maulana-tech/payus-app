@@ -67,6 +67,7 @@ export const config = {
     "/transactions/:path*",
     "/storefront/:path*",
     "/requests/:path*",
+    "/agents/:path*",
     "/developers/:path*",
     "/settings/:path*",
   ],

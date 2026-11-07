@@ -8,6 +8,7 @@ export const INVOICES_PATH = "/invoices";
 export const TRANSACTIONS_PATH = "/transactions";
 export const STOREFRONT_PATH = "/storefront";
 export const REQUESTS_PATH = "/requests";
+export const AGENTS_PATH = "/agents";
 export const SIGN_IN_PATH = "/";
 export const REFRESH_PATH = "/refresh";
 
@@ -20,6 +21,7 @@ export const DASHBOARD_PATHS = [
   TRANSACTIONS_PATH,
   STOREFRONT_PATH,
   REQUESTS_PATH,
+  AGENTS_PATH,
 ] as const;
 const authOnlyPublicRoutes = [SIGN_IN_PATH] as const;
 
