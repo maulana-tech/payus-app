@@ -393,13 +393,23 @@ export function AgentsScreen() {
 
   const open = showing === null ? null : turns[showing];
 
+  // An empty transcript and an unreadable one look identical, and the
+  // difference matters: one means nothing was asked, the other means the
+  // record could not be read. Say which.
+  const historyNote = history.error ? (
+    <ErrorNote>
+      Your earlier questions could not be loaded, so only this session is shown.{" "}
+      {history.error.message}
+    </ErrorNote>
+  ) : null;
+
   return (
     // Measured against the shell rather than guessed: the page header and
     // the main's own padding take 259px on a desktop and rather more on a
     // phone, where the tab bar is also in the way.
     <div className="flex h-[calc(100svh-19rem)] min-h-96 flex-col lg:h-[calc(100svh-17rem)]">
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {turns.length === 0 && !busy ? (
+        {turns.length === 0 && !busy && !history.isLoading ? (
           // Nothing asked yet: an introduction and the questions it can
           // actually answer. The composer does not move to meet them — a
           // reply box that travels is one you have to find twice.
@@ -432,9 +442,11 @@ export function AgentsScreen() {
                 </li>
               ))}
             </ul>
+            {historyNote ? <div className="mt-4">{historyNote}</div> : null}
           </div>
         ) : (
           <div className={`${COLUMN} grid gap-6 py-6`}>
+            {historyNote}
             {kept.length > 0 ? (
               <p className="text-center text-[11px] text-(--dash-ash)">
                 {kept.length / 2} earlier question
