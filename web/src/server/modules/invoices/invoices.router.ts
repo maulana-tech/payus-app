@@ -7,6 +7,7 @@ import {
   invoiceUpdateInput,
 } from "../../../features/invoices/input";
 import { toMinor } from "../../../features/invoices/money";
+import { MAX_UPLOAD_CHARS } from "../../../features/uploads/table";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -20,6 +21,7 @@ import {
   startRefund,
 } from "../payments/refunds.service";
 import { requireUsername } from "../profiles/profiles.service";
+import { readImport } from "./import.service";
 import {
   InvoiceClosedError,
   InvoiceLockedError,
@@ -57,6 +59,79 @@ export const invoicesRouter = createTRPCRouter({
         mapError,
       ),
     ),
+  /**
+   * What a spreadsheet would become, without becoming it. Nothing is
+   * written here — an importer that writes first and reports afterwards
+   * leaves work that is harder to undo than it was to do.
+   */
+  previewImport: protectedProcedure
+    .input(
+      z
+        .object({
+          csv: z.string().min(1).max(MAX_UPLOAD_CHARS),
+          defaultDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        })
+        .strict(),
+    )
+    .query(({ input }) => readImport(input.csv, input.defaultDueDate)),
+
+  /**
+   * Creates the rows that passed. The file is read again here rather than
+   * trusting a list the browser sends back: the preview is for the person,
+   * not a contract with the server.
+   */
+  commitImport: protectedProcedure
+    .input(
+      z
+        .object({
+          csv: z.string().min(1).max(MAX_UPLOAD_CHARS),
+          defaultDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const owner = await requireUsername(ctx.privyUserId);
+      const preview = readImport(input.csv, input.defaultDueDate);
+      const results: {
+        row: number;
+        number: string;
+        outcome: "created" | "already here" | "refused";
+        detail?: string;
+      }[] = [];
+
+      for (const candidate of preview.rows) {
+        if (!candidate.ok) continue;
+        const parsed = invoiceInput.safeParse(candidate.draft);
+        if (!parsed.success) continue;
+        try {
+          await createInvoice(owner, parsed.data);
+          results.push({
+            row: candidate.row,
+            number: parsed.data.number,
+            outcome: "created",
+          });
+        } catch (error) {
+          // Re-importing the same file finds the numbers taken, which is
+          // the idempotency: it reports rather than duplicates.
+          results.push({
+            row: candidate.row,
+            number: parsed.data.number,
+            outcome:
+              error instanceof InvoiceNumberTakenError
+                ? "already here"
+                : "refused",
+            detail:
+              error instanceof InvoiceNumberTakenError
+                ? undefined
+                : error instanceof Error
+                  ? error.message
+                  : undefined,
+          });
+        }
+      }
+      return { results };
+    }),
+
   update: protectedProcedure
     .input(invoiceUpdateInput)
     .mutation(async ({ ctx, input }) =>

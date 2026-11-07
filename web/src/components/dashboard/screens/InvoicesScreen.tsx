@@ -8,6 +8,7 @@ import {
   Plus,
   RotateCcw,
   Trash2,
+  Upload,
   XCircle,
 } from "lucide-react";
 import { type CSSProperties, useMemo, useState } from "react";
@@ -31,6 +32,7 @@ import {
   dashIconButton,
 } from "../styles";
 import { ChaseDialog } from "./ChaseDialog";
+import { ImportDialog } from "./ImportDialog";
 import {
   EmptyState,
   ErrorNote,
@@ -63,6 +65,7 @@ export function InvoicesScreen() {
   const list = trpc.invoices.list.useQuery();
   const [filter, setFilter] = useState<Filter>("open");
   const [composing, setComposing] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const invoices = list.data ?? [];
   const shown = invoices.filter((invoice) =>
@@ -83,14 +86,24 @@ export function InvoicesScreen() {
           value={filter}
           onChange={setFilter}
         />
-        <button
-          type="button"
-          className={dashButtonPrimary}
-          onClick={() => setComposing(true)}
-        >
-          <Plus aria-hidden="true" />
-          New invoice
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className={dashButtonSecondary}
+            onClick={() => setImporting(true)}
+          >
+            <Upload aria-hidden="true" />
+            Import
+          </button>
+          <button
+            type="button"
+            className={dashButtonPrimary}
+            onClick={() => setComposing(true)}
+          >
+            <Plus aria-hidden="true" />
+            New invoice
+          </button>
+        </div>
       </div>
 
       <Panel
@@ -142,6 +155,7 @@ export function InvoicesScreen() {
         onOpenChange={setComposing}
         existing={invoices}
       />
+      <ImportDialog open={importing} onOpenChange={setImporting} />
     </div>
   );
 }
