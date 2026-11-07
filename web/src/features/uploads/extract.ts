@@ -96,6 +96,25 @@ async function fromDocx(file: File): Promise<Extracted> {
   return cap(file.name, text);
 }
 
+/**
+ * Whatever was attached, as the CSV the rest of the app already reads.
+ *
+ * A spreadsheet is a table, and we have a table reader — so the only new
+ * work is getting the grid out. Everything downstream (reconcile, import,
+ * asking about it) then has one shape to handle instead of two.
+ */
+export async function extractCsv(file: File): Promise<string> {
+  if (/\.xlsx$/i.test(file.name)) {
+    const { toCsv } = await import("../../lib/csv");
+    return toCsv(await extractSheet(file));
+  }
+  if (/\.xls$/i.test(file.name))
+    throw new ExtractError(
+      "That is the old Excel format. Save it as .xlsx or CSV and try again.",
+    );
+  return file.text();
+}
+
 /** Reads a document for its words. Throws with something a person can act on. */
 export async function extractText(file: File): Promise<Extracted> {
   const name = file.name.toLowerCase();
@@ -107,4 +126,86 @@ export async function extractText(file: File): Promise<Extracted> {
     );
   if (/\.(txt|md)$/.test(name)) return cap(file.name, await file.text());
   throw new ExtractError("This reads PDF, .docx and plain text.");
+}
+
+/**
+ * A spreadsheet, read as a table.
+ *
+ * .xlsx is a zip like .docx, so the same unzip serves. Two parts matter:
+ * `sharedStrings.xml`, where every repeated string lives once, and the
+ * first sheet, whose cells point into it by index. Everything else in
+ * there is formatting.
+ *
+ * Hand-read rather than a dependency: the `xlsx` package has had a run of
+ * advisories, and what is needed here is the values of one grid.
+ */
+export async function extractSheet(file: File): Promise<string[][]> {
+  const { unzipSync, strFromU8 } = await import("fflate");
+  let files: Record<string, Uint8Array>;
+  try {
+    files = unzipSync(new Uint8Array(await file.arrayBuffer()), {
+      filter: (f) =>
+        f.name === "xl/sharedStrings.xml" ||
+        /^xl\/worksheets\/sheet1\.xml$/.test(f.name),
+    });
+  } catch {
+    throw new ExtractError(`${file.name} is not a readable .xlsx.`);
+  }
+
+  const sheetBytes = files["xl/worksheets/sheet1.xml"];
+  if (!sheetBytes)
+    throw new ExtractError(`${file.name} has no first sheet to read.`);
+
+  const unescape = (text: string) =>
+    text
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, "&");
+
+  const shared: string[] = [];
+  const sharedBytes = files["xl/sharedStrings.xml"];
+  if (sharedBytes) {
+    const xml = strFromU8(sharedBytes);
+    for (const si of xml.match(/<si>[\s\S]*?<\/si>/g) ?? []) {
+      // One <si> can hold several <t> runs; they are one string.
+      const runs = si.match(/<t[^>]*>([\s\S]*?)<\/t>/g) ?? [];
+      shared.push(
+        unescape(runs.map((t) => t.replace(/<[^>]+>/g, "")).join("")),
+      );
+    }
+  }
+
+  const sheet = strFromU8(sheetBytes);
+  const grid: string[][] = [];
+  for (const rowXml of sheet.match(/<row[^>]*>[\s\S]*?<\/row>/g) ?? []) {
+    const cells: string[] = [];
+    for (const cellXml of rowXml.match(/<c[^>]*\/>|<c[^>]*>[\s\S]*?<\/c>/g) ??
+      []) {
+      // The column letter in r="B7" says where the cell sits, so a sparse
+      // row does not shift everything after a gap one place left.
+      // Both quote styles: Excel writes double, other writers single.
+      const at = cellXml.match(/\sr=["']([A-Z]+)/)?.[1];
+      if (at) {
+        let index = 0;
+        for (const ch of at) index = index * 26 + (ch.charCodeAt(0) - 64);
+        while (cells.length < index - 1) cells.push("");
+      }
+      const type = cellXml.match(/\st=["']([^"']+)["']/)?.[1];
+      const raw = cellXml.match(/<v>([\s\S]*?)<\/v>/)?.[1];
+      if (type === "inlineStr") {
+        const inline = cellXml.match(/<t[^>]*>([\s\S]*?)<\/t>/)?.[1] ?? "";
+        cells.push(unescape(inline.replace(/<[^>]+>/g, "")));
+      } else if (type === "s" && raw !== undefined) {
+        cells.push(shared[Number(raw)] ?? "");
+      } else {
+        cells.push(raw === undefined ? "" : unescape(raw));
+      }
+    }
+    grid.push(cells);
+  }
+  if (grid.length === 0)
+    throw new ExtractError(`${file.name} has no rows on its first sheet.`);
+  return grid;
 }

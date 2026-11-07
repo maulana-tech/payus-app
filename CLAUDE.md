@@ -94,6 +94,49 @@ Nothing moves money without a proposal, and no proposal is decided by a model. `
 - The Guardian guards **agents**, not the owner: `ledger.createRule` lets a person set any split by hand. That is deliberate — the owner is the authority the limits exist to serve.
 - Proposals left unanswered are closed by `expireStaleProposals()`, called from `/api/cron/outbox`.
 
+### Files people bring
+`features/uploads/` reads what someone else wrote, and is deliberately
+separate from what we write: `lib/csv.ts` and `features/invoices/money.ts`
+guard our own output and our own form, and loosening either to accept a
+bank's formatting would quietly widen what the invoice form accepts.
+- **`table.ts`** parses CSV by hand — quoted fields, doubled quotes, newlines
+  inside them, `\r\n`, a BOM, and the delimiter *found* rather than assumed
+  (a European export is semicolon-separated, and splitting it on commas
+  yields one column holding everything, which looks like a parse).
+- **`amount.ts`** reads an amount a bank wrote: symbols, grouping, accounting
+  brackets, and either separator as the decimal. One separator followed by
+  exactly three digits is a group, so `1,500` and `1.500` both read as 1500.
+  It returns **null, not zero**, for what is not an amount — zero would
+  reconcile against nothing and look like agreement.
+- **`extract.ts` runs in the browser.** PDF and .docx are container formats
+  with a long history of parser bugs and the server has no reason to meet
+  one: it is sent the text and never the file. Both parsers are imported
+  inside their functions, so nothing downloads until a document is attached.
+  .docx and .xlsx are unzipped with `fflate` and read directly; `mammoth`
+  and `xlsx` are not worth their surface for `<w:t>` and one grid.
+- **A date reads as a perfectly good number**, so every column chooser settles
+  the date column first and takes it out of the running before picking the
+  amount. This was a real bug twice, in `reconcile/match.ts` and in
+  `uploads/toInvoices.ts`, and each has a test named after it.
+
+Three things are done with a file, and they are different promises:
+- **Ask** — the Advisor answers from the file's rows, and `unknownNumbers`
+  still runs, so the guarantee moved source rather than weakened.
+- **Reconcile** (`features/reconcile/match.ts`) — pure, no model anywhere
+  near it. Matching a line to a posting is arithmetic and dates, and "right
+  most of the time" is the one thing reconciliation may not be. The two
+  "only in" lists are what earn the feature.
+- **Import** (`modules/invoices/import.service.ts`) — read, show, then
+  create. The commit re-reads the file rather than trusting the browser's
+  list, and every candidate goes through `invoiceInput`, so an imported
+  invoice is nothing a typed one could not be. Idempotent through the
+  invoice number, which is already unique.
+
+**A document answer is the one this seat gives that nothing checks.** Prose
+has no rows, so `AdvisorAnswer.source` records which of the three it was and
+the screen says so on every document answer. It is stored, so the warning
+survives a reload.
+
 ### The embed widget
 `public/embed.js` (no build step, no dependencies — keep it that way) frames `/embed/*` and documents the events it dispatches. Those events come from `features/embed/bridge.ts`, mounted by `components/embed/EmbedBridge.tsx` on every embed page: without it the iframe never resizes and `payus:paid` never fires, which is how it sat for a while. A panel rendered with `embed` posts `payus:paid` itself when a payment lands.
 

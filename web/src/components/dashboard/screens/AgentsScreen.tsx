@@ -221,8 +221,24 @@ export function AgentsScreen() {
       );
       return;
     }
-    if (/\.(csv|tsv)$/i.test(picked.name)) {
-      setFile({ kind: "table", name: picked.name, csv: await picked.text() });
+    if (/\.(csv|tsv|xlsx|xls)$/i.test(picked.name)) {
+      setReading(true);
+      try {
+        const { extractCsv } = await import("@/features/uploads/extract");
+        setFile({
+          kind: "table",
+          name: picked.name,
+          csv: await extractCsv(picked),
+        });
+      } catch (error) {
+        setFileError(
+          error instanceof Error
+            ? error.message
+            : "That spreadsheet could not be read.",
+        );
+      } finally {
+        setReading(false);
+      }
       return;
     }
     // A PDF and a .docx are read here, in the page. Both are container
@@ -289,7 +305,7 @@ export function AgentsScreen() {
           <input
             ref={picker}
             type="file"
-            accept=".csv,.tsv,.pdf,.docx,.txt,.md"
+            accept=".csv,.tsv,.xlsx,.pdf,.docx,.txt,.md"
             // The paperclip is the control; this is the mechanism behind it.
             // Named anyway, because a hidden input with no label is still a
             // form element to a screen reader, and out of the tab order so

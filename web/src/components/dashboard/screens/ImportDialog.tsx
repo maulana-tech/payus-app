@@ -62,11 +62,14 @@ export function ImportDialog({
       setError(`${picked.name} is over the 2 MB limit.`);
       return;
     }
-    if (!/\.(csv|tsv|txt)$/i.test(picked.name)) {
-      setError("This reads CSV. Export one from your spreadsheet.");
-      return;
+    try {
+      const { extractCsv } = await import("@/features/uploads/extract");
+      setFile({ name: picked.name, csv: await extractCsv(picked) });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "That file could not be read.",
+      );
     }
-    setFile({ name: picked.name, csv: await picked.text() });
   };
 
   const data = preview.data;
@@ -86,9 +89,9 @@ export function ImportDialog({
         <DialogHeader>
           <DialogTitle>Bring invoices in from a file</DialogTitle>
           <DialogDescription>
-            A CSV with a client and an amount per row. You will see every row
-            before anything is created, and the ones that cannot be made are
-            named rather than dropped.
+            A CSV or spreadsheet with a client and an amount per row. You will
+            see every row before anything is created, and the ones that cannot
+            be made are named rather than dropped.
           </DialogDescription>
         </DialogHeader>
 
@@ -100,7 +103,7 @@ export function ImportDialog({
               <input
                 ref={picker}
                 type="file"
-                accept=".csv,.tsv,.txt,text/csv"
+                accept=".csv,.tsv,.xlsx,.txt"
                 aria-label="Choose a CSV"
                 tabIndex={-1}
                 className="sr-only"
