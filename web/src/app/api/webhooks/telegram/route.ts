@@ -58,10 +58,23 @@ export async function POST(request: Request) {
     return Response.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  if (update.message) await onMessage(update.message);
-  else if (update.callback_query) await onCallback(update.callback_query);
   // Telegram retries anything that is not a 2xx, and a retry of a decision
-  // is not something we want, so handled or not the answer is the same.
+  // is not something we want — so the answer is 200 whether this was
+  // handled, ignored, or failed outright.
+  //
+  // Failing to *speak back* is the realistic case: a chat that blocked the
+  // bot, a message too old to edit, a rate limit. `call()` throws on all of
+  // them, and by then the decision has already been recorded — a retry
+  // would record a second act of consent for one press of one button.
+  try {
+    if (update.message) await onMessage(update.message);
+    else if (update.callback_query) await onCallback(update.callback_query);
+  } catch (error) {
+    console.error(
+      "[telegram] update handled but the reply failed:",
+      error instanceof Error ? error.message : error,
+    );
+  }
   return ok();
 }
 

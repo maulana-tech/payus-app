@@ -15,6 +15,8 @@ const sent = vi.hoisted(() => ({
   messages: [] as { chatId: string; html: string }[],
   edits: [] as { chatId: string; html: string }[],
   answers: [] as (string | undefined)[],
+  /** Set to make the next reply fail, the way a blocked chat does. */
+  failNext: false,
 }));
 
 vi.mock("../src/server/lib/telegram", () => ({
@@ -22,6 +24,10 @@ vi.mock("../src/server/lib/telegram", () => ({
   telegramSecret: () => "shared-secret",
   escapeHtml: (text: string) => text,
   sendMessage: async (chatId: string, html: string) => {
+    if (sent.failNext) {
+      sent.failNext = false;
+      throw new Error("Telegram sendMessage failed: 403 bot was blocked");
+    }
     sent.messages.push({ chatId, html });
     return { messageId: sent.messages.length };
   },
@@ -106,6 +112,18 @@ describe.skipIf(!available)("telegram approvals (Postgres)", () => {
   it("refuses a delivery that is not Telegram's", async () => {
     const response = await post({ message: {} }, "guessed");
     expect(response.status).toBe(401);
+  });
+
+  // The route's promise is that Telegram never gets a non-2xx, because a
+  // retry would record a second act of consent for one press of a button.
+  // Failing to *speak back* is the realistic way that promise breaks: a chat
+  // that blocked the bot, a message too old to edit, a rate limit.
+  it("still answers 200 when the reply itself fails", async () => {
+    sent.failNext = true;
+    const response = await startWith(4242, "/start nonsense");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(sent.failNext).toBe(false);
   });
 
   it("links a chat with a single-use code", async () => {
