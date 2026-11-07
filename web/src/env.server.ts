@@ -9,10 +9,31 @@ const optionalString = z.preprocess(
   emptyToUndefined,
   z.string().trim().min(1).optional(),
 );
+
+/**
+ * A fixed set of values, read from an environment variable.
+ *
+ * It has to forgive the same things `optionalString` forgives, because the
+ * variable is typed into a hosting dashboard by a person: a value left
+ * empty arrives as `""` rather than as absent, and one pasted with a space
+ * or a capital arrives as written. Zod's enum refuses all three, and the
+ * refusal is a thrown error inside `getServerEnv()` — which every request
+ * that reads any setting calls. One empty box in a dashboard took the whole
+ * API down with a 500 once; the variable was not even one in use.
+ */
+const enumVar = <const T extends readonly [string, ...string[]]>(values: T) =>
+  // `.optional()` has to sit *inside* the preprocess: a `.default()` or an
+  // `.optional()` wrapped around it only fires when the key is absent, not
+  // when the cleaning step turned a present-but-empty value into undefined.
+  z.preprocess((value) => {
+    if (typeof value !== "string") return value;
+    const one = value.trim().toLowerCase();
+    return one === "" ? undefined : one;
+  }, z.enum(values).optional());
 export const serverEnvSchema = z.object({
-  NODE_ENV: z
-    .enum(["development", "test", "production"])
-    .default("development"),
+  NODE_ENV: enumVar(["development", "test", "production"]).transform(
+    (value) => value ?? "development",
+  ),
   DATABASE_URL: optionalString,
   CRON_SECRET: optionalString,
   /** Signs the public demo's cookie; falls back to CRON_SECRET. */
@@ -27,7 +48,9 @@ export const serverEnvSchema = z.object({
   EMAIL_FROM: optionalString,
   APP_URL: optionalString,
   // PayPal REST. `sandbox` unless deliberately pointed at live.
-  PAYPAL_ENV: z.enum(["sandbox", "live"]).default("sandbox"),
+  PAYPAL_ENV: enumVar(["sandbox", "live"]).transform(
+    (value) => value ?? "sandbox",
+  ),
   PAYPAL_CLIENT_ID: optionalString,
   PAYPAL_CLIENT_SECRET: optionalString,
   // From the webhook you registered; without it no event is trusted.
@@ -44,7 +67,7 @@ export const serverEnvSchema = z.object({
    * credentials to the ordinary AWS chain (env vars, profile, or an IAM role
    * with no environment variable at all).
    */
-  ANTHROPIC_BACKEND: z.enum(["api", "bedrock"]).optional(),
+  ANTHROPIC_BACKEND: enumVar(["api", "bedrock"]),
   BEDROCK_AWS_REGION: optionalString,
   /**
    * The exact id to ask Bedrock for. Leave unset in us-east-1; elsewhere set
