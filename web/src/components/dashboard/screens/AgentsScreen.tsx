@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { formatMinor } from "@/features/invoices/money";
 import { trpc } from "@/trpc/react";
 import { RunPanel } from "../RunPanel";
 import { dashFocus } from "../styles";
@@ -45,7 +46,25 @@ type Turn =
       model: string;
       pickedBy: string;
     }
-  | { from: "refused"; text: string };
+  | { from: "refused"; text: string }
+  | { from: "reconciled"; report: Reconciled };
+
+type Reconciled = {
+  name: string;
+  matched: number;
+  unreadable: number;
+  onlyInFile: {
+    row: number;
+    date: string | null;
+    amountMinor: string;
+    description: string;
+  }[];
+  onlyInLedger: {
+    date: string;
+    amountMinor: string;
+    description: string;
+  }[];
+};
 
 /** The six, in the words someone would actually use. */
 const EXAMPLES = [
@@ -130,6 +149,12 @@ export function AgentsScreen() {
   // Which run's detail is open, by its index in the transcript.
   const [showing, setShowing] = useState<number | null>(null);
 
+  const check = trpc.agents.reconcileTable.useMutation({
+    onSuccess: (report) =>
+      setFresh((t) => [...t, { from: "reconciled", report }]),
+    onError: (error) =>
+      setFresh((t) => [...t, { from: "refused", text: error.message }]),
+  });
   const onTable = trpc.agents.askAboutTable.useMutation({
     onSuccess: (reply) => setFresh((t) => [...t, answered(reply, started)]),
     onError: (error) =>
@@ -143,7 +168,7 @@ export function AgentsScreen() {
       setFresh((t) => [...t, { from: "refused", text: error.message }]),
   });
 
-  const busy = ask.isPending || onTable.isPending;
+  const busy = ask.isPending || onTable.isPending || check.isPending;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: follow the tail
   useEffect(() => {
@@ -225,6 +250,12 @@ export function AgentsScreen() {
             ref={picker}
             type="file"
             accept=".csv,.tsv,.txt,text/csv"
+            // The paperclip is the control; this is the mechanism behind it.
+            // Named anyway, because a hidden input with no label is still a
+            // form element to a screen reader, and out of the tab order so
+            // the two are not announced as two separate things to press.
+            aria-label="Attach a CSV"
+            tabIndex={-1}
             className="sr-only"
             onChange={(event) => {
               const picked = event.target.files?.[0];
@@ -243,6 +274,32 @@ export function AgentsScreen() {
           {file ? (
             <span className="flex min-w-0 items-center gap-1.5 rounded-full bg-(--dash-tint) py-1 pr-1 pl-3 text-[11px]">
               <span className="truncate">{file.name}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const today = new Date();
+                  const from = new Date(today);
+                  from.setUTCDate(from.getUTCDate() - 180);
+                  setFresh((t) => [
+                    ...t,
+                    {
+                      from: "you",
+                      text: "Check this against my books.",
+                      attached: file.name,
+                    },
+                  ]);
+                  check.mutate({
+                    name: file.name,
+                    csv: file.csv,
+                    from: from.toISOString().slice(0, 10),
+                    to: today.toISOString().slice(0, 10),
+                  });
+                  setFile(null);
+                }}
+                className={`rounded-full bg-(--dash-fg) px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-(--dash-surface) uppercase ${dashFocus}`}
+              >
+                Reconcile
+              </button>
               <button
                 type="button"
                 onClick={() => setFile(null)}
@@ -339,7 +396,9 @@ export function AgentsScreen() {
                   <Who
                     meta={turn.from === "advisor" ? "answered" : "refused"}
                   />
-                  {turn.from === "refused" ? (
+                  {turn.from === "reconciled" ? (
+                    <ReconciledReport report={turn.report} />
+                  ) : turn.from === "refused" ? (
                     <ErrorNote>{turn.text}</ErrorNote>
                   ) : (
                     <>
@@ -527,6 +586,114 @@ function Step({
       </p>
       <div className="pl-7">{children}</div>
     </section>
+  );
+}
+
+/**
+ * What agreed, and — the part that earns the feature — what did not.
+ *
+ * The two "only in" lists lead, because a line your bank has and your books
+ * do not is exactly what someone opens this to find. A count of matches is
+ * reassurance; a named difference is work.
+ */
+function ReconciledReport({ report }: { report: Reconciled }) {
+  const clean =
+    report.onlyInFile.length === 0 && report.onlyInLedger.length === 0;
+  const sum = (xs: { amountMinor: string }[]) =>
+    xs.reduce((total, x) => total + BigInt(x.amountMinor), 0n);
+  const fileSide = sum(report.onlyInFile);
+  const ledgerSide = sum(report.onlyInLedger);
+  const difference = fileSide - ledgerSide;
+  return (
+    <div className="grid gap-4">
+      <p className="text-[15px] leading-relaxed">
+        {clean
+          ? `Every line in ${report.name} has a posting, and every posting has a line.`
+          : `${report.matched} line${report.matched === 1 ? "" : "s"} in ${report.name} ${report.matched === 1 ? "agrees" : "agree"} with your books. The rest are below.`}
+        {report.unreadable > 0
+          ? ` ${report.unreadable} row${report.unreadable === 1 ? "" : "s"} carried no amount and took no part.`
+          : ""}
+      </p>
+
+      {!clean && difference === 0n ? (
+        // The same money, recorded differently — a statement that lists a
+        // sale and its fee separately against books that post the net is
+        // the usual cause. Said, not matched: pairing them automatically is
+        // how a reconciler starts agreeing with things it should not.
+        <p className="rounded-(--dash-radius) border border-(--dash-line) bg-(--dash-tint) p-3 text-sm leading-relaxed">
+          The two lists come to the same amount, so these are probably the same
+          movements written down differently — a sale and its fee on separate
+          lines against one posting of the net, most often.
+        </p>
+      ) : null}
+
+      <Difference
+        title="In the file, not in your books"
+        hint="Money your bank saw that nothing here accounts for."
+        rows={report.onlyInFile.map((line) => ({
+          key: `f${line.row}`,
+          left: `row ${line.row}${line.date ? ` · ${line.date}` : ""}`,
+          middle: line.description,
+          amountMinor: line.amountMinor,
+        }))}
+      />
+      <Difference
+        title="In your books, not in the file"
+        hint="Posted here, but not seen on the statement — yet, or at all."
+        rows={report.onlyInLedger.map((posting, i) => ({
+          key: `l${i}`,
+          left: posting.date,
+          middle: posting.description,
+          amountMinor: posting.amountMinor,
+        }))}
+      />
+
+      {!clean && difference !== 0n ? (
+        <p className="border-t border-(--dash-line) pt-3 text-sm text-(--dash-ash)">
+          The unmatched lines differ by{" "}
+          <span className="tabular-nums text-(--dash-fg)">
+            {formatMinor(difference)}
+          </span>{" "}
+          — the file side less the ledger side.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function Difference({
+  title,
+  hint,
+  rows,
+}: {
+  title: string;
+  hint: string;
+  rows: { key: string; left: string; middle: string; amountMinor: string }[];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="border-t border-(--dash-line) pt-3">
+      <p className="text-[11px] font-semibold tracking-[0.14em] text-(--dash-ash) uppercase">
+        {title} · {rows.length}
+      </p>
+      <p className="mt-1 text-sm text-(--dash-ash)">{hint}</p>
+      <ul className="mt-2 grid gap-1.5">
+        {rows.map((row) => (
+          <li
+            key={row.key}
+            className="flex items-baseline justify-between gap-4 text-sm"
+          >
+            <span className="min-w-0">
+              <span className="text-(--dash-ash)">{row.left}</span>
+              {row.middle ? ` · ${row.middle}` : ""}
+            </span>
+            <span className="shrink-0 tabular-nums">
+              {formatMinor(BigInt(row.amountMinor))}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

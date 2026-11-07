@@ -1,11 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { linesOf, reconcile } from "@/features/reconcile/match";
 import {
   MAX_UPLOAD_CHARS,
   parseTable,
   type Table,
   TableError,
 } from "@/features/uploads/table";
+import { cashPostings } from "@/server/modules/ledger/reports.service";
 import {
   ClaudeAccessError,
   ClaudeNotConfiguredError,
@@ -199,6 +201,61 @@ export const agentsRouter = createTRPCRouter({
         },
       );
       return answer;
+    }),
+
+  /**
+   * A statement against the books. No model anywhere near it: matching a
+   * line to a posting is arithmetic and dates, and "right most of the time"
+   * is the one thing reconciliation may not be.
+   */
+  reconcileTable: protectedProcedure
+    .input(
+      z
+        .object({
+          name: z.string().trim().min(1).max(120),
+          csv: z.string().min(1).max(MAX_UPLOAD_CHARS),
+          from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const owner = await requireUsername(ctx.privyUserId);
+      let table: Table;
+      try {
+        table = parseTable(input.csv);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            error instanceof TableError
+              ? error.message
+              : "That file could not be read as a table.",
+        });
+      }
+      const { lines, unreadable } = linesOf(table.columns, table.rows);
+      const postings = await cashPostings(owner, {
+        from: input.from,
+        to: input.to,
+      });
+      const result = reconcile(lines, postings, unreadable);
+      // bigint does not cross tRPC; the screen only ever shows these.
+      return {
+        name: input.name,
+        matched: result.matched.length,
+        unreadable: result.unreadable,
+        onlyInFile: result.onlyInFile.map((line) => ({
+          row: line.index + 2, // +2: one for the header, one for 1-based
+          date: line.date,
+          amountMinor: line.amountMinor.toString(),
+          description: line.description,
+        })),
+        onlyInLedger: result.onlyInLedger.map((posting) => ({
+          date: posting.date,
+          amountMinor: posting.amountMinor.toString(),
+          description: posting.description,
+        })),
+      };
     }),
 
   /** The transcript, so a refresh does not throw the conversation away. */
