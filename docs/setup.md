@@ -130,6 +130,29 @@ Two things catch people out:
   it; the call then fails with `permission_error`. Grant it in the Bedrock
   console under **Model access**, in that region.
 
+### Vercel instead of Render
+
+It works, and two things that need care on Render come free here: there is no
+Docker stage, and `NEXT_PUBLIC_*` is already present at build time, so the
+PayPal and Privy ids need no build arguments. `next.config.mjs` turns the
+standalone output off when `VERCEL=1`, which Vercel sets itself.
+
+What does not come free is the outbox. `render.yaml` runs it **every minute**,
+and that worker is what posts a capture whose payer closed the tab before the
+browser could confirm, and what expires stale proposals. On Vercel:
+
+- **Pro** — add it to `web/vercel.json` beside the daily invoice run:
+  `{ "path": "/api/cron/outbox", "schedule": "* * * * *" }`. Vercel sends
+  `Authorization: Bearer $CRON_SECRET` on its own once `CRON_SECRET` is set,
+  which is exactly what the route checks.
+- **Hobby** — a cron more frequent than daily is refused at deploy time, so
+  point something external at it instead (a free scheduler, or a GitHub
+  Actions workflow) with the same Bearer header. Leaving it unrun is the one
+  choice to avoid: money stays in `in_flight` until something calls it.
+
+Postgres is not included either way; Neon or Supabase both work, and
+`DATABASE_URL` is all the app wants.
+
 ### Approvals on Telegram (optional)
 
 Create a bot with [@BotFather](https://t.me/BotFather), put its token in

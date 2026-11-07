@@ -31,6 +31,9 @@ if (fs.existsSync(rootEnv)) {
 }
 
 const localBuild = process.env.APP_BUILD_TARGET === "local";
+// Vercel builds and serves the app its own way; the standalone bundle is for
+// the Docker image only, and asking for both is how a deploy gets confusing.
+const onVercel = process.env.VERCEL === "1";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async headers() {
@@ -88,7 +91,7 @@ const nextConfig = {
   // with outputFileTracingRoot (the monorepo root), the standalone output lands
   // at web/.next/standalone/web/server.js with node_modules traced from the
   // repo root — see the Dockerfile runner stage.
-  output: localBuild ? undefined : "standalone",
+  output: localBuild || onVercel ? undefined : "standalone",
   distDir: localBuild ? ".next-local" : ".next",
   outputFileTracingRoot: repoRoot,
   reactStrictMode: true,
