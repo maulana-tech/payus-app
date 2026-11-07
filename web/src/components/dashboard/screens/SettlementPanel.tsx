@@ -29,6 +29,79 @@ function defaultRange() {
   return { from: iso(from), to: iso(to) };
 }
 
+/** The six money columns, named once so the table and the phone layout
+ * cannot drift apart. */
+type MoneyRow = {
+  takenMinor: string;
+  feesMinor: string;
+  refundedMinor: string;
+  setAsideMinor: string;
+  yoursMinor: string;
+  paidOutMinor: string;
+};
+
+const COLUMNS: readonly { label: string; of: (row: MoneyRow) => string }[] = [
+  { label: "Taken", of: (r) => r.takenMinor },
+  { label: "Fees", of: (r) => r.feesMinor },
+  { label: "Refunded", of: (r) => r.refundedMinor },
+  { label: "Set aside", of: (r) => r.setAsideMinor },
+  { label: "Yours", of: (r) => r.yoursMinor },
+  { label: "Released", of: (r) => r.paidOutMinor },
+];
+
+function Simulated({ minor }: { minor: string }) {
+  if (BigInt(minor) <= 0n) return null;
+  return (
+    <span className="text-(--dash-ash)">
+      {" "}
+      +{formatMinor(BigInt(minor))} simulated
+    </span>
+  );
+}
+
+/** One day (or the total) as a stack, for screens too narrow for a table. */
+function DayCard({
+  heading,
+  row,
+  simulatedOutMinor,
+  strong = false,
+}: {
+  heading: string;
+  row: MoneyRow;
+  simulatedOutMinor?: string;
+  strong?: boolean;
+}) {
+  return (
+    <div
+      className={
+        strong
+          ? "border-t border-(--dash-line-solid) pt-3 font-medium"
+          : "border-t border-(--dash-line) pt-3"
+      }
+    >
+      <p className="text-[11px] font-semibold tracking-[0.1em] text-(--dash-ash) uppercase">
+        {heading}
+      </p>
+      <dl className="mt-2 grid gap-1.5">
+        {COLUMNS.map((column) => (
+          <div
+            key={column.label}
+            className="flex items-baseline justify-between gap-4"
+          >
+            <dt className="text-sm text-(--dash-ash)">{column.label}</dt>
+            <dd className="text-sm tabular-nums">
+              {formatMinor(BigInt(column.of(row)))}
+              {column.label === "Released" && simulatedOutMinor ? (
+                <Simulated minor={simulatedOutMinor} />
+              ) : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 export function SettlementPanel({ owner }: { owner: string }) {
   const [range, setRange] = useState(defaultRange);
   const report = trpc.ledger.settlement.useQuery(range);
@@ -99,94 +172,60 @@ export function SettlementPanel({ owner }: { owner: string }) {
             </p>
           ) : (
             <>
-              {/* Seven columns do not fit a phone, so this scrolls — and a
-                  scrollable box with nothing focusable inside it cannot be
-                  reached by keyboard at all. tabIndex makes it a stop; the
-                  label says what the arrow keys are moving. */}
-              <section
-                className="overflow-x-auto"
-                aria-label="Settlement by day"
-                // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region is a tab stop by WAI-ARIA, and axe fails it without one
-                tabIndex={0}
-              >
-                <table className="w-full text-right text-sm tabular-nums">
-                  <thead>
-                    <tr className="text-[11px] tracking-[0.1em] text-(--dash-ash) uppercase">
-                      <th className="py-1.5 pr-4 text-left font-semibold">
-                        Day
-                      </th>
-                      {[
-                        "Taken",
-                        "Fees",
-                        "Refunded",
-                        "Set aside",
-                        "Yours",
-                        "Released",
-                      ].map((label) => (
-                        <th key={label} className="py-1.5 pl-4 font-semibold">
-                          {label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.days.map((day) => (
-                      <tr
-                        key={day.day}
-                        className="border-t border-(--dash-line)"
+              {/* Seven money columns cannot be read on a 390px screen. A
+                  phone gets the same figures stacked under each day — no
+                  sideways scrolling inside a page that already scrolls, and
+                  nothing to reach for with a keyboard. */}
+              <table className="hidden w-full text-right text-sm tabular-nums sm:table">
+                <thead>
+                  <tr className="text-[11px] tracking-[0.1em] text-(--dash-ash) uppercase">
+                    <th className="py-1.5 pr-4 text-left font-semibold">Day</th>
+                    {COLUMNS.map((column) => (
+                      <th
+                        key={column.label}
+                        className="py-1.5 pl-4 font-semibold"
                       >
-                        <td className="py-1.5 pr-4 text-left">{day.day}</td>
-                        <td className="py-1.5 pl-4">
-                          {formatMinor(BigInt(day.takenMinor))}
-                        </td>
-                        <td className="py-1.5 pl-4">
-                          {formatMinor(BigInt(day.feesMinor))}
-                        </td>
-                        <td className="py-1.5 pl-4">
-                          {formatMinor(BigInt(day.refundedMinor))}
-                        </td>
-                        <td className="py-1.5 pl-4">
-                          {formatMinor(BigInt(day.setAsideMinor))}
-                        </td>
-                        <td className="py-1.5 pl-4">
-                          {formatMinor(BigInt(day.yoursMinor))}
-                        </td>
-                        <td className="py-1.5 pl-4">
-                          {formatMinor(BigInt(day.paidOutMinor))}
-                          {BigInt(day.simulatedOutMinor) > 0n ? (
-                            <span className="text-(--dash-ash)">
-                              {" "}
-                              +{formatMinor(BigInt(day.simulatedOutMinor))}{" "}
-                              simulated
-                            </span>
+                        {column.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.days.map((day) => (
+                    <tr key={day.day} className="border-t border-(--dash-line)">
+                      <td className="py-1.5 pr-4 text-left">{day.day}</td>
+                      {COLUMNS.map((column) => (
+                        <td key={column.label} className="py-1.5 pl-4">
+                          {formatMinor(BigInt(column.of(day)))}
+                          {column.label === "Released" ? (
+                            <Simulated minor={day.simulatedOutMinor} />
                           ) : null}
                         </td>
-                      </tr>
-                    ))}
-                    <tr className="border-t border-(--dash-line-solid) font-medium">
-                      <td className="py-2 pr-4 text-left">Total</td>
-                      <td className="py-2 pl-4">
-                        {formatMinor(BigInt(data.totals.takenMinor))}
-                      </td>
-                      <td className="py-2 pl-4">
-                        {formatMinor(BigInt(data.totals.feesMinor))}
-                      </td>
-                      <td className="py-2 pl-4">
-                        {formatMinor(BigInt(data.totals.refundedMinor))}
-                      </td>
-                      <td className="py-2 pl-4">
-                        {formatMinor(BigInt(data.totals.setAsideMinor))}
-                      </td>
-                      <td className="py-2 pl-4">
-                        {formatMinor(BigInt(data.totals.yoursMinor))}
-                      </td>
-                      <td className="py-2 pl-4">
-                        {formatMinor(BigInt(data.totals.paidOutMinor))}
-                      </td>
+                      ))}
                     </tr>
-                  </tbody>
-                </table>
-              </section>
+                  ))}
+                  <tr className="border-t border-(--dash-line-solid) font-medium">
+                    <td className="py-2 pr-4 text-left">Total</td>
+                    {COLUMNS.map((column) => (
+                      <td key={column.label} className="py-2 pl-4">
+                        {formatMinor(BigInt(column.of(data.totals)))}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="grid gap-4 sm:hidden">
+                {data.days.map((day) => (
+                  <DayCard
+                    key={day.day}
+                    heading={day.day}
+                    row={day}
+                    simulatedOutMinor={day.simulatedOutMinor}
+                  />
+                ))}
+                <DayCard heading="Total" row={data.totals} strong />
+              </div>
 
               <p
                 className={`text-sm ${

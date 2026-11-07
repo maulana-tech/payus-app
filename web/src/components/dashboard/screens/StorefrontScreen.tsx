@@ -1,25 +1,30 @@
 "use client";
 
-import { ExternalLink, Plus } from "lucide-react";
+import {
+  ExternalLink,
+  EyeOff,
+  Globe,
+  Link2,
+  PenLine,
+  Plus,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 import { Input } from "@/components/ui/input";
 import type { RouterOutputs } from "@/server/root";
 import { trpc } from "@/trpc/react";
-import {
-  dashButtonPrimary,
-  dashButtonSecondary,
-  dashIconButton,
-} from "../styles";
+import { dashButtonPrimary, dashButtonSecondary } from "../styles";
 import { Field } from "./InvoicesScreen";
 import {
-  CopyButton,
   EmptyState,
   ErrorNote,
   Ledger,
   ListRow,
   Panel,
+  RowMenu,
+  RowMenuItem,
+  RowMenuSeparator,
   StatusChip,
 } from "./kit";
 
@@ -81,7 +86,10 @@ function StoreList() {
     );
 
   return (
-    <Ledger className="border-0 border-t border-(--dash-line-solid)">
+    <Ledger
+      className="border-0 border-t border-(--dash-line-solid)"
+      style={{ "--row-actions": "14rem" } as CSSProperties}
+    >
       {stores.data?.map((store) => (
         <StoreRow key={store.id} store={store} />
       ))}
@@ -163,6 +171,16 @@ function StoreRow({ store }: { store: Store }) {
   });
   const path = `/shop/${store.slug}`;
   const published = store.state === "published";
+  const [copied, setCopied] = useState(false);
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${origin()}${path}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   return (
     <div>
@@ -181,35 +199,41 @@ function StoreRow({ store }: { store: Store }) {
         meta={`${path} · ${store.products.length} item${
           store.products.length === 1 ? "" : "s"
         }`}
+        // The canvas is what a shop is for; everything else is one menu,
+        // the same shape the other list screens use.
         actions={
           <>
-            {published ? (
-              <CopyButton value={`${origin()}${path}`} label="Link" />
-            ) : null}
-            {published ? (
-              <a
-                href={path}
-                target="_blank"
-                rel="noreferrer"
-                className={dashIconButton}
-                aria-label={`Open ${store.title}`}
-              >
-                <ExternalLink aria-hidden="true" />
-              </a>
-            ) : null}
             <Link href={`/canvas/${store.id}`} className={dashButtonSecondary}>
+              <PenLine aria-hidden="true" />
               Open canvas
             </Link>
-            <button
-              type="button"
-              className={published ? dashButtonSecondary : dashButtonPrimary}
-              disabled={publish.isPending}
-              onClick={() =>
-                publish.mutate({ id: store.id, published: !published })
-              }
-            >
-              {published ? "Unpublish" : "Publish"}
-            </button>
+            <RowMenu label={`More for ${store.title}`}>
+              {published ? (
+                <RowMenuItem icon={Link2} onSelect={() => void copyLink()}>
+                  {copied ? "Link copied" : "Copy the shop's address"}
+                </RowMenuItem>
+              ) : null}
+              {published ? (
+                <RowMenuItem
+                  icon={ExternalLink}
+                  onSelect={() => window.open(path, "_blank", "noreferrer")}
+                >
+                  Open the shop page
+                </RowMenuItem>
+              ) : null}
+              {published ? <RowMenuSeparator /> : null}
+              <RowMenuItem
+                icon={published ? EyeOff : Globe}
+                disabled={publish.isPending}
+                onSelect={() =>
+                  publish.mutate({ id: store.id, published: !published })
+                }
+              >
+                {published
+                  ? "Take it off the web"
+                  : "Publish it at this address"}
+              </RowMenuItem>
+            </RowMenu>
           </>
         }
       />

@@ -2,8 +2,15 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { render } from "@testing-library/react";
+import { Trash2 } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { Ledger, ListRow, Panel } from "@/components/dashboard/screens/kit";
+import {
+  Ledger,
+  ListRow,
+  Panel,
+  RowMenu,
+  RowMenuItem,
+} from "@/components/dashboard/screens/kit";
 
 // One panel used to decide the width of every other panel on the screen.
 //
@@ -55,5 +62,38 @@ describe("a panel cannot widen the screen", () => {
 
     const actions = container.querySelector("div.justify-end");
     expect(actions?.className).toContain("min-w-0");
+  });
+});
+
+// Rows carried four or five pills of equal weight. The destructive one was
+// an unlabelled bin between two words, and every row was a different width,
+// so the amounts beside them never lined up.
+describe("a row has one pill and one menu", () => {
+  it("reserves the width a list declares, so the amounts share an edge", () => {
+    const { container } = render(
+      <Ledger style={{ "--row-actions": "12.5rem" } as React.CSSProperties}>
+        <ListRow
+          title={<span>INV-001</span>}
+          trailing={<span>$1,500.00</span>}
+          actions={<button type="button">Mark paid</button>}
+        />
+      </Ledger>,
+    );
+    const ledger = container.querySelector<HTMLElement>(".dash-ledger");
+    expect(ledger?.style.getPropertyValue("--row-actions")).toBe("12.5rem");
+    expect(container.querySelector("div.justify-end")?.className).toContain(
+      "sm:w-[var(--row-actions,auto)]",
+    );
+  });
+
+  it("names the menu, because the icon says nothing on its own", () => {
+    const { getByLabelText } = render(
+      <RowMenu label="More for INV-001">
+        <RowMenuItem icon={Trash2} destructive onSelect={() => {}}>
+          Void INV-001
+        </RowMenuItem>
+      </RowMenu>,
+    );
+    expect(getByLabelText("More for INV-001")).toBeInTheDocument();
   });
 });

@@ -1,11 +1,19 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Check, Copy, MoreHorizontal } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatMinor } from "@/features/invoices/money";
 import { cn } from "@/lib/utils";
-import { dashCell, dashFocus, dashLedger } from "../styles";
+import { dashCell, dashFocus, dashIconButton, dashLedger } from "../styles";
 
 // The shared vocabulary of the built screens: a hairline panel, rows that
 // divide into cells, status chips, money, and a copy button. Anything a
@@ -237,6 +245,61 @@ export function EmptyState({
     </div>
   );
 }
+
+/**
+ * The second control on a row, and the only one that is ever an icon alone.
+ *
+ * Rows used to carry four or five pills of equal weight, which made the
+ * destructive one — an unlabelled bin between two words — the hardest thing
+ * on the row to notice, and made every row a different width, so the amounts
+ * beside them never lined up. One pill and this.
+ */
+export function RowMenu({
+  label,
+  children,
+}: {
+  /** Names the row, e.g. "More for INV-001": the icon says nothing alone. */
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className={dashIconButton} aria-label={label}>
+        <MoreHorizontal aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56">
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export function RowMenuItem({
+  icon: Icon,
+  onSelect,
+  disabled,
+  destructive = false,
+  children,
+}: {
+  icon: LucideIcon;
+  onSelect: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <DropdownMenuItem
+      disabled={disabled}
+      variant={destructive ? "destructive" : "default"}
+      onSelect={onSelect}
+    >
+      <Icon aria-hidden="true" />
+      {children}
+    </DropdownMenuItem>
+  );
+}
+
+export { DropdownMenuSeparator as RowMenuSeparator };
 
 /** A row of the list screens: title line, meta line, trailing controls. */
 export function ListRow({

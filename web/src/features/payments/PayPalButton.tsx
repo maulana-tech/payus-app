@@ -146,7 +146,10 @@ export function PayPalButton({
 
   if (!clientId)
     return (
-      <p className="rounded-lg border border-current/15 p-4 text-sm opacity-70">
+      // No opacity on the text: this is the one page a payer sees, and
+      // these three lines are the only things on it that explain the
+      // button's state. The border carries the quietness instead.
+      <p className="rounded-lg border border-current/15 p-4 text-sm">
         This deployment has no PayPal client id, so the pay button is off. The
         invoice, its totals and its webhook all work.
       </p>
@@ -156,12 +159,12 @@ export function PayPalButton({
     <div className="grid gap-2">
       <div ref={container} />
       {working ? (
-        <p className="text-sm opacity-70" role="status">
+        <p className="text-sm" role="status">
           Recording the payment…
         </p>
       ) : null}
       {error ? (
-        <p className="text-sm font-medium opacity-90" role="alert">
+        <p className="text-sm font-medium" role="alert">
           {error}
         </p>
       ) : null}

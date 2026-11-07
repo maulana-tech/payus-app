@@ -513,7 +513,9 @@ function HtmlPane({
             type="button"
             title={snippet.hint}
             onClick={() => editor.current?.insert(snippet.body)}
-            className={`rounded-full border border-(--dash-line-strong) px-3 py-1 text-[12px] text-(--dash-fg) transition-colors hover:bg-(--dash-fg) hover:text-(--dash-surface) ${dashFocus}`}
+            // min-h-9: these measured 28px, the smallest targets in the app,
+            // and there are eleven of them side by side.
+            className={`min-h-9 rounded-full border border-(--dash-line-strong) px-3 py-1 text-[12px] text-(--dash-fg) transition-colors hover:bg-(--dash-fg) hover:text-(--dash-surface) ${dashFocus}`}
           >
             {snippet.label}
           </button>

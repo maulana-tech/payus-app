@@ -5,7 +5,6 @@ import {
   ExternalLink,
   Link2,
   MessageSquare,
-  MoreHorizontal,
   Plus,
   RotateCcw,
   Trash2,
@@ -19,13 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { invoiceStatus, suggestNextNumber } from "@/features/invoices/input";
@@ -46,6 +38,9 @@ import {
   ListRow,
   Money,
   Panel,
+  RowMenu,
+  RowMenuItem,
+  RowMenuSeparator,
   StatusChip,
 } from "./kit";
 import { RefundDialog } from "./RefundDialog";
@@ -235,65 +230,60 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
                 Mark paid
               </button>
             ) : null}
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className={dashIconButton}
-                aria-label={`More for ${invoice.number}`}
+            <RowMenu label={`More for ${invoice.number}`}>
+              <RowMenuItem icon={Link2} onSelect={() => void copyLink()}>
+                {copied ? "Link copied" : "Copy the pay link"}
+              </RowMenuItem>
+              <RowMenuItem
+                icon={ExternalLink}
+                onSelect={() =>
+                  window.open(`/i/${invoice.token}`, "_blank", "noreferrer")
+                }
               >
-                <MoreHorizontal aria-hidden="true" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-56">
-                <DropdownMenuItem onSelect={() => void copyLink()}>
-                  <Link2 aria-hidden="true" />
-                  {copied ? "Link copied" : "Copy the pay link"}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() =>
-                    window.open(`/i/${invoice.token}`, "_blank", "noreferrer")
-                  }
+                Open the pay page
+              </RowMenuItem>
+              {status === "overdue" ? (
+                <RowMenuItem
+                  icon={MessageSquare}
+                  onSelect={() => setChasing(true)}
                 >
-                  <ExternalLink aria-hidden="true" />
-                  Open the pay page
-                </DropdownMenuItem>
-                {status === "overdue" ? (
-                  <DropdownMenuItem onSelect={() => setChasing(true)}>
-                    <MessageSquare aria-hidden="true" />
-                    Ask the Collector to chase
-                  </DropdownMenuItem>
-                ) : null}
-                {BigInt(invoice.paidMinor) > 0n ? (
-                  <DropdownMenuItem onSelect={() => setRefunding(true)}>
-                    <RotateCcw aria-hidden="true" />
-                    Refund part or all of it
-                  </DropdownMenuItem>
-                ) : null}
-                {invoice.recurrence !== "none" ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      disabled={stopRecurring.isPending}
-                      onSelect={() => stopRecurring.mutate({ id: invoice.id })}
-                    >
-                      <XCircle aria-hidden="true" />
-                      Stop issuing this {invoice.recurrence}
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-                {invoice.status === "pending" ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      variant="destructive"
-                      disabled={voidInvoice.isPending}
-                      onSelect={() => voidInvoice.mutate({ id: invoice.id })}
-                    >
-                      <Trash2 aria-hidden="true" />
-                      Void {invoice.number}
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  Ask the Collector to chase
+                </RowMenuItem>
+              ) : null}
+              {paid > 0n ? (
+                <RowMenuItem
+                  icon={RotateCcw}
+                  onSelect={() => setRefunding(true)}
+                >
+                  Refund part or all of it
+                </RowMenuItem>
+              ) : null}
+              {invoice.recurrence !== "none" ? (
+                <>
+                  <RowMenuSeparator />
+                  <RowMenuItem
+                    icon={XCircle}
+                    disabled={stopRecurring.isPending}
+                    onSelect={() => stopRecurring.mutate({ id: invoice.id })}
+                  >
+                    Stop issuing this {invoice.recurrence}
+                  </RowMenuItem>
+                </>
+              ) : null}
+              {invoice.status === "pending" ? (
+                <>
+                  <RowMenuSeparator />
+                  <RowMenuItem
+                    icon={Trash2}
+                    destructive
+                    disabled={voidInvoice.isPending}
+                    onSelect={() => voidInvoice.mutate({ id: invoice.id })}
+                  >
+                    Void {invoice.number}
+                  </RowMenuItem>
+                </>
+              ) : null}
+            </RowMenu>
           </>
         }
       />

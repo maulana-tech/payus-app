@@ -223,7 +223,7 @@ export function DatePicker({
         <span
           className={cn(
             "min-w-0 flex-1 truncate tabular-nums",
-            !selected && "text-foreground/45",
+            !selected && "text-foreground/70",
           )}
         >
           {selected ? formatDisplayDate(selected) : placeholder}
@@ -238,6 +238,11 @@ export function DatePicker({
           collisionPadding={12}
         >
           <Popover.Popup
+            // The popup is a dialog; a dialog with no name is announced as
+            // nothing at all. It borrows the field's own label.
+            aria-label={
+              ariaLabel ? `${ariaLabel}: choose a date` : "Choose a date"
+            }
             initialFocus={() =>
               grid.current?.querySelector<HTMLElement>('[tabindex="0"]') ?? true
             }
@@ -297,7 +302,7 @@ export function DatePicker({
                         key={short}
                         scope="col"
                         abbr={long}
-                        className="h-8 text-center text-[11px] font-semibold tracking-[0.06em] text-foreground/50 uppercase"
+                        className="h-8 text-center text-[11px] font-semibold tracking-[0.06em] text-foreground/70 uppercase"
                       >
                         {short}
                       </th>
@@ -329,7 +334,9 @@ export function DatePicker({
                                 "mx-auto grid size-10 place-items-center rounded-full text-sm tabular-nums transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                 inMonth
                                   ? "text-foreground"
-                                  : "text-foreground/35",
+                                  : // Still plainly secondary beside full ink,
+                                    // but readable: /35 measured under 2.5:1.
+                                    "text-foreground/70",
                                 !isSelected &&
                                   !blocked &&
                                   "hover:bg-foreground/8",

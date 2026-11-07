@@ -1,7 +1,7 @@
 "use client";
 
 import { Send } from "lucide-react";
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -81,7 +81,10 @@ export function RequestsScreen() {
               : "Ask another @username for money and it appears here until they settle it."}
           </EmptyState>
         ) : (
-          <Ledger className="border-0 border-t border-(--dash-line-solid)">
+          <Ledger
+            className="border-0 border-t border-(--dash-line-solid)"
+            style={{ "--row-actions": "15rem" } as CSSProperties}
+          >
             {(list.data ?? []).map((request) => (
               <RequestRow
                 key={request.id}
@@ -142,9 +145,11 @@ function RequestRow({
         actions={
           request.status !== "pending" ? null : direction === "incoming" ? (
             <>
+              {/* The affirmative one leads: two identical pills make the
+                  person read both before either means anything. */}
               <button
                 type="button"
-                className={dashButtonSecondary}
+                className={dashButtonPrimary}
                 disabled={markPaid.isPending}
                 onClick={() => markPaid.mutate({ id: request.id })}
               >

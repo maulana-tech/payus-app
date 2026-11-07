@@ -890,6 +890,15 @@ body:has(.dashboard-app) .ag-header {
   background: var(--dash-surface);
 }
 
+/* The grid lays a transparent ::before over each header cell for its own
+   hover highlight — a highlight this theme never colours in. It paints
+   nothing, but a contrast checker will not measure text behind a pseudo
+   element, so every header came back as "could not be determined". Taking
+   it away changes no pixel and makes the 5.9:1 checkable. */
+body:has(.dashboard-app) .ag-header-cell::before {
+  content: none;
+}
+
 body:has(.dashboard-app) :is([data-slot="button"], [data-slot="badge"]) {
   border-radius: 999px;
 }

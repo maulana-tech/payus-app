@@ -1,7 +1,15 @@
 "use client";
 
-import { Archive, ExternalLink, Plus, QrCode, RotateCcw } from "lucide-react";
-import { useRef, useState } from "react";
+import {
+  Archive,
+  Check,
+  ExternalLink,
+  Link2,
+  Plus,
+  QrCode,
+  RotateCcw,
+} from "lucide-react";
+import { type CSSProperties, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,20 +21,18 @@ import { Input } from "@/components/ui/input";
 import type { RouterOutputs } from "@/server/root";
 import { trpc } from "@/trpc/react";
 import { PaymentQrDialog } from "../PaymentQrDialog";
-import {
-  dashButtonPrimary,
-  dashButtonSecondary,
-  dashIconButton,
-} from "../styles";
+import { dashButtonPrimary, dashButtonSecondary } from "../styles";
 import { Field } from "./InvoicesScreen";
 import {
-  CopyButton,
   EmptyState,
   ErrorNote,
   Ledger,
   ListRow,
   Money,
   Panel,
+  RowMenu,
+  RowMenuItem,
+  RowMenuSeparator,
   StatusChip,
 } from "./kit";
 
@@ -78,7 +84,10 @@ export function LinksScreen({ username }: { username: string }) {
             the amount open, and send the address.
           </EmptyState>
         ) : (
-          <Ledger className="border-0 border-t border-(--dash-line-solid)">
+          <Ledger
+            className="border-0 border-t border-(--dash-line-solid)"
+            style={{ "--row-actions": "12.5rem" } as CSSProperties}
+          >
             {active.map((link) => (
               <LinkRow key={link.id} link={link} username={username} />
             ))}
@@ -88,7 +97,10 @@ export function LinksScreen({ username }: { username: string }) {
 
       {archived.length > 0 ? (
         <Panel title="Archived" hint="Not payable; the address is kept.">
-          <Ledger className="border-0 border-t border-(--dash-line-solid)">
+          <Ledger
+            className="border-0 border-t border-(--dash-line-solid)"
+            style={{ "--row-actions": "12.5rem" } as CSSProperties}
+          >
             {archived.map((link) => (
               <LinkRow key={link.id} link={link} username={username} />
             ))}
@@ -114,6 +126,16 @@ function LinkRow({ link, username }: { link: Link; username: string }) {
   });
   const path = `/pay/${username}/${link.slug}`;
   const archived = link.state === "archived";
+  const [copied, setCopied] = useState(false);
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${origin()}${path}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   return (
     <div>
@@ -134,44 +156,50 @@ function LinkRow({ link, username }: { link: Link; username: string }) {
             <span className="text-sm text-(--dash-ash)">Payer chooses</span>
           )
         }
+        // Copying the address is what people come here to do; the rest is
+        // one menu, the same shape every list screen uses.
         actions={
           <>
-            <CopyButton value={`${origin()}${path}`} label="Link" />
-            <button
-              ref={qrButton}
-              type="button"
-              className={dashIconButton}
-              aria-label={`QR code for ${link.title}`}
-              onClick={() => setShowQr(true)}
-            >
-              <QrCode aria-hidden="true" />
-            </button>
-            <a
-              href={path}
-              target="_blank"
-              rel="noreferrer"
-              className={dashIconButton}
-              aria-label={`Open ${link.title}`}
-            >
-              <ExternalLink aria-hidden="true" />
-            </a>
             <button
               type="button"
-              className={dashIconButton}
-              aria-label={
-                archived ? `Restore ${link.title}` : `Archive ${link.title}`
-              }
-              disabled={setArchived.isPending}
-              onClick={() =>
-                setArchived.mutate({ id: link.id, archived: !archived })
-              }
+              className={dashButtonSecondary}
+              onClick={() => void copyLink()}
             >
-              {archived ? (
-                <RotateCcw aria-hidden="true" />
+              {copied ? (
+                <Check aria-hidden="true" />
               ) : (
-                <Archive aria-hidden="true" />
+                <Link2 aria-hidden="true" />
               )}
+              {copied ? "Copied" : "Copy link"}
             </button>
+            <RowMenu label={`More for ${link.title}`}>
+              <RowMenuItem
+                icon={QrCode}
+                onSelect={() => {
+                  qrButton.current?.focus();
+                  setShowQr(true);
+                }}
+              >
+                Show a QR code
+              </RowMenuItem>
+              <RowMenuItem
+                icon={ExternalLink}
+                onSelect={() => window.open(path, "_blank", "noreferrer")}
+              >
+                Open the pay page
+              </RowMenuItem>
+              <RowMenuSeparator />
+              <RowMenuItem
+                icon={archived ? RotateCcw : Archive}
+                destructive={!archived}
+                disabled={setArchived.isPending}
+                onSelect={() =>
+                  setArchived.mutate({ id: link.id, archived: !archived })
+                }
+              >
+                {archived ? "Make it payable again" : "Archive this link"}
+              </RowMenuItem>
+            </RowMenu>
           </>
         }
       />
