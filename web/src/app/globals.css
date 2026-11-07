@@ -106,12 +106,14 @@
     overflow-x: clip;
   }
 
+  /* A link takes the colour of what it sits in. This used to force olive on
+     every <a> that did not name a colour of its own, which overrode the
+     inherited value even on the landing's ink field — the footer links there
+     measured 2.1:1, olive on near-black. Components that want a link to
+     stand out already say so. */
   a {
-    color: var(--color-olive);
+    color: inherit;
     text-decoration: none;
-  }
-  a:hover {
-    color: var(--color-olive-deep);
   }
   * {
     @apply border-border outline-ring/50;

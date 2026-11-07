@@ -46,7 +46,13 @@ export default function PrivacyPage() {
           Today {APP_NAME} runs against the PayPal sandbox.
         </p>
       </main>
-      <FooterBar />
+      {/* A landmark of its own: on the landing this bar sits inside the
+          page's <footer>, but here it is the only thing after <main>, and
+          content outside every landmark is content a screen reader has no
+          way to jump to. */}
+      <footer>
+        <FooterBar />
+      </footer>
     </div>
   );
 }
