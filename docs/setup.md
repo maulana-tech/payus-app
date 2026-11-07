@@ -206,6 +206,24 @@ through the rail and partly refunded), a payment link, a published shop at
 `/shop/kopi-senja`, and a proposal the Guardian is holding. The seed is
 idempotent — run it again and it adds only what is missing.
 
+The money all comes from one number, `DEMO_PAID` at the top of
+`web/src/app/api/dev/seed/route.ts`. Everything beside it is derived by the
+real code rather than written down: PayPal's fee, the refund reversed in
+proportion, 10% set aside for tax, 5% into a pot, the rest yours. Change it
+to `"100"` or `"1000"` and the whole picture moves with it, because the
+seeded capture goes down the same path a real one does.
+
+It only writes to an empty account, so re-running it with a different amount
+means clearing the demo rows first. That is a delete against your own
+database and nothing here will do it for you:
+
+```sh
+psql "$DATABASE_URL" -c "delete from ledger_entries; delete from ledger_txns;
+  delete from payments; delete from refunds; delete from advisor_turns;
+  delete from proposals; delete from invoices;"
+curl -X POST http://localhost:3000/api/dev/seed
+```
+
 Two guards keep this where it belongs: the username has to be set
 deliberately, and `NODE_ENV` has to be `development`, which a production
 build hard-codes to `production`. `/api/dev/seed` answers 404 anywhere else,

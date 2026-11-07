@@ -33,6 +33,25 @@ export const dynamic = "force-dynamic";
 const day = (offset: number) =>
   new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
 
+/**
+ * The one number the demo's money comes from. Everything else is derived by
+ * the real code, not written down here:
+ *
+ *   taken          DEMO_PAID
+ *   PayPal's fee   DEMO_FEE_MINOR
+ *   refunded       DEMO_REFUND_MINOR, reversed in proportion from the pots
+ *   tax set aside  10% of what settled   (the split rule below)
+ *   savings pot     5% of what settled
+ *   yours          whatever is left
+ *
+ * Change DEMO_PAID and the whole picture moves with it, because the capture
+ * goes down the same path a real one does. The seed only runs on an empty
+ * account, so clear the demo data first (see docs/setup.md) to re-run it.
+ */
+const DEMO_PAID = "1500";
+const DEMO_FEE_MINOR = 4_650n;
+const DEMO_REFUND_MINOR = 20_000n;
+
 export async function POST() {
   if (!demoMode()) return new Response("Not found", { status: 404 });
   const owner = demoUser();
@@ -73,7 +92,7 @@ export async function POST() {
       clientEmail: null,
       dueDate: day(-3),
       notes: "Design retainer, October",
-      items: [line("Design retainer", "1500")],
+      items: [line("Design retainer", DEMO_PAID)],
       recurrence: "none",
     });
     // The capture is written the way the rail writes one, so the ledger,
@@ -96,7 +115,7 @@ export async function POST() {
       paymentId: null,
       status: "COMPLETED",
       grossMinor: BigInt(paid.totalMinor),
-      feeMinor: 4_650n,
+      feeMinor: DEMO_FEE_MINOR,
       currency: paid.currency,
     });
 
@@ -109,9 +128,9 @@ export async function POST() {
           refundId: `DEMOREF-${paid.id}`,
           captureId: `DEMOCAP-${paid.id}`,
           status: "COMPLETED",
-          grossMinor: 20_000n,
+          grossMinor: DEMO_REFUND_MINOR,
           feeReturnedMinor: 0n,
-          netMinor: 20_000n,
+          netMinor: DEMO_REFUND_MINOR,
           currency: paid.currency,
         },
         { source: "owner", reason: "Two days of the retainer unused" },
