@@ -155,4 +155,4 @@ Tailwind v4 (`@tailwindcss/postcss`), shadcn-style primitives in `web/src/compon
 ## Conventions
 - Formatting: Biome (2-space, double quotes, organized imports).
 - Commit messages in Indonesian, short and imperative, no co-author trailer.
-- Remote: `origin` = github.com/maulana-tech/payus, working branch `zecathon` — rename the GitHub repository to match before pushing, it still carries the project's former name. Push only when asked. (This local directory is not itself a git checkout, so edits here have no undo.)
+- Remote: `origin` = github.com/maulana-tech/payus-app, branch `main` (public). `maulana-tech/zua` is a *different* project with an unrelated history — never push this repository there. Push only when asked.
