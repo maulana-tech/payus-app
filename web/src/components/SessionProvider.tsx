@@ -562,7 +562,16 @@ function useDemoSession(real: {
       closePinModal: noop,
       promptUnlock: noop,
       signIn: noop,
-      disconnect: async () => {},
+      // Leaving the demo is a real action: the cookie is http-only, so only
+      // the server can drop it, and then the page has to start again as
+      // someone with no session at all.
+      disconnect: async () => {
+        try {
+          await fetch("/api/demo/session", { method: "DELETE" });
+        } finally {
+          window.location.href = "/";
+        }
+      },
       recoveryMethod: "pin",
       recoveryModal: null,
       recoveryBusy: false,

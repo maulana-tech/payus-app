@@ -55,3 +55,28 @@ export async function GET(request: Request) {
     },
   );
 }
+
+/**
+ * Leaves the demo. The cookie is http-only, so the page cannot drop it
+ * itself — and without a way out, a visitor who wants to sign in as
+ * themselves is stuck in a sandbox they cannot leave.
+ */
+export async function DELETE() {
+  if (!publicDemo())
+    return Response.json({ error: "not_enabled" }, { status: 404 });
+  return Response.json(
+    { ok: true },
+    {
+      headers: {
+        "set-cookie": [
+          `${DEMO_COOKIE}=`,
+          "Path=/",
+          "Max-Age=0",
+          "HttpOnly",
+          "SameSite=Lax",
+          "Secure",
+        ].join("; "),
+      },
+    },
+  );
+}

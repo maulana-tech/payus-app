@@ -858,6 +858,8 @@ function Rows({ caption, rows }: { caption: string; rows: Row[] }) {
       {/* A tab stop so the box can be reached by keyboard at all, but not a
           landmark: the same table appears in the transcript and again in the
           detail panel, and two landmarks with one name is worse than none. */}
+      {/* biome-ignore lint/a11y/useSemanticElements: a fieldset groups form
+          controls; this is a scrollable table */}
       <div
         className="mt-2 overflow-x-auto"
         // `group`, not `region`: region is a landmark, and this same table

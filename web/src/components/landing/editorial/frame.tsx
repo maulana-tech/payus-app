@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { publicDemo } from "@/lib/demo";
+import { isDemoOwner, publicDemo } from "@/lib/demo";
 import { cn } from "@/lib/utils";
 import { useSession } from "../../SessionProvider";
 import { mono } from "./styles";
@@ -55,11 +55,30 @@ export function Cta({ className }: { className?: string }) {
     mono,
     className,
   );
+  // A demo visitor counts as authenticated, so without this the sign-in
+  // branch below is never rendered and nobody — the owner of the
+  // deployment included — can reach their own account from the landing.
+  const inDemo = Boolean(username && isDemoOwner(username));
+
   if (authenticated)
     return (
-      <Link href="/dashboard" className={shell}>
-        {body}
-      </Link>
+      <span className={cn("inline-flex items-center gap-4", className)}>
+        <Link href="/dashboard" className={shell}>
+          {body}
+        </Link>
+        {inDemo ? (
+          <button
+            type="button"
+            onClick={() => signIn()}
+            className={cn(
+              mono,
+              "text-ed-cream/60 underline-offset-4 transition-colors hover:text-ed-cream hover:underline focus-visible:ring-2 focus-visible:ring-ed-cream/60 focus-visible:outline-none",
+            )}
+          >
+            Sign in
+          </button>
+        ) : null}
+      </span>
     );
 
   return (

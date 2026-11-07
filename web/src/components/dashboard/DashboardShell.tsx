@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { isDemoOwner } from "@/lib/demo";
 import { navFor } from "../../features/account/accountType";
 import { SETTINGS_PATH } from "../../lib/auth-routes";
 import { cn } from "../../lib/utils";
@@ -341,7 +342,11 @@ function AccountMenu() {
           className="cursor-pointer !text-(--dash-fg) focus:bg-(--dash-tint) focus:!text-(--dash-fg) [&_svg]:!text-(--dash-fg)"
           onClick={disconnect}
         >
-          <LogOut aria-hidden="true" /> Sign out
+          <LogOut aria-hidden="true" />{" "}
+          {/* Leaving a sandbox is not signing out of anything — and what it
+              leads to, a real sign-in, is the thing a visitor is looking
+              for when they press it. */}
+          {username && isDemoOwner(username) ? "Leave the demo" : "Sign out"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -156,7 +156,7 @@ export async function extractSheet(file: File): Promise<string[][]> {
   if (!sheetBytes)
     throw new ExtractError(`${file.name} has no first sheet to read.`);
 
-  const unescape = (text: string) =>
+  const unentity = (text: string) =>
     text
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
@@ -172,7 +172,7 @@ export async function extractSheet(file: File): Promise<string[][]> {
       // One <si> can hold several <t> runs; they are one string.
       const runs = si.match(/<t[^>]*>([\s\S]*?)<\/t>/g) ?? [];
       shared.push(
-        unescape(runs.map((t) => t.replace(/<[^>]+>/g, "")).join("")),
+        unentity(runs.map((t) => t.replace(/<[^>]+>/g, "")).join("")),
       );
     }
   }
@@ -196,11 +196,11 @@ export async function extractSheet(file: File): Promise<string[][]> {
       const raw = cellXml.match(/<v>([\s\S]*?)<\/v>/)?.[1];
       if (type === "inlineStr") {
         const inline = cellXml.match(/<t[^>]*>([\s\S]*?)<\/t>/)?.[1] ?? "";
-        cells.push(unescape(inline.replace(/<[^>]+>/g, "")));
+        cells.push(unentity(inline.replace(/<[^>]+>/g, "")));
       } else if (type === "s" && raw !== undefined) {
         cells.push(shared[Number(raw)] ?? "");
       } else {
-        cells.push(raw === undefined ? "" : unescape(raw));
+        cells.push(raw === undefined ? "" : unentity(raw));
       }
     }
     grid.push(cells);
