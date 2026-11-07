@@ -51,9 +51,9 @@ export function ShopHtml({
   table { border-collapse: collapse; width: 100%; }
   th, td { border-bottom: 1px solid ${palette.line}; padding: 0.5em 0; text-align: left; }
   small, figcaption { color: ${palette.muted}; font-size: 0.875rem; }
-  /* The allowlisted classes: shop- is the only prefix the sanitiser keeps,
-     and these are what it keeps it for — a writer gets a few shapes
-     without getting a stylesheet. */
+  /* The shop- classes: a few shapes for an author who does not want to
+     write a stylesheet. An author who does write one gets their own class
+     names too, and their rules are emitted after these, so theirs win. */
   .shop-lead { font-size: 1.2rem; line-height: 1.5; }
   .shop-muted { color: ${palette.muted}; font-size: 0.9375rem; }
   .shop-center { text-align: center; }
@@ -68,19 +68,46 @@ export function ShopHtml({
   @media (max-width: 520px) { .shop-cols { grid-template-columns: 1fr; } }
 </style></head><body>${html}</body></html>`;
 
+  // Measuring the frame is the whole reason `allow-same-origin` is here, and
+  // it has to survive a design that arrives before its typeface does. A
+  // single timeout was enough when this held prose in a font the page
+  // already had; a web font lands whenever the network says so, and every
+  // line reflows when it does. So: measure on load, again when the fonts
+  // report ready, and then keep watching, because a grid that rewraps at a
+  // container query is a height change nobody fired an event for.
   useEffect(() => {
+    let alive = true;
     const measure = () => {
       const body = frame.current?.contentDocument?.body;
-      if (body) setHeight(Math.ceil(body.getBoundingClientRect().height));
+      if (!alive || !body) return;
+      const next = Math.ceil(body.getBoundingClientRect().height);
+      // Only grow or shrink on a real change: setting state to the number it
+      // already holds on every observer tick is a render loop.
+      setHeight((current) => (current === next ? current : next));
     };
+
     measure();
     window.addEventListener("resize", measure);
-    const timer = setTimeout(measure, 120); // after webfonts settle
+
+    const doc = frame.current?.contentDocument;
+    // `fonts.ready` resolves immediately when there is nothing to wait for,
+    // so this costs nothing for a shop that brought no typeface.
+    doc?.fonts?.ready.then(measure).catch(() => {});
+
+    const observer =
+      doc?.body && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(measure)
+        : null;
+    if (doc?.body) observer?.observe(doc.body);
+
     return () => {
+      alive = false;
       window.removeEventListener("resize", measure);
-      clearTimeout(timer);
+      observer?.disconnect();
     };
-  }, []);
+    // `html` is a dependency because a new document is a new body to watch:
+    // the editor replaces this frame's contents on every keystroke.
+  }, [html]);
 
   if (!html.trim()) return null;
 
@@ -95,6 +122,9 @@ export function ShopHtml({
         const body = frame.current?.contentDocument?.body;
         if (body) setHeight(Math.ceil(body.getBoundingClientRect().height));
       }}
+      // The frame is sized to its content, so its own scrollbar would only
+      // ever be a second one inside the page's.
+      scrolling="no"
       style={{ height: height || 160 }}
       className="w-full border-0"
     />

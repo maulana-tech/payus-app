@@ -60,15 +60,16 @@ describe("transactions grid", () => {
   it("shows every posting and the totals that must agree", async () => {
     renderGrid(entries);
 
-    await waitFor(() =>
-      expect(screen.getByText("paypal_cash")).toBeInTheDocument(),
-    );
+    // AG Grid fills its rows over several frames, so the first cell to
+    // appear does not mean the last one has. Wait for the figure that needs
+    // both a row and both footers — three $150.00 — and the rest is settled
+    // by the time it is true.
+    await waitFor(() => expect(screen.getAllByText("$150.00")).toHaveLength(3));
+    expect(screen.getByText("paypal_cash")).toBeInTheDocument();
     expect(screen.getByText("psp_fee")).toBeInTheDocument();
     expect(screen.getByText("in_flight:shop")).toBeInTheDocument();
     expect(screen.getByText("$145.00")).toBeInTheDocument();
     expect(screen.getByText("$5.00")).toBeInTheDocument();
-    // $150.00 appears three times: the credit cell, and both footer totals.
-    expect(screen.getAllByText("$150.00")).toHaveLength(3);
 
     expect(screen.getByText("3 postings")).toBeInTheDocument();
     // Both totals read $150.00, so the one word that matters is "Balanced".

@@ -82,6 +82,7 @@ const STRUCTURE = [
   "details",
   "summary",
   "picture",
+  "source",
 ];
 
 const TABLE = [

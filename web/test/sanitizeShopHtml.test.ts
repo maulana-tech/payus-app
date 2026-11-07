@@ -157,6 +157,17 @@ describe("shop html", () => {
     expect(out.removed).toEqual([]);
   });
 
+  it("lets an svg point at itself but not at somewhere else", () => {
+    const own = clean(
+      '<svg viewBox="0 0 24 24"><use href="#chev"/></svg><svg><symbol id="chev"><path d="m9 6 6 6"/></symbol></svg>',
+    );
+    expect(own).toContain('href="#chev"');
+    expect(own).toContain('id="chev"');
+
+    const away = clean('<svg><use href="https://e.com/sprite.svg#x"/></svg>');
+    expect(away).not.toContain("e.com");
+  });
+
   it("says what it took out, so the author is not left guessing", () => {
     const result = sanitizeShopHtml(
       '<script>x</script><iframe></iframe><style>@charset "utf-8";</style><p>ok</p>',

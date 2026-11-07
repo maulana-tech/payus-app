@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
 import {
   createTestDb,
   type IsolatedDb,
@@ -38,6 +39,21 @@ vi.mock("../src/server/lib/telegram", () => ({
     sent.answers.push(text);
   },
 }));
+
+/**
+ * Waits for something that happens outside the call we made, and fails with
+ * a sentence rather than with `undefined` when it never does.
+ */
+async function landed<T>(read: () => T | undefined, within = 3000): Promise<T> {
+  const deadline = Date.now() + within;
+  for (;;) {
+    const value = read();
+    if (value !== undefined) return value;
+    if (Date.now() > deadline)
+      throw new Error("the side effect never landed within 3s");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
 
 describe.skipIf(!available)("telegram approvals (Postgres)", () => {
   let route: typeof import("../src/app/api/webhooks/telegram/route");
@@ -140,10 +156,14 @@ describe.skipIf(!available)("telegram approvals (Postgres)", () => {
     sent.messages.length = 0;
     const proposal = await propose("tess", "attempt-1");
     expect(proposal.status).toBe("awaiting");
-    // The side effect is not awaited, so give the microtask a turn.
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(sent.messages.at(-1)?.chatId).toBe("100");
-    expect(sent.messages.at(-1)?.html).toContain("Waiting for you");
+    // Asking the chat is a side effect nobody awaits — a bot being down
+    // must not stop a proposal being recorded — so the test waits for the
+    // message rather than for a number of milliseconds. A fixed 20ms was
+    // plenty on an idle machine and not enough with the suite running.
+    const asked = await landed(() =>
+      sent.messages.find((message) => message.chatId === "100"),
+    );
+    expect(asked.html).toContain("Waiting for you");
   });
 
   it("approves from the chat, down the same path as the button", async () => {
