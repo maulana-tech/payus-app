@@ -96,8 +96,17 @@ const nextConfig = {
   outputFileTracingRoot: repoRoot,
   reactStrictMode: true,
   // Bundling these breaks their dynamic requires: pg's optional native
-  // bindings, and the Bedrock SDK's AWS credential chain.
-  serverExternalPackages: ["pg", "@anthropic-ai/bedrock-sdk"],
+  // bindings, the Bedrock SDK's AWS credential chain, and css-tree's
+  // `require("../data/patch.json")`.
+  //
+  // css-tree is the cautionary one. Bundled, its *code* is inlined and the
+  // build is green, but the JSON it reads at runtime is not a module the
+  // tracer can see — so the package throws `Cannot find module` the first
+  // time it is loaded, in the deployment only. Everything that imports the
+  // storefront sanitiser goes with it, which is the whole tRPC router: the
+  // API answered 500 to every call while every test passed and every local
+  // build worked. Left external, the tracer copies the package whole.
+  serverExternalPackages: ["pg", "@anthropic-ai/bedrock-sdk", "css-tree"],
   // Turbopack runs `next dev` (see the dev script) and ignores the webpack
   // block below, so the one alias that matters is repeated here: Privy pulls
   // in a Solana package this app never uses.
