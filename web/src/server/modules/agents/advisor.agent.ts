@@ -212,10 +212,14 @@ is "the rows do not say". No headings, no bullets, no greeting.`;
 export type AdvisorAnswer = {
   question: string;
   query: string;
+  /** The Advisor's own line on why that query would settle the question. */
+  why: string;
   caption: string;
   rows: Row[];
   answer: string;
   model: string;
+  /** The model that chose the query; the answer is a second, separate call. */
+  pickedBy: string;
 };
 
 export async function runAdvisor(
@@ -226,7 +230,7 @@ export async function runAdvisor(
   const ask = options.ask ?? askForJson;
   if (!options.ask && !claudeConfigured()) throw new ClaudeNotConfiguredError();
 
-  const chosen = await ask({
+  const chosen: Completion = await ask({
     system: PICK_SYSTEM,
     prompt: [
       `The question: ${question}`,
@@ -285,10 +289,12 @@ export async function runAdvisor(
   return {
     question,
     query: query.name,
+    why: parsedPick.data.why,
     caption,
     rows,
     answer: parsed.data.answer,
     model: `${completion.model}@${completion.promptVersion}`,
+    pickedBy: `${chosen.model}@${chosen.promptVersion}`,
   };
 }
 
