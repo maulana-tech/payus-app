@@ -48,7 +48,7 @@ const day = (offset: number) =>
  * goes down the same path a real one does. The seed only runs on an empty
  * account, so clear the demo data first (see docs/setup.md) to re-run it.
  */
-const DEMO_PAID = "1500";
+const DEMO_PAID = "1000";
 const DEMO_FEE_MINOR = 4_650n;
 const DEMO_REFUND_MINOR = 20_000n;
 
