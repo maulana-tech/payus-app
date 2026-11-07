@@ -414,7 +414,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     else openPinModal("unlock");
   }, [recoveryMethod, openPinModal, openRecoveryModal]);
 
-  const demoValue = useDemoSession();
+  const demoValue = useDemoSession({ ready: sessionReady, authenticated });
 
   const value = useMemo<SessionState>(
     () => ({
@@ -505,13 +505,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
  * returns null outside development, so this hook yields null in any
  * production build and the real session above is the only one.
  */
-function useDemoSession(): SessionState | null {
+function useDemoSession(real: {
+  ready: boolean;
+  authenticated: boolean;
+}): SessionState | null {
   const dev = demoUser();
   // The public demo asks the server which sandbox this visitor is in; the
   // name lives in a signed, http-only cookie, so the page cannot read it.
+  //
+  // Only for someone who is *not* signed in. Without that condition the
+  // demo swallows every visitor, the owner of the deployment included, and
+  // their own account becomes unreachable on their own site.
   const [minted, setMinted] = useState<string | null>(null);
+  const wanted = real.ready && !real.authenticated;
   useEffect(() => {
-    if (dev || !publicDemo()) return;
+    if (dev || !publicDemo() || !wanted) return;
     let cancelled = false;
     void fetch("/api/demo/session")
       .then((r) => (r.ok ? r.json() : null))
@@ -522,8 +530,8 @@ function useDemoSession(): SessionState | null {
     return () => {
       cancelled = true;
     };
-  }, [dev]);
-  const name = dev ?? minted;
+  }, [dev, wanted]);
+  const name = dev ?? (real.authenticated ? null : minted);
   return useMemo(() => {
     if (!name) return null;
     const master = demoMaster(name);

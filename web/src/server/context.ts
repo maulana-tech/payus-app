@@ -69,6 +69,9 @@ export async function createTRPCContext(opts?: {
   // taken, so a signed-in person is never mistaken for a demo visitor — and
   // what a demo account may do is fenced by `isDemoOwner`, not by this.
   if (publicDemo()) {
+    // A real token wins. Someone signed in who still carries a demo cookie
+    // from before — the owner of the deployment, most likely — must reach
+    // their own account and not a sandbox.
     const name = demoNameFrom(cookie(opts.req, DEMO_COOKIE) ?? undefined);
     if (name && !accessToken(opts.req)) {
       return {
