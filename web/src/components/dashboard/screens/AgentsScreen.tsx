@@ -57,7 +57,33 @@ const COLUMN = "mx-auto w-full max-w-3xl";
 
 export function AgentsScreen() {
   const status = trpc.agents.status.useQuery();
-  const [turns, setTurns] = useState<Turn[]>([]);
+  // Fetched once and left alone: `fresh` already holds this session's turns,
+  // so a refetch would show each of them twice until the page reloads.
+  const history = trpc.agents.advisorHistory.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const forget = trpc.agents.forgetAdvisorHistory.useMutation();
+  // What was asked before, plus what has been asked since this page opened.
+  const [fresh, setFresh] = useState<Turn[]>([]);
+  const kept: Turn[] = (history.data ?? []).flatMap((turn) => [
+    { from: "you" as const, text: turn.question },
+    {
+      from: "advisor" as const,
+      text: turn.answer,
+      question: turn.question,
+      query: turn.query,
+      why: turn.why,
+      caption: turn.caption,
+      rows: turn.rows,
+      seconds: turn.seconds,
+      model: turn.model,
+      pickedBy: turn.pickedBy,
+      askedVia: turn.askedVia,
+    },
+  ]);
+  const turns = [...kept, ...fresh];
   const [text, setText] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -67,7 +93,7 @@ export function AgentsScreen() {
 
   const ask = trpc.agents.runAdvisor.useMutation({
     onSuccess: (reply) =>
-      setTurns((t) => [
+      setFresh((t) => [
         ...t,
         {
           from: "advisor",
@@ -85,7 +111,7 @@ export function AgentsScreen() {
     // A refusal is an answer too — it belongs in the transcript, in order,
     // not in a box above it that the next question wipes.
     onError: (error) =>
-      setTurns((t) => [...t, { from: "refused", text: error.message }]),
+      setFresh((t) => [...t, { from: "refused", text: error.message }]),
   });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: follow the tail
@@ -96,7 +122,7 @@ export function AgentsScreen() {
   const send = (question: string) => {
     const q = question.trim();
     if (q.length < 3 || ask.isPending) return;
-    setTurns((t) => [...t, { from: "you", text: q }]);
+    setFresh((t) => [...t, { from: "you", text: q }]);
     setText("");
     started.current = Date.now();
     ask.mutate({ question: q });
@@ -252,6 +278,26 @@ export function AgentsScreen() {
       <div className="shrink-0 border-t border-(--dash-line) pt-3">
         <div className={COLUMN}>{composer}</div>
       </div>
+
+      {turns.length > 0 ? (
+        <div className="shrink-0 pt-2 text-right">
+          <button
+            type="button"
+            disabled={forget.isPending}
+            onClick={() => {
+              forget.mutate(undefined, {
+                onSuccess: () => {
+                  setFresh([]);
+                  void history.refetch();
+                },
+              });
+            }}
+            className={`text-[11px] text-(--dash-ash) underline-offset-2 hover:underline disabled:opacity-40 ${dashFocus}`}
+          >
+            {forget.isPending ? "Clearing…" : "Clear this transcript"}
+          </button>
+        </div>
+      ) : null}
 
       <RunPanel
         open={open?.from === "advisor"}

@@ -172,6 +172,8 @@ curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setMyCommands" \
   -H 'content-type: application/json' \
   -d '{"commands":[
         {"command":"status","description":"What is waiting for you right now"},
+        {"command":"ask","description":"Ask the Advisor, from your own rows"},
+        {"command":"today","description":"The Reporter on the day"},
         {"command":"help","description":"What this bot can do"},
         {"command":"unlink","description":"Stop sending approvals to this chat"}
       ]}'

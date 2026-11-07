@@ -633,3 +633,34 @@ export type ProposalRow = typeof proposals.$inferSelect;
 export type ApprovalRow = typeof approvals.$inferSelect;
 export type PayoutRow = typeof payouts.$inferSelect;
 export type StorefrontRow = typeof storefronts.$inferSelect;
+
+/**
+ * What the Advisor was asked, and what it answered from.
+ *
+ * The seat itself still writes nothing — this row is written by the service
+ * that ran it, the way `webhook_events` is written by the route rather than
+ * by the sender. Keeping the rows beside the answer is the point: an answer
+ * whose rows you can no longer see is back to being a claim.
+ */
+export const advisorTurns = pgTable(
+  "advisor_turns",
+  {
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(),
+    question: text("question").notNull(),
+    /** One of the six query names; never anything the model composed. */
+    query: text("query").notNull(),
+    why: text("why").notNull(),
+    caption: text("caption").notNull(),
+    rows: jsonb("rows").$type<Record<string, string>[]>().notNull(),
+    answer: text("answer").notNull(),
+    model: text("model").notNull(),
+    pickedBy: text("picked_by").notNull(),
+    tookMs: integer("took_ms").notNull(),
+    askedVia: text("asked_via").$type<"app" | "telegram">().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("advisor_turns_by_owner").on(t.owner, t.createdAt)],
+);
+
+export type AdvisorTurnRow = typeof advisorTurns.$inferSelect;

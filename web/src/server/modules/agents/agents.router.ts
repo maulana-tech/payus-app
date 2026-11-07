@@ -25,6 +25,11 @@ import {
   NothingToChaseError,
   runCollector,
 } from "./collector.agent";
+import {
+  advisorHistory,
+  forgetAdvisorHistory,
+  recordAdvisorTurn,
+} from "./history.service";
 import { runPayer } from "./payer.agent";
 import { runReporter } from "./reporter.agent";
 
@@ -134,11 +139,29 @@ export const agentsRouter = createTRPCRouter({
   /** Asks the Advisor a question; it picks one of our queries to answer it. */
   runAdvisor: protectedProcedure
     .input(z.object({ question: z.string().trim().min(3).max(300) }).strict())
-    .mutation(async ({ ctx, input }) =>
-      runAdvisor(await requireUsername(ctx.privyUserId), input.question).catch(
-        mapError,
-      ),
-    ),
+    .mutation(async ({ ctx, input }) => {
+      const owner = await requireUsername(ctx.privyUserId);
+      const started = Date.now();
+      const answer = await runAdvisor(owner, input.question).catch(mapError);
+      // Recorded by the service that ran it, not by the seat itself. A
+      // failure to keep the transcript must not lose the answer.
+      await recordAdvisorTurn(owner, answer, Date.now() - started, "app").catch(
+        (error: unknown) => {
+          console.error("[advisor] could not keep the turn:", error);
+        },
+      );
+      return answer;
+    }),
+
+  /** The transcript, so a refresh does not throw the conversation away. */
+  advisorHistory: protectedProcedure.query(async ({ ctx }) =>
+    advisorHistory(await requireUsername(ctx.privyUserId)),
+  ),
+
+  forgetAdvisorHistory: protectedProcedure.mutation(async ({ ctx }) => {
+    await forgetAdvisorHistory(await requireUsername(ctx.privyUserId));
+    return { ok: true };
+  }),
 
   /** Asks the Builder to write a storefront from a description, as a draft. */
   runBuilder: protectedProcedure

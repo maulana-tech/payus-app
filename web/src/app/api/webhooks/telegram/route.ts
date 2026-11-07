@@ -6,6 +6,9 @@ import {
   telegramConfigured,
   telegramSecret,
 } from "@/server/lib/telegram";
+import { runAdvisor } from "@/server/modules/agents/advisor.agent";
+import { recordAdvisorTurn } from "@/server/modules/agents/history.service";
+import { runReporter } from "@/server/modules/agents/reporter.agent";
 import {
   approveProposal,
   refuseProposal,
@@ -88,9 +91,25 @@ export async function POST(request: Request) {
  */
 const COMMANDS = [
   ["/status", "What is waiting for you right now"],
+  ["/ask <question>", "Ask the Advisor, from your own rows"],
+  ["/today", "The Reporter's few sentences on the day"],
   ["/help", "This list"],
   ["/unlink", "Stop sending approvals to this chat"],
 ] as const;
+
+/** A table of rows, narrow enough for a phone-width chat window. */
+function rowsAsText(rows: Record<string, string>[], limit = 8): string {
+  if (rows.length === 0) return "(no rows)";
+  const shown = rows.slice(0, limit);
+  const lines = shown.map((row) =>
+    Object.entries(row)
+      .map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`)
+      .join(" · "),
+  );
+  if (rows.length > shown.length)
+    lines.push(`…and ${rows.length - shown.length} more`);
+  return lines.map((line) => escapeHtml(line)).join("\n");
+}
 
 const helpText = (linked: string | null) =>
   [
@@ -179,10 +198,72 @@ async function onMessage(message: NonNullable<Update["message"]>) {
     return;
   }
 
+  if (command === "/ask") {
+    if (!owner) {
+      await sendMessage(chat, helpText(null));
+      return;
+    }
+    const question = text.slice(command.length).trim();
+    if (question.length < 3) {
+      await sendMessage(
+        chat,
+        "Ask me something, like <code>/ask who still owes me money</code>.",
+      );
+      return;
+    }
+    const started = Date.now();
+    try {
+      const reply = await runAdvisor(owner, question);
+      await sendMessage(
+        chat,
+        [
+          escapeHtml(reply.answer),
+          "",
+          `<i>${escapeHtml(reply.caption)} · ${reply.rows.length} row${reply.rows.length === 1 ? "" : "s"}</i>`,
+          rowsAsText(reply.rows),
+        ].join("\n"),
+      );
+      // Same transcript the dashboard reads, with where it came from kept.
+      await recordAdvisorTurn(
+        owner,
+        reply,
+        Date.now() - started,
+        "telegram",
+      ).catch(() => {});
+    } catch (error) {
+      await sendMessage(
+        chat,
+        escapeHtml(
+          error instanceof Error ? error.message : "That did not work.",
+        ),
+      );
+    }
+    return;
+  }
+
+  if (command === "/today") {
+    if (!owner) {
+      await sendMessage(chat, helpText(null));
+      return;
+    }
+    try {
+      const run = await runReporter(owner);
+      await sendMessage(chat, escapeHtml(run.report));
+    } catch (error) {
+      await sendMessage(
+        chat,
+        escapeHtml(
+          error instanceof Error ? error.message : "That did not work.",
+        ),
+      );
+    }
+    return;
+  }
+
   await sendMessage(
     chat,
     owner
-      ? "I only take commands here. Try <code>/status</code>, or <code>/help</code> for the list."
+      ? "I did not recognise that. <code>/help</code> has the list."
       : helpText(null),
   );
 }

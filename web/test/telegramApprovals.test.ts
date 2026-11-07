@@ -201,6 +201,14 @@ describe.skipIf(!available)("telegram approvals (Postgres)", () => {
     expect(after?.status).toBe("awaiting");
     expect(sent.answers.at(-1)).toMatch(/not linked/);
   });
+  it("lists every command it has, not just the two it started with", async () => {
+    sent.messages.length = 0;
+    await startWith(7100, "/help");
+    const listed = sent.messages[0].html;
+    for (const command of ["/status", "/ask", "/today", "/help", "/unlink"])
+      expect(listed).toContain(command);
+  });
+
   it("answers an unlinked chat with what it can do and how to link", async () => {
     sent.messages.length = 0;
     await startWith(7001, "/help");
