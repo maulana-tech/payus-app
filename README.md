@@ -125,14 +125,6 @@ someone's funds is a different promise.
 Without a model configured (`ANTHROPIC_API_KEY`, or Bedrock) the six thinking
 seats are simply off and say so; the rail runs without them.
 
-## Built with AI
-
-Claude Code (Opus) wrote most of this repository alongside its author: the
-commits, the tests and the documents are the record of that work. At runtime
-the six thinking seats call Claude through the Anthropic API or Amazon
-Bedrock — `web/src/server/lib/claude.ts` is the only place a model is
-reached, and `docs/plan.md` has the measurements behind the model choice.
-
 ## Stack
 
 Next.js 15 (App Router) · React 19 · tRPC 11 · Postgres (Drizzle ORM) ·
