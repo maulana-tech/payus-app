@@ -153,6 +153,38 @@ browser could confirm, and what expires stale proposals. On Vercel:
 Postgres is not included either way; Neon or Supabase both work, and
 `DATABASE_URL` is all the app wants.
 
+### The public demo (two modes)
+
+The development shortcut above hands *you* a fixed account on your own
+machine. The public demo is a different thing and runs in production: one
+sandbox per visitor, so a judge can try the flow without an account and
+without standing in anyone else's.
+
+```sh
+NEXT_PUBLIC_PUBLIC_DEMO=true
+DEMO_SECRET=<a long random string>   # falls back to CRON_SECRET
+```
+
+A visitor's sandbox is named `demo-xxxxxxxx` and lives in a signed,
+http-only cookie for two weeks. The hyphen is the isolation: `usernameSchema`
+forbids one, so a demo sandbox can never collide with an account someone
+claimed, and no guessing lands a visitor on a real person's rows.
+
+What a demo account may not do is fenced in code, not by `NODE_ENV`:
+
+- **Never sends a payout.** Payouts can be approved on a sandbox app, and the
+  demo puts a Release button with a free-text destination in front of
+  strangers. `isDemoOwner` forces `payout.simulated` in `payouts.service.ts`.
+- **Never sends email.** `sendEmail` takes a required `owner` — required so
+  the compiler names every call site — and refuses for a demo account.
+  Without it the demo is a way to send mail to any address from a domain you
+  verified.
+- **Never links Telegram**, which would bind a stranger's chat to a sandbox.
+
+Every screen carries a band saying what this is. Demo accounts accumulate,
+one per visitor: there is no cleanup job yet, so delete them between rounds
+if you run this for long.
+
 ### Approvals on Telegram (optional)
 
 Create a bot with [@BotFather](https://t.me/BotFather), put its token in

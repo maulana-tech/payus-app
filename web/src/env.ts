@@ -22,6 +22,12 @@ export const publicEnvSchema = z.object({
    * development — see `lib/demo.ts`.
    */
   NEXT_PUBLIC_DEMO_USER: optionalString,
+  /**
+   * "true" turns on the public demo: a sandbox account per visitor, in
+   * production. Unlike NEXT_PUBLIC_DEMO_USER this is not development-only,
+   * so what a demo account may do is fenced in code rather than by NODE_ENV.
+   */
+  NEXT_PUBLIC_PUBLIC_DEMO: optionalString,
 });
 
 /**
@@ -34,6 +40,7 @@ export function getPublicEnv() {
     NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
     NEXT_PUBLIC_PAYPAL_CLIENT_ID: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID,
     NEXT_PUBLIC_DEMO_USER: process.env.NEXT_PUBLIC_DEMO_USER,
+    NEXT_PUBLIC_PUBLIC_DEMO: process.env.NEXT_PUBLIC_PUBLIC_DEMO,
   });
 }
 

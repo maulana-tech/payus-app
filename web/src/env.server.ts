@@ -15,6 +15,8 @@ export const serverEnvSchema = z.object({
     .default("development"),
   DATABASE_URL: optionalString,
   CRON_SECRET: optionalString,
+  /** Signs the public demo's cookie; falls back to CRON_SECRET. */
+  DEMO_SECRET: optionalString,
   PRIVY_APP_ID: optionalString,
   PRIVY_APP_SECRET: optionalString,
   RESEND_API_KEY: optionalString,
@@ -57,6 +59,7 @@ export function getServerEnv() {
     NODE_ENV: process.env.NODE_ENV,
     DATABASE_URL: process.env.DATABASE_URL,
     CRON_SECRET: process.env.CRON_SECRET,
+    DEMO_SECRET: process.env.DEMO_SECRET,
     PRIVY_APP_ID: process.env.PRIVY_APP_ID,
     PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,

@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { formatMinor } from "../../../features/invoices/money";
+import { isDemoOwner } from "../../../lib/demo";
 import { newId } from "../../../lib/ids";
 import { getDb, telegramLinks } from "../../db/client";
 import {
@@ -32,6 +33,11 @@ export async function telegramStatus(owner: string): Promise<TelegramStatus> {
 
 /** The code to send the bot, made on first ask and kept until it is used. */
 export async function linkCode(owner: string): Promise<string> {
+  // A demo account may not reach a real person's chat. The public demo is
+  // open to anyone, and a code it minted would bind a stranger's Telegram
+  // to a sandbox they do not own.
+  if (isDemoOwner(owner))
+    throw new Error("Approvals on Telegram are off in the demo.");
   const existing = await linkRow(owner);
   if (existing?.chatId) throw new Error("This account is already linked.");
   if (existing?.code) return existing.code;

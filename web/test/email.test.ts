@@ -72,6 +72,7 @@ describe("Email Transport and Templates", () => {
   it("returns not_configured without throwing when RESEND_API_KEY is missing", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
     const result = await sendEmail({
+      owner: "tess",
       to: "client@example.com",
       subject: "Test Subject",
       html: "<p>Hello</p>",
@@ -89,6 +90,7 @@ describe("Email Transport and Templates", () => {
     global.fetch = mockFetch;
 
     const result = await sendEmail({
+      owner: "tess",
       to: "client@example.com",
       subject: "Test Subject",
       html: "<p>Hello</p>",
@@ -127,6 +129,7 @@ describe("Email Transport and Templates", () => {
     global.fetch = mockFetch;
 
     const result = await sendEmail({
+      owner: "tess",
       to: "client@example.com",
       subject: "Test Subject",
       html: "<p>Hello</p>",
@@ -156,6 +159,7 @@ describe("Email Transport and Templates", () => {
     global.fetch = mockFetch;
 
     const result = await sendEmail({
+      owner: "tess",
       to: "invalid-email",
       subject: "Test Subject",
       html: "<p>Hello</p>",
@@ -173,6 +177,7 @@ describe("Email Transport and Templates", () => {
     global.fetch = mockFetch;
 
     const result = await sendEmail({
+      owner: "tess",
       to: "client@example.com",
       subject: "Test Subject",
       html: "<p>Hello</p>",
@@ -188,6 +193,7 @@ describe("Email Transport and Templates", () => {
     global.fetch = mockFetch;
 
     const result = await sendEmail({
+      owner: "tess",
       to: "client@example.com",
       subject: "Test Subject",
       html: "<p>Hello</p>",
@@ -196,5 +202,24 @@ describe("Email Transport and Templates", () => {
 
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("request_failed");
+  });
+});
+
+describe("a demo account may not send", () => {
+  it("refuses before it reaches Resend", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const result = await sendEmail({
+      owner: "demo-a7f3k2zz",
+      to: "someone@example.com",
+      subject: "Hello",
+      html: "<p>Hello</p>",
+      text: "Hello",
+    });
+    expect(result).toEqual({ ok: false, reason: "demo" });
+    // Not "it failed to send" — it never tried. The public demo is open to
+    // anyone, and a send from it would be mail to any address from a domain
+    // someone verified.
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });

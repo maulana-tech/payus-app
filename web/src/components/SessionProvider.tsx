@@ -14,7 +14,7 @@ import {
 } from "react";
 import type { AccountType } from "../features/account/accountType";
 import { DASHBOARD_PATH, SIGN_IN_PATH } from "../lib/auth-routes";
-import { demoMaster, demoUser } from "../lib/demo";
+import { demoMaster, demoUser, publicDemo } from "../lib/demo";
 import { messagingSecret, profileSigningSeed } from "../lib/derive";
 import {
   decryptMaster,
@@ -506,7 +506,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
  * production build and the real session above is the only one.
  */
 function useDemoSession(): SessionState | null {
-  const name = demoUser();
+  const dev = demoUser();
+  // The public demo asks the server which sandbox this visitor is in; the
+  // name lives in a signed, http-only cookie, so the page cannot read it.
+  const [minted, setMinted] = useState<string | null>(null);
+  useEffect(() => {
+    if (dev || !publicDemo()) return;
+    let cancelled = false;
+    void fetch("/api/demo/session")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { username?: string } | null) => {
+        if (!cancelled && body?.username) setMinted(body.username);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [dev]);
+  const name = dev ?? minted;
   return useMemo(() => {
     if (!name) return null;
     const master = demoMaster(name);

@@ -1,5 +1,6 @@
 import type { VerifyAccessTokenResponse } from "@privy-io/node";
-import { demoMode } from "../lib/demo";
+import { demoMode, demoPrivyUserId, publicDemo } from "../lib/demo";
+import { DEMO_COOKIE, demoNameFrom } from "./lib/demoCookie";
 import { verifyPrivyAccessToken } from "./lib/privy";
 import { ensureDemoAccount } from "./modules/demo/demo.service";
 
@@ -61,6 +62,24 @@ export async function createTRPCContext(opts?: {
       authError: null,
       demo: true,
     };
+  }
+
+  // The public demo, which runs in production: a signed cookie naming one
+  // sandbox. It is checked after the real token path below would have been
+  // taken, so a signed-in person is never mistaken for a demo visitor — and
+  // what a demo account may do is fenced by `isDemoOwner`, not by this.
+  if (publicDemo()) {
+    const name = demoNameFrom(cookie(opts.req, DEMO_COOKIE) ?? undefined);
+    if (name && !accessToken(opts.req)) {
+      return {
+        ip: clientIp(opts.req),
+        authToken: null,
+        privyUserId: demoPrivyUserId(name),
+        privyClaim: null,
+        authError: null,
+        demo: true,
+      };
+    }
   }
 
   const token = accessToken(opts.req);

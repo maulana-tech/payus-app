@@ -8,7 +8,7 @@ import {
   REFRESH_PATH,
   SIGN_IN_PATH,
 } from "./lib/auth-routes";
-import { demoMode } from "./lib/demo";
+import { DEMO_COOKIE, demoMode, publicDemo } from "./lib/demo";
 
 const OAUTH_QUERY_KEYS = [
   "privy_oauth_code",
@@ -21,6 +21,12 @@ export function middleware(request: NextRequest) {
   // Demo mode has no cookies to check; `demoMode()` is false outside
   // development, so this cannot open a deployed dashboard.
   if (demoMode()) return NextResponse.next();
+  // The public demo carries a signed cookie instead of a Privy session.
+  // Whether it is valid is decided in the tRPC context, not here: this only
+  // decides whether to send someone to the sign-in page, and a demo visitor
+  // has no sign-in to go to.
+  if (publicDemo() && request.cookies.has(DEMO_COOKIE))
+    return NextResponse.next();
   if (
     pathname === REFRESH_PATH ||
     OAUTH_QUERY_KEYS.some((key) => searchParams.has(key))

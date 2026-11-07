@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { useDashboardMode } from "./DashboardBackground";
+import { DemoBanner } from "./DemoBanner";
 import { NAV_ITEMS, type NavItem } from "./navItems";
 import { dashFocus, dashIconButton } from "./styles";
 
@@ -129,6 +130,7 @@ function DashboardNavLayout({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <DemoBanner />
         <header className="flex h-16 items-center justify-between gap-4 px-(--dashboard-gutter) lg:pr-10 lg:pl-6">
           <div className="flex items-center gap-3">
             <Link

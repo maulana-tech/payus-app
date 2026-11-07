@@ -1,4 +1,5 @@
 import "server-only";
+import { isDemoOwner } from "@/lib/demo";
 import { getServerEnv } from "../../env.server";
 
 export type EmailContent = {
@@ -10,6 +11,8 @@ export type EmailContent = {
 };
 
 export type SendEmailParams = {
+  /** Whose account is sending. Required so no call site can forget it. */
+  owner: string;
   to: string;
   subject: string;
   html: string;
@@ -18,7 +21,10 @@ export type SendEmailParams = {
 
 export type SendEmailResult =
   | { ok: true; id?: string }
-  | { ok: false; reason: "not_configured" | "request_failed" | "timeout" };
+  | {
+      ok: false;
+      reason: "not_configured" | "request_failed" | "timeout" | "demo";
+    };
 
 export function buildEmailHtml(params: EmailContent): string {
   const { title, message, actionLabel, actionUrl, unsubscribeUrl } = params;
@@ -81,6 +87,10 @@ export async function sendEmail(
   params: SendEmailParams,
 ): Promise<SendEmailResult> {
   const env = getServerEnv();
+  // Required, not optional, so the compiler names every call site: the
+  // public demo is open to anyone, and without this it is a way to send
+  // mail to any address from a domain you verified.
+  if (isDemoOwner(params.owner)) return { ok: false, reason: "demo" };
   if (!env.RESEND_API_KEY) {
     return { ok: false, reason: "not_configured" };
   }

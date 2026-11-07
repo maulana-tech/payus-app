@@ -40,6 +40,7 @@ async function dispatch(params: {
     unsubscribeUrl: `${appUrl}/unsubscribe/${settings.unsubscribeToken}`,
   };
   await sendEmail({
+    owner: await usernameOf(params.userId),
     to: settings.email,
     subject: params.email.subject,
     html: buildEmailHtml(content),
@@ -66,6 +67,20 @@ export function notifyInvoicePaid(userId: string, invoice: InvoiceView) {
  * Receipt email to the invoice's client, if they left an address. The client
  * is not a user, so there are no settings; the event log keeps it to one email.
  */
+
+/**
+ * The username behind a Privy id, for the one thing `sendEmail` needs to
+ * know: whether this is a demo account, which may not send at all.
+ */
+async function usernameOf(userId: string): Promise<string> {
+  const [row] = await getDb()
+    .select({ username: profiles.username })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+  return row?.username ?? userId;
+}
+
 export async function emailInvoiceClient(
   invoice: InvoiceView,
   clientEmail: string,
@@ -88,6 +103,7 @@ export async function emailInvoiceClient(
     actionUrl: `${appUrl}/i/${invoice.token}`,
   };
   await sendEmail({
+    owner: invoice.username,
     to: clientEmail,
     subject: `Receipt for invoice ${invoice.number}`,
     html: buildEmailHtml(content),
@@ -121,6 +137,7 @@ async function emailInvoiceLink(
           actionUrl: `${appUrl}/i/${invoice.token}`,
         };
   await sendEmail({
+    owner: invoice.username,
     to: clientEmail,
     subject: content.title,
     html: buildEmailHtml(content),
@@ -201,6 +218,7 @@ export async function sendTestEmail(userId: string): Promise<boolean> {
     unsubscribeUrl: `${appUrl}/unsubscribe/${settings.unsubscribeToken}`,
   };
   const res = await sendEmail({
+    owner: await usernameOf(userId),
     to: settings.email,
     subject: `${APP_NAME}: test email`,
     html: buildEmailHtml(content),
@@ -231,6 +249,7 @@ export async function emailCollectorLetter(input: {
     actionUrl: `${appUrl}/i/${input.invoice.token}`,
   };
   await sendEmail({
+    owner: input.invoice.username,
     to: input.clientEmail,
     subject: input.subject,
     html: buildEmailHtml(content),

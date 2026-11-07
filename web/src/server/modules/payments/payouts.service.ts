@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
 import { DEFAULT_CURRENCY } from "../../../features/invoices/money";
+import { isDemoOwner } from "../../../lib/demo";
 import { newId } from "../../../lib/ids";
 import { getDb, isUniqueViolation, payouts } from "../../db/client";
 import { createPayout, payoutsEnabled } from "../../lib/paypal";
@@ -126,7 +127,12 @@ export async function releasePayout(
     throw error;
   }
 
-  const simulated = !payoutsEnabled();
+  // A demo account never sends. Payouts can be approved on a sandbox app,
+  // and the public demo puts a Release button in front of strangers with a
+  // free-text destination — so the one thing it may not do is reach PayPal
+  // with it. Recorded as `payout.simulated` and labelled as such, the way
+  // any deployment without the permission already behaves.
+  const simulated = !payoutsEnabled() || isDemoOwner(owner);
   let providerBatch: string | null = null;
   if (!simulated) {
     try {

@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { publicDemo } from "@/lib/demo";
 import { cn } from "@/lib/utils";
 import { useSession } from "../../SessionProvider";
 import { mono } from "./styles";
@@ -35,11 +36,15 @@ export function Cta({ className }: { className?: string }) {
     <>
       {connecting
         ? "Signing in…"
-        : authenticated
-          ? username
-            ? `Open @${username}`
-            : "Open the app"
-          : "Get started"}
+        : // A generated sandbox name is not an identity anyone recognises,
+          // so the public demo says what the button does instead.
+          publicDemo()
+          ? "Try the demo"
+          : authenticated
+            ? username
+              ? `Open @${username}`
+              : "Open the app"
+            : "Get started"}
       <span className="flex size-6 items-center justify-center rounded-[2px] border border-ed-cream/30 transition-transform group-hover:translate-x-0.5">
         <ArrowRight className="size-3" aria-hidden="true" />
       </span>

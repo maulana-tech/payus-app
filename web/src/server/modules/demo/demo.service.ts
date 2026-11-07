@@ -22,10 +22,19 @@ import { getDb, profiles, users } from "../../db/client";
 
 let ensured: string | null = null;
 
-/** Creates the demo account if it is missing. Returns its Privy-shaped id. */
+/** Creates the development demo account if it is missing. */
 export async function ensureDemoAccount(): Promise<string | null> {
   const username = demoUser();
   if (!username) return null;
+  return ensureDemoAccountFor(username);
+}
+
+/**
+ * Creates one demo account. The public demo calls this with a name of its
+ * own per visitor, which is why it takes one rather than reading the
+ * environment: two sandboxes that share an account are one sandbox.
+ */
+export async function ensureDemoAccountFor(username: string): Promise<string> {
   const userId = demoPrivyUserId(username);
   if (ensured === userId) return userId;
 
@@ -68,9 +77,7 @@ export async function ensureDemoAccount(): Promise<string | null> {
     .where(eq(profiles.username, username))
     .limit(1);
   if (row?.userId !== userId)
-    throw new Error(
-      `@${username} already belongs to another account; pick a different NEXT_PUBLIC_DEMO_USER.`,
-    );
+    throw new Error(`@${username} already belongs to another account.`);
 
   ensured = userId;
   return userId;
