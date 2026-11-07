@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AccountTypeDialog } from "../src/components/AccountTypeDialog";
 import { NAV_ITEMS } from "../src/components/dashboard/navItems";
@@ -101,8 +101,13 @@ describe("AccountTypeDialog", () => {
         recoveryMethod="pin"
       />,
     );
+    // Scoped to the list: below `sm` the current step is also printed under
+    // the track as an aria-hidden line, so the bare text appears twice.
+    const steps = within(
+      screen.getByRole("list", { name: "Onboarding steps" }),
+    );
     for (const label of ONBOARDING_STEPS) {
-      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(steps.getByText(label)).toBeInTheDocument();
     }
     expect(screen.getByText("@demo")).toBeInTheDocument();
     expect(screen.getByText("A 6-digit PIN")).toBeInTheDocument();

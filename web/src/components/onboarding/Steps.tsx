@@ -21,32 +21,37 @@ export function OnboardingStep({ step }: { step: OnboardingStepNumber }) {
       <p className="text-[10px] font-semibold tracking-[0.18em] text-foreground/70 uppercase">
         Step {step} of {ONBOARDING_STEPS.length}
       </p>
-      <ol className="flex flex-wrap gap-x-4 gap-y-2">
+
+      {/* One track, not three loose marks. The bars used to be 1px hairlines
+          separated by the gap between their labels, which read as three
+          unrelated rules; and below `sm` only the current one was rendered,
+          so a phone showed no progress at all — the count in words was the
+          only clue left. The track now survives every width. */}
+      <ol aria-label="Onboarding steps" className="grid grid-cols-3 gap-1.5">
         {ONBOARDING_STEPS.map((label, i) => {
           const position = i + 1;
-          const done = position < step;
+          const reached = position <= step;
           const current = position === step;
           return (
             <li
               key={label}
-              // The step on screen is the only one that has to fit a phone;
-              // the rest are context and may fall away. No opacity on the
-              // row: dimming a container multiplies with the label's own
-              // colour, and two 60% labels inside a 70% row measured 3:1.
-              className={cn("grid gap-1.5", current ? "" : "hidden sm:grid")}
+              aria-current={current ? "step" : undefined}
+              className="grid gap-1.5"
             >
               <span
                 aria-hidden="true"
                 className={cn(
-                  "block h-px w-14",
-                  done || current ? "bg-foreground" : "bg-foreground/30",
+                  "block h-1 rounded-full transition-colors",
+                  reached ? "bg-foreground" : "bg-foreground/25",
                 )}
               />
-              {/* State is carried by the rule above and the weight here, not
-                  by fading the words — every label stays at 5.9:1 or better. */}
+              {/* A column is about 110px on a phone, not enough for "How
+                  you'll use it", so there the names are read out but not
+                  drawn — the one being answered is printed under the whole
+                  track instead, where it has the width to sit straight. */}
               <span
                 className={cn(
-                  "text-[11px] tracking-[0.1em]",
+                  "sr-only text-[11px] leading-tight tracking-[0.1em] sm:not-sr-only sm:block",
                   current
                     ? "font-semibold text-foreground"
                     : "text-foreground/70",
@@ -54,12 +59,22 @@ export function OnboardingStep({ step }: { step: OnboardingStepNumber }) {
               >
                 {label}
                 {current ? <span className="sr-only"> (this step)</span> : null}
-                {done ? <span className="sr-only"> (done)</span> : null}
+                {reached && !current ? (
+                  <span className="sr-only"> (done)</span>
+                ) : null}
               </span>
             </li>
           );
         })}
       </ol>
+
+      {/* aria-hidden: the list above already names this step to a reader. */}
+      <p
+        aria-hidden="true"
+        className="text-[11px] font-semibold tracking-[0.1em] text-foreground sm:hidden"
+      >
+        {ONBOARDING_STEPS[step - 1]}
+      </p>
     </div>
   );
 }
