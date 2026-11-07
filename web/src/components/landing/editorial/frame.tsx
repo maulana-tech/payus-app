@@ -15,6 +15,8 @@ export const SECTIONS: { id: string; label: string; quiet?: boolean }[] = [
   // quiet: the section carries its own index, so the rail shows only its tick
   { id: "team", label: "The table", quiet: true },
   { id: "ways", label: "Ways to be paid" },
+  { id: "settles", label: "Splits & refunds" },
+  { id: "brought", label: "Your own files" },
   { id: "terms", label: "The terms" },
   { id: "questions", label: "Questions" },
 ];

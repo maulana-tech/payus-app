@@ -3,7 +3,16 @@
 import { ReactLenis } from "lenis/react";
 import { Council } from "./council";
 import { Frame } from "./frame";
-import { Chapter, Closing, Hero, Questions, Terms, Ways } from "./sections";
+import {
+  Brought,
+  Chapter,
+  Closing,
+  Hero,
+  Questions,
+  Settles,
+  Terms,
+  Ways,
+} from "./sections";
 
 /**
  * The landing: a fixed hairline frame over full-bleed painted loops, with
@@ -33,6 +42,11 @@ export function EditorialLanding() {
           />
           <Council />
           <Ways />
+          {/* What a payment writes, then what happens to it, then what you
+              can bring to it — the rail first and the reasoning after, so
+              the claims arrive in the order they depend on each other. */}
+          <Settles />
+          <Brought />
           <Terms />
           <Questions />
         </main>
