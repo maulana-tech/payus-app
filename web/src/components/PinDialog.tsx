@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader } from "lucide-react";
+import { Eye, EyeOff, Loader } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
@@ -39,6 +39,9 @@ export function PinDialog({
   const [localError, setLocalError] = useState("");
   const [pinState, setPinState] = useState<ValidationState>("idle");
   const [confirmState, setConfirmState] = useState<ValidationState>("idle");
+  // One toggle for both fields: they are the same secret being typed twice,
+  // and hiding one while showing the other helps nobody.
+  const [shown, setShown] = useState(false);
   const pinRef = useRef<HTMLInputElement>(null);
   const pinId = useId();
   const confirmId = useId();
@@ -139,28 +142,31 @@ export function PinDialog({
             >
               {dualField ? "New PIN" : "PIN"}
             </label>
-            <Input
-              ref={pinRef}
-              appearance="linen"
-              id={pinId}
-              autoFocus
-              className={validationClass(pinState)}
-              type="password"
-              inputMode="numeric"
-              autoComplete={dualField ? "new-password" : "current-password"}
-              placeholder="••••••"
-              value={pin}
-              maxLength={6}
-              disabled={submitting}
-              aria-invalid={pinState === "invalid" || undefined}
-              onChange={(e) => {
-                setPin(onlyDigits(e.target.value));
-                setPinState("idle");
-                setConfirmState("idle");
-                setLocalError("");
-              }}
-              onBlur={validatePin}
-            />
+            <div className="relative">
+              <Input
+                ref={pinRef}
+                appearance="linen"
+                id={pinId}
+                autoFocus
+                className={cn(validationClass(pinState), "pr-11")}
+                type={shown ? "text" : "password"}
+                inputMode="numeric"
+                autoComplete={dualField ? "new-password" : "current-password"}
+                placeholder="••••••"
+                value={pin}
+                maxLength={6}
+                disabled={submitting}
+                aria-invalid={pinState === "invalid" || undefined}
+                onChange={(e) => {
+                  setPin(onlyDigits(e.target.value));
+                  setPinState("idle");
+                  setConfirmState("idle");
+                  setLocalError("");
+                }}
+                onBlur={validatePin}
+              />
+              <PinReveal shown={shown} onToggle={() => setShown((s) => !s)} />
+            </div>
           </div>
 
           {dualField ? (
@@ -171,25 +177,28 @@ export function PinDialog({
               >
                 Confirm PIN
               </label>
-              <Input
-                appearance="linen"
-                id={confirmId}
-                className={validationClass(confirmState)}
-                type="password"
-                inputMode="numeric"
-                autoComplete="new-password"
-                placeholder="••••••"
-                value={confirm}
-                maxLength={6}
-                disabled={submitting}
-                aria-invalid={confirmState === "invalid" || undefined}
-                onChange={(e) => {
-                  setConfirm(onlyDigits(e.target.value));
-                  setConfirmState("idle");
-                  setLocalError("");
-                }}
-                onBlur={validateConfirm}
-              />
+              <div className="relative">
+                <Input
+                  appearance="linen"
+                  id={confirmId}
+                  className={cn(validationClass(confirmState), "pr-11")}
+                  type={shown ? "text" : "password"}
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  placeholder="••••••"
+                  value={confirm}
+                  maxLength={6}
+                  disabled={submitting}
+                  aria-invalid={confirmState === "invalid" || undefined}
+                  onChange={(e) => {
+                    setConfirm(onlyDigits(e.target.value));
+                    setConfirmState("idle");
+                    setLocalError("");
+                  }}
+                  onBlur={validateConfirm}
+                />
+                <PinReveal shown={shown} onToggle={() => setShown((s) => !s)} />
+              </div>
             </div>
           ) : null}
 
@@ -225,5 +234,36 @@ function validationClass(state: ValidationState): string {
     "min-h-11 text-center tracking-[0.5em]",
     state === "valid" && "border-emerald-600 ring-1 ring-emerald-600/25",
     state === "invalid" && "border-destructive ring-1 ring-destructive/30",
+  );
+}
+
+/**
+ * Shows the digits that were just typed. A six-digit PIN that cannot be read
+ * back is a PIN people set wrong and then cannot unlock with — and the usual
+ * answer, typing it twice, only tells you the two matched, not what they say.
+ */
+function PinReveal({
+  shown,
+  onToggle,
+}: {
+  shown: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={shown}
+      aria-label={shown ? "Hide the PIN" : "Show the PIN"}
+      // Outside the input's own tab order would be wrong — it belongs to the
+      // field — but it must not come before it either.
+      className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-lg text-foreground/70 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground/70 focus-visible:outline-none"
+    >
+      {shown ? (
+        <EyeOff className="size-4" aria-hidden="true" />
+      ) : (
+        <Eye className="size-4" aria-hidden="true" />
+      )}
+    </button>
   );
 }

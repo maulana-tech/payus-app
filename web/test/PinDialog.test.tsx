@@ -149,3 +149,42 @@ describe("PinDialog — secure (re-key) mode", () => {
     expect(onSubmit).toHaveBeenCalledWith("112233");
   });
 });
+
+// A six-digit PIN that cannot be read back is one people set wrong and then
+// cannot unlock with. Typing it twice only proves the two matched.
+describe("PinDialog — showing the digits", () => {
+  it("reveals and hides the PIN, and says which it will do", async () => {
+    setup();
+    const field = screen.getByLabelText("PIN") as HTMLInputElement;
+    await userEvent.type(field, "123456");
+    expect(field.type).toBe("password");
+
+    const reveal = screen.getByRole("button", { name: "Show the PIN" });
+    expect(reveal).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(reveal);
+
+    expect(field.type).toBe("text");
+    expect(
+      screen.getByRole("button", { name: "Hide the PIN" }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(screen.getByRole("button", { name: "Hide the PIN" }));
+    expect(field.type).toBe("password");
+  });
+
+  it("shows both fields together when a PIN is being set", async () => {
+    setup({ mode: "set" });
+    const next = screen.getByLabelText("New PIN") as HTMLInputElement;
+    const confirm = screen.getByLabelText("Confirm PIN") as HTMLInputElement;
+    expect(next.type).toBe("password");
+    expect(confirm.type).toBe("password");
+
+    // One toggle for one secret: hiding one while showing the other would
+    // help nobody.
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "Show the PIN" })[0],
+    );
+    expect(next.type).toBe("text");
+    expect(confirm.type).toBe("text");
+  });
+});

@@ -64,9 +64,13 @@ export function AccountTypeDialog({
     <Dialog open={open}>
       <DialogContent
         appearance="linen"
-        size="md"
+        size="lg"
         showCloseButton={false}
-        className="max-h-[90svh] overflow-y-auto"
+        // Wide rather than tall: three stacked cards ran past the bottom of
+        // a laptop screen, so the third choice was below the fold and the
+        // three were never seen together — which is the whole point of
+        // putting them side by side.
+        className="max-h-[90svh] overflow-y-auto sm:max-w-4xl"
       >
         <DialogHeader className="px-1">
           <OnboardingStep step={3} />
@@ -95,7 +99,11 @@ export function AccountTypeDialog({
           ]}
         />
 
-        <div className="grid gap-3" role="radiogroup" aria-label="Account type">
+        <div
+          className="grid gap-3 sm:grid-cols-3"
+          role="radiogroup"
+          aria-label="Account type"
+        >
           {ACCOUNT_TYPES.map(({ type, label, summary, tools, goodIf }, i) => (
             <ChoiceCard
               key={type}

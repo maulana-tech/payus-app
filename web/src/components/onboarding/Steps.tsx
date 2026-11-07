@@ -77,7 +77,10 @@ export function OnboardingSettled({
 }) {
   if (items.length === 0) return null;
   return (
-    <dl className="grid gap-1.5 border-t border-foreground/12 pt-3">
+    // The same measure the dialog gives its description (400px): in the wide
+    // step-3 dialog an unconstrained list stretched the full 848px while the
+    // paragraph above it stopped less than half way, which read as a mistake.
+    <dl className="grid max-w-md gap-1.5 border-t border-foreground/12 pt-3">
       {items.map((item) => (
         <div
           key={item.label}

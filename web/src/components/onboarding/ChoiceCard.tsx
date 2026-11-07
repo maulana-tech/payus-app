@@ -76,12 +76,12 @@ export function ChoiceCard({
       </span>
 
       {rows?.length ? (
-        <span className="grid gap-1.5 border-t border-foreground/12 pt-3">
+        <span className="grid gap-2.5 border-t border-foreground/12 pt-3">
           {rows.map((row) => (
-            <span
-              key={row.label}
-              className="grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-3"
-            >
+            // Label above value, not beside it: in a column one third of the
+            // dialog wide, a 5.5rem label column left the answer too narrow
+            // to read.
+            <span key={row.label} className="grid gap-0.5">
               <span className="text-[10px] font-semibold tracking-[0.16em] text-foreground/70 uppercase">
                 {row.label}
               </span>
