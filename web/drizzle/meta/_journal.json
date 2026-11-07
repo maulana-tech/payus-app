@@ -78,6 +78,13 @@
       "when": 1794036990962,
       "tag": "0010_fluffy_shadow_king",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794040948534,
+      "tag": "0011_powerful_albert_cleary",
+      "breakpoints": true
     }
   ]
 }

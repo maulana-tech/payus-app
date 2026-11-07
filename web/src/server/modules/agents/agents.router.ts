@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { linesOf, reconcile } from "@/features/reconcile/match";
+import { MAX_TEXT_CHARS } from "@/features/uploads/extract";
 import {
   MAX_UPLOAD_CHARS,
   parseTable,
@@ -25,7 +26,11 @@ import {
 import { emailCollectorLetter } from "../notifications/notifications.service";
 import { appOrigin } from "../payments/applyPayment";
 import { requireUsername } from "../profiles/profiles.service";
-import { runAdvisor, runAdvisorOnTable } from "./advisor.agent";
+import {
+  runAdvisor,
+  runAdvisorOnDocument,
+  runAdvisorOnTable,
+} from "./advisor.agent";
 import { runAllocator } from "./allocator.agent";
 import { runBuilder } from "./builder.agent";
 import {
@@ -194,6 +199,36 @@ export const agentsRouter = createTRPCRouter({
       const answer = await runAdvisorOnTable(input.question, {
         name: input.name,
         rows: table.rows,
+      }).catch(mapError);
+      await recordAdvisorTurn(owner, answer, Date.now() - started, "app").catch(
+        (error: unknown) => {
+          console.error("[advisor] could not keep the turn:", error);
+        },
+      );
+      return answer;
+    }),
+
+  /**
+   * A document, read for its words. The text arrives already extracted in
+   * the browser: a PDF and a .docx are container formats with a long
+   * history of parser bugs, and the server has no reason to meet one.
+   */
+  askAboutDocument: protectedProcedure
+    .input(
+      z
+        .object({
+          question: z.string().trim().min(3).max(300),
+          name: z.string().trim().min(1).max(120),
+          text: z.string().trim().min(1).max(MAX_TEXT_CHARS),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const owner = await requireUsername(ctx.privyUserId);
+      const started = Date.now();
+      const answer = await runAdvisorOnDocument(input.question, {
+        name: input.name,
+        text: input.text,
       }).catch(mapError);
       await recordAdvisorTurn(owner, answer, Date.now() - started, "app").catch(
         (error: unknown) => {

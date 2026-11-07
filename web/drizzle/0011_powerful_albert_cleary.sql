@@ -1,0 +1,1 @@
+ALTER TABLE "advisor_turns" ADD COLUMN "source" text DEFAULT 'ledger' NOT NULL;

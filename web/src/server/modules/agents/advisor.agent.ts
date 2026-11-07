@@ -209,8 +209,19 @@ and leave the arithmetic to them.
 Answer the question that was asked, including when the answer is bad news or
 is "the rows do not say". No headings, no bullets, no greeting.`;
 
+/**
+ * Where the rows came from, and so how much the answer can be trusted.
+ *
+ * `ledger` and `table` both end at the figures check — a number that is not
+ * in the rows throws the answer away. `document` cannot: prose has no rows,
+ * so nothing checks it, and the screen has to say so rather than let the
+ * two look alike.
+ */
+export type AdvisorSource = "ledger" | "table" | "document";
+
 export type AdvisorAnswer = {
   question: string;
+  source: AdvisorSource;
   query: string;
   /** The Advisor's own line on why that query would settle the question. */
   why: string;
@@ -256,6 +267,7 @@ export async function runAdvisor(
 
   return {
     question,
+    source: "ledger",
     query: query.name,
     why: parsedPick.data.why,
     caption,
@@ -353,11 +365,66 @@ export async function runAdvisorOnTable(
   );
   return {
     question,
+    source: "table",
     query: "uploaded file",
     why: `Read ${file.name}, which you attached. Nothing from your ledger was used.`,
     caption,
     rows: file.rows,
     answer,
+    model: `${completion.model}@${completion.promptVersion}`,
+    pickedBy: "—",
+  };
+}
+
+const DOCUMENT_SYSTEM = `You are the Advisor at Payus. Someone has attached a
+document — a contract, a quote, a statement of work — and asked about it.
+
+Answer only from what the document says. Quote the wording where the answer
+turns on it. If the document does not settle the question, say so plainly
+rather than filling the gap: "it does not say" is a useful answer and a
+guess is not. You have no access to their ledger here, so do not describe
+what is or is not in their books.`;
+
+/**
+ * The same seat, reading a document instead of rows.
+ *
+ * The guarantee here is weaker, and the screen has to say so. Every other
+ * answer this seat gives is checked against rows — a figure it was not
+ * given throws the answer away. Prose has no rows, so there is nothing to
+ * check it against: what comes back is the model's reading of the words.
+ * Saying that plainly is the only honest way to offer it.
+ */
+export async function runAdvisorOnDocument(
+  question: string,
+  file: { name: string; text: string },
+  options: { ask?: typeof askForJson } = {},
+): Promise<AdvisorAnswer> {
+  const ask = options.ask ?? askForJson;
+  if (!options.ask && !claudeConfigured()) throw new ClaudeNotConfiguredError();
+
+  const completion: Completion = await ask({
+    system: DOCUMENT_SYSTEM,
+    prompt: [
+      `The question: ${question}`,
+      "",
+      `The document (${file.name}):`,
+      file.text,
+    ].join("\n"),
+    schema: ANSWER_SCHEMA as unknown as Record<string, unknown>,
+    effort: "medium",
+  });
+  const parsed = answered.safeParse(completion.json);
+  if (!parsed.success)
+    throw new ClaudeShapeError("The Advisor answered in an unusable shape.");
+
+  return {
+    question,
+    source: "document",
+    query: "a document you attached",
+    why: `Read ${file.name}. There are no rows behind this answer, so it is not checked the way a ledger answer is.`,
+    caption: file.name,
+    rows: [],
+    answer: parsed.data.answer,
     model: `${completion.model}@${completion.promptVersion}`,
     pickedBy: "—",
   };

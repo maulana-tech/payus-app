@@ -31,6 +31,7 @@ export async function recordAdvisorTurn(
       owner,
       question: answer.question,
       query: answer.query,
+      source: answer.source,
       why: answer.why,
       caption: answer.caption,
       rows: answer.rows,
@@ -56,6 +57,7 @@ export async function advisorHistory(
   return rows.reverse().map((row) => ({
     id: row.id,
     question: row.question,
+    source: row.source,
     query: row.query,
     why: row.why,
     caption: row.caption,

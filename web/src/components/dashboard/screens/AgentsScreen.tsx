@@ -38,6 +38,7 @@ type Turn =
       from: "advisor";
       text: string;
       question: string;
+      source: "ledger" | "table" | "document";
       query: string;
       why: string;
       caption: string;
@@ -84,6 +85,7 @@ function answered(
   reply: {
     answer: string;
     question: string;
+    source: "ledger" | "table" | "document";
     query: string;
     why: string;
     caption: string;
@@ -97,6 +99,7 @@ function answered(
     from: "advisor",
     text: reply.answer,
     question: reply.question,
+    source: reply.source,
     query: reply.query,
     why: reply.why,
     caption: reply.caption,
@@ -125,6 +128,7 @@ export function AgentsScreen() {
       from: "advisor" as const,
       text: turn.answer,
       question: turn.question,
+      source: turn.source,
       query: turn.query,
       why: turn.why,
       caption: turn.caption,
@@ -140,7 +144,12 @@ export function AgentsScreen() {
   // A file is attached to the next question only. Nothing is uploaded until
   // something is asked about it, and the bytes never leave this page — only
   // the text does, and only once.
-  const [file, setFile] = useState<{ name: string; csv: string } | null>(null);
+  const [file, setFile] = useState<
+    | { kind: "table"; name: string; csv: string }
+    | { kind: "document"; name: string; text: string }
+    | null
+  >(null);
+  const [reading, setReading] = useState(false);
   const [fileError, setFileError] = useState("");
   const picker = useRef<HTMLInputElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
@@ -152,6 +161,11 @@ export function AgentsScreen() {
   const check = trpc.agents.reconcileTable.useMutation({
     onSuccess: (report) =>
       setFresh((t) => [...t, { from: "reconciled", report }]),
+    onError: (error) =>
+      setFresh((t) => [...t, { from: "refused", text: error.message }]),
+  });
+  const onDocument = trpc.agents.askAboutDocument.useMutation({
+    onSuccess: (reply) => setFresh((t) => [...t, answered(reply, started)]),
     onError: (error) =>
       setFresh((t) => [...t, { from: "refused", text: error.message }]),
   });
@@ -168,7 +182,12 @@ export function AgentsScreen() {
       setFresh((t) => [...t, { from: "refused", text: error.message }]),
   });
 
-  const busy = ask.isPending || onTable.isPending || check.isPending;
+  const busy =
+    ask.isPending ||
+    onTable.isPending ||
+    onDocument.isPending ||
+    check.isPending ||
+    reading;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: follow the tail
   useEffect(() => {
@@ -181,8 +200,13 @@ export function AgentsScreen() {
     setFresh((t) => [...t, { from: "you", text: q, attached: file?.name }]);
     setText("");
     started.current = Date.now();
-    if (file) {
+    if (file?.kind === "table") {
       onTable.mutate({ question: q, name: file.name, csv: file.csv });
+      setFile(null);
+      return;
+    }
+    if (file?.kind === "document") {
+      onDocument.mutate({ question: q, name: file.name, text: file.text });
       setFile(null);
       return;
     }
@@ -197,13 +221,25 @@ export function AgentsScreen() {
       );
       return;
     }
-    if (!/\.(csv|tsv|txt)$/i.test(picked.name)) {
-      setFileError(
-        "For now this reads CSV. Spreadsheets and PDFs are next; export a CSV in the meantime.",
-      );
+    if (/\.(csv|tsv)$/i.test(picked.name)) {
+      setFile({ kind: "table", name: picked.name, csv: await picked.text() });
       return;
     }
-    setFile({ name: picked.name, csv: await picked.text() });
+    // A PDF and a .docx are read here, in the page. Both are container
+    // formats with a long history of parser bugs, and the server has no
+    // reason to meet one: it is sent the words and never the file.
+    setReading(true);
+    try {
+      const { extractText } = await import("@/features/uploads/extract");
+      const read = await extractText(picked);
+      setFile({ kind: "document", name: read.name, text: read.text });
+    } catch (error) {
+      setFileError(
+        error instanceof Error ? error.message : "That file could not be read.",
+      );
+    } finally {
+      setReading(false);
+    }
   };
 
   if (status.data && !status.data.configured)
@@ -253,7 +289,7 @@ export function AgentsScreen() {
           <input
             ref={picker}
             type="file"
-            accept=".csv,.tsv,.txt,text/csv"
+            accept=".csv,.tsv,.pdf,.docx,.txt,.md"
             // The paperclip is the control; this is the mechanism behind it.
             // Named anyway, because a hidden input with no label is still a
             // form element to a screen reader, and out of the tab order so
@@ -278,32 +314,36 @@ export function AgentsScreen() {
           {file ? (
             <span className="flex min-w-0 items-center gap-1.5 rounded-full bg-(--dash-tint) py-1 pr-1 pl-3 text-[11px]">
               <span className="truncate">{file.name}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const today = new Date();
-                  const from = new Date(today);
-                  from.setUTCDate(from.getUTCDate() - 180);
-                  setFresh((t) => [
-                    ...t,
-                    {
-                      from: "you",
-                      text: "Check this against my books.",
-                      attached: file.name,
-                    },
-                  ]);
-                  check.mutate({
-                    name: file.name,
-                    csv: file.csv,
-                    from: from.toISOString().slice(0, 10),
-                    to: today.toISOString().slice(0, 10),
-                  });
-                  setFile(null);
-                }}
-                className={`rounded-full bg-(--dash-fg) px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-(--dash-surface) uppercase ${dashFocus}`}
-              >
-                Reconcile
-              </button>
+              {/* Only a table can be put against the books; a contract has
+                  nothing to reconcile. */}
+              {file.kind === "table" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = new Date();
+                    const from = new Date(today);
+                    from.setUTCDate(from.getUTCDate() - 180);
+                    setFresh((t) => [
+                      ...t,
+                      {
+                        from: "you",
+                        text: "Check this against my books.",
+                        attached: file.name,
+                      },
+                    ]);
+                    check.mutate({
+                      name: file.name,
+                      csv: file.csv,
+                      from: from.toISOString().slice(0, 10),
+                      to: today.toISOString().slice(0, 10),
+                    });
+                    setFile(null);
+                  }}
+                  className={`rounded-full bg-(--dash-fg) px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-(--dash-surface) uppercase ${dashFocus}`}
+                >
+                  Reconcile
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setFile(null)}
@@ -315,7 +355,9 @@ export function AgentsScreen() {
             </span>
           ) : (
             <p className="truncate text-[11px] text-(--dash-ash)">
-              Reads your rows. It has no write access of any kind.
+              {reading
+                ? "Reading the document…"
+                : "Reads your rows. It has no write access of any kind."}
             </p>
           )}
         </div>
@@ -407,7 +449,11 @@ export function AgentsScreen() {
                   ) : (
                     <>
                       <p className="text-[15px] leading-relaxed">{turn.text}</p>
-                      <Rows caption={turn.caption} rows={turn.rows} />
+                      {turn.source === "document" ? (
+                        <Unchecked name={turn.caption} />
+                      ) : (
+                        <Rows caption={turn.caption} rows={turn.rows} />
+                      )}
                       <RunBar
                         query={turn.query}
                         rows={turn.rows.length}
@@ -478,6 +524,24 @@ export function AgentsScreen() {
         {open?.from === "advisor" ? <RunDetail turn={open} /> : null}
       </RunPanel>
     </div>
+  );
+}
+
+/**
+ * The one answer this seat gives that nothing checks.
+ *
+ * Every other answer is held to its rows — a figure it was not given throws
+ * the answer away. A document has no rows, so the model's arithmetic and
+ * its reading both stand unverified. That is worth offering and not worth
+ * hiding, so it is said on every one of them.
+ */
+function Unchecked({ name }: { name: string }) {
+  return (
+    <p className="border-t border-(--dash-line) pt-3 text-sm text-(--dash-ash)">
+      Read from <span className="text-(--dash-fg)">{name}</span>. There are no
+      rows behind this one, so nothing checked the figures in it — unlike an
+      answer from your ledger. Worth reading against the document itself.
+    </p>
   );
 }
 

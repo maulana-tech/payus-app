@@ -650,6 +650,12 @@ export const advisorTurns = pgTable(
     question: text("question").notNull(),
     /** One of the six query names; never anything the model composed. */
     query: text("query").notNull(),
+    /** Which of the three sources the rows came from — and so whether the
+     * figures in the answer were checked at all. */
+    source: text("source")
+      .$type<"ledger" | "table" | "document">()
+      .notNull()
+      .default("ledger"),
     why: text("why").notNull(),
     caption: text("caption").notNull(),
     rows: jsonb("rows").$type<Record<string, string>[]>().notNull(),
