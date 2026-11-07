@@ -10,6 +10,7 @@ import {
   navFor,
 } from "../src/features/account/accountType";
 import {
+  AGENTS_PATH,
   DASHBOARD_PATH,
   DEVELOPERS_PATH,
   INVOICES_PATH,
@@ -26,12 +27,14 @@ describe("account type navigation", () => {
     expect(hiddenFor(null, NAV_ITEMS)).toEqual([]);
   });
 
-  it("puts invoices first for a business", () => {
+  it("puts invoices first for a business, after the two every type has", () => {
     const nav = hrefs(navFor("business", NAV_ITEMS));
-    // The point is the order of the first few, not the whole list: adding a
-    // page in the middle should not break this.
-    expect(nav.slice(0, 3)).toEqual([
+    // Overview and Agents lead for everyone; what follows is what the
+    // account type is for. The point is the order of the first few, not the
+    // whole list — adding a page further down should not break this.
+    expect(nav.slice(0, 4)).toEqual([
       DASHBOARD_PATH,
+      AGENTS_PATH,
       INVOICES_PATH,
       TRANSACTIONS_PATH,
     ]);

@@ -252,7 +252,46 @@ export async function runAdvisor(
     throw new ClaudeShapeError("The Advisor did not choose a query we have.");
 
   const { rows, caption } = await query.run(owner);
+  const { answer, completion } = await answerFrom(ask, question, caption, rows);
 
+  return {
+    question,
+    query: query.name,
+    why: parsedPick.data.why,
+    caption,
+    rows,
+    answer,
+    model: `${completion.model}@${completion.promptVersion}`,
+    pickedBy: `${chosen.model}@${chosen.promptVersion}`,
+  };
+}
+
+/**
+ * Every value in the rows, as the allowed figures. The row count is allowed
+ * too: "you have four open invoices" is a reading, not a calculation.
+ */
+export function figuresIn(rows: Row[]): Record<string, string> {
+  const figures: Record<string, string> = { rows: String(rows.length) };
+  rows.forEach((row, index) => {
+    for (const [key, value] of Object.entries(row))
+      figures[`${index}.${key}`] = value;
+  });
+  return figures;
+}
+
+/**
+ * The answer step, shared by the two sources a question can have: the six
+ * queries we wrote, and a table the owner uploaded. Both end at the same
+ * check — a figure that is not in the rows throws the answer away — so the
+ * promise holds either way. What changes is only where the rows came from,
+ * and the screen says which.
+ */
+async function answerFrom(
+  ask: typeof askForJson,
+  question: string,
+  caption: string,
+  rows: Row[],
+): Promise<{ answer: string; completion: Completion }> {
   const completion: Completion = await ask({
     system: ANSWER_SYSTEM,
     prompt: [
@@ -285,28 +324,41 @@ export async function runAdvisor(
     throw new ClaudeShapeError(
       `The Advisor used figures that are not in the rows (${invented.join(", ")}), so the answer was thrown away.`,
     );
-
-  return {
-    question,
-    query: query.name,
-    why: parsedPick.data.why,
-    caption,
-    rows,
-    answer: parsed.data.answer,
-    model: `${completion.model}@${completion.promptVersion}`,
-    pickedBy: `${chosen.model}@${chosen.promptVersion}`,
-  };
+  return { answer: parsed.data.answer, completion };
 }
 
 /**
- * Every value in the rows, as the allowed figures. The row count is allowed
- * too: "you have four open invoices" is a reading, not a calculation.
+ * The same seat, reading a table the owner brought instead of one of ours.
+ *
+ * There is no query to pick, so there is no pick step: the rows are the
+ * file's rows, and `why` says so plainly rather than inventing a reason.
+ * The figures check still runs, against the file — so the guarantee is not
+ * weaker, it is about a different source, and the answer is labelled with
+ * which one it was.
  */
-export function figuresIn(rows: Row[]): Record<string, string> {
-  const figures: Record<string, string> = { rows: String(rows.length) };
-  rows.forEach((row, index) => {
-    for (const [key, value] of Object.entries(row))
-      figures[`${index}.${key}`] = value;
-  });
-  return figures;
+export async function runAdvisorOnTable(
+  question: string,
+  file: { name: string; rows: Row[] },
+  options: { ask?: typeof askForJson } = {},
+): Promise<AdvisorAnswer> {
+  const ask = options.ask ?? askForJson;
+  if (!options.ask && !claudeConfigured()) throw new ClaudeNotConfiguredError();
+
+  const caption = `${file.name}`;
+  const { answer, completion } = await answerFrom(
+    ask,
+    question,
+    caption,
+    file.rows,
+  );
+  return {
+    question,
+    query: "uploaded file",
+    why: `Read ${file.name}, which you attached. Nothing from your ledger was used.`,
+    caption,
+    rows: file.rows,
+    answer,
+    model: `${completion.model}@${completion.promptVersion}`,
+    pickedBy: "—",
+  };
 }

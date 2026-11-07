@@ -61,29 +61,29 @@ export function accountTypeInfo(type: AccountType): AccountTypeInfo {
 const NAV: Record<AccountType, readonly string[]> = {
   personal: [
     DASHBOARD_PATH,
+    AGENTS_PATH,
     REQUESTS_PATH,
     LINKS_PATH,
-    AGENTS_PATH,
     SETTINGS_PATH,
   ],
   freelancer: [
     DASHBOARD_PATH,
+    AGENTS_PATH,
     INVOICES_PATH,
     TRANSACTIONS_PATH,
     LINKS_PATH,
     STOREFRONT_PATH,
     REQUESTS_PATH,
-    AGENTS_PATH,
     SETTINGS_PATH,
   ],
   business: [
     DASHBOARD_PATH,
+    AGENTS_PATH,
     INVOICES_PATH,
     TRANSACTIONS_PATH,
     STOREFRONT_PATH,
     LINKS_PATH,
     DEVELOPERS_PATH,
-    AGENTS_PATH,
     SETTINGS_PATH,
   ],
 };

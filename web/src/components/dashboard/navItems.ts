@@ -41,6 +41,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: LayoutGrid,
   },
   {
+    href: AGENTS_PATH,
+    label: "Agents",
+    description: "Ask about your money, and run the seats that think.",
+    icon: Sparkles,
+  },
+  {
     href: LINKS_PATH,
     label: "Links",
     description: "Reusable payment links with a fixed or open amount.",
@@ -70,12 +76,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: "Requests",
     description: "Ask another @username to pay you, end-to-end encrypted.",
     icon: Inbox,
-  },
-  {
-    href: AGENTS_PATH,
-    label: "Agents",
-    description: "Ask about your money, and run the seats that think.",
-    icon: Sparkles,
   },
   {
     href: DEVELOPERS_PATH,

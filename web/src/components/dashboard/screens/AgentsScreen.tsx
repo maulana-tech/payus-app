@@ -5,7 +5,9 @@ import {
   Check,
   ChevronRight,
   Loader2,
+  Paperclip,
   Sparkles,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/trpc/react";
@@ -30,7 +32,7 @@ import { ErrorNote } from "./kit";
 type Row = Record<string, string>;
 
 type Turn =
-  | { from: "you"; text: string }
+  | { from: "you"; text: string; attached?: string }
   | {
       from: "advisor";
       text: string;
@@ -54,6 +56,37 @@ const EXAMPLES = [
 ] as const;
 
 const COLUMN = "mx-auto w-full max-w-3xl";
+/** 2 MB: a year of bank lines is well under it, a spreadsheet dump is not. */
+const MAX_FILE_BYTES = 2_000_000;
+
+/** One shape for both sources, so the transcript cannot tell them apart by
+ * accident — only by the label the answer carries. */
+function answered(
+  reply: {
+    answer: string;
+    question: string;
+    query: string;
+    why: string;
+    caption: string;
+    rows: Row[];
+    model: string;
+    pickedBy: string;
+  },
+  started: { current: number },
+): Turn {
+  return {
+    from: "advisor",
+    text: reply.answer,
+    question: reply.question,
+    query: reply.query,
+    why: reply.why,
+    caption: reply.caption,
+    rows: reply.rows,
+    seconds: (Date.now() - started.current) / 1000,
+    model: reply.model,
+    pickedBy: reply.pickedBy,
+  };
+}
 
 export function AgentsScreen() {
   const status = trpc.agents.status.useQuery();
@@ -85,47 +118,67 @@ export function AgentsScreen() {
   ]);
   const turns = [...kept, ...fresh];
   const [text, setText] = useState("");
+  // A file is attached to the next question only. Nothing is uploaded until
+  // something is asked about it, and the bytes never leave this page — only
+  // the text does, and only once.
+  const [file, setFile] = useState<{ name: string; csv: string } | null>(null);
+  const [fileError, setFileError] = useState("");
+  const picker = useRef<HTMLInputElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const started = useRef(0);
   // Which run's detail is open, by its index in the transcript.
   const [showing, setShowing] = useState<number | null>(null);
 
+  const onTable = trpc.agents.askAboutTable.useMutation({
+    onSuccess: (reply) => setFresh((t) => [...t, answered(reply, started)]),
+    onError: (error) =>
+      setFresh((t) => [...t, { from: "refused", text: error.message }]),
+  });
   const ask = trpc.agents.runAdvisor.useMutation({
-    onSuccess: (reply) =>
-      setFresh((t) => [
-        ...t,
-        {
-          from: "advisor",
-          text: reply.answer,
-          question: reply.question,
-          query: reply.query,
-          why: reply.why,
-          caption: reply.caption,
-          rows: reply.rows,
-          seconds: (Date.now() - started.current) / 1000,
-          model: reply.model,
-          pickedBy: reply.pickedBy,
-        },
-      ]),
+    onSuccess: (reply) => setFresh((t) => [...t, answered(reply, started)]),
     // A refusal is an answer too — it belongs in the transcript, in order,
     // not in a box above it that the next question wipes.
     onError: (error) =>
       setFresh((t) => [...t, { from: "refused", text: error.message }]),
   });
 
+  const busy = ask.isPending || onTable.isPending;
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: follow the tail
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
-  }, [turns.length, ask.isPending]);
+  }, [turns.length, busy]);
 
   const send = (question: string) => {
     const q = question.trim();
-    if (q.length < 3 || ask.isPending) return;
-    setFresh((t) => [...t, { from: "you", text: q }]);
+    if (q.length < 3 || busy) return;
+    setFresh((t) => [...t, { from: "you", text: q, attached: file?.name }]);
     setText("");
     started.current = Date.now();
+    if (file) {
+      onTable.mutate({ question: q, name: file.name, csv: file.csv });
+      setFile(null);
+      return;
+    }
     ask.mutate({ question: q });
+  };
+
+  const attach = async (picked: File) => {
+    setFileError("");
+    if (picked.size > MAX_FILE_BYTES) {
+      setFileError(
+        `${picked.name} is ${(picked.size / 1_000_000).toFixed(1)} MB. The limit is 2 MB.`,
+      );
+      return;
+    }
+    if (!/\.(csv|tsv|txt)$/i.test(picked.name)) {
+      setFileError(
+        "For now this reads CSV. Spreadsheets and PDFs are next; export a CSV in the meantime.",
+      );
+      return;
+    }
+    setFile({ name: picked.name, csv: await picked.text() });
   };
 
   if (status.data && !status.data.configured)
@@ -167,15 +220,50 @@ export function AgentsScreen() {
         className={`max-h-48 min-h-12 w-full resize-none bg-transparent px-1.5 py-1 text-[15px] leading-relaxed outline-none placeholder:text-(--dash-ash) ${dashFocus}`}
       />
       <div className="mt-2 flex items-center justify-between gap-3 border-t border-(--dash-line) pt-2">
-        <p className="text-[11px] text-(--dash-ash)">
-          Reads your rows. It has no write access of any kind.
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <input
+            ref={picker}
+            type="file"
+            accept=".csv,.tsv,.txt,text/csv"
+            className="sr-only"
+            onChange={(event) => {
+              const picked = event.target.files?.[0];
+              if (picked) void attach(picked);
+              event.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => picker.current?.click()}
+            aria-label="Attach a CSV"
+            className={`flex size-8 shrink-0 items-center justify-center rounded-full text-(--dash-ash) transition-colors hover:bg-(--dash-tint) hover:text-(--dash-fg) ${dashFocus}`}
+          >
+            <Paperclip className="size-4" aria-hidden />
+          </button>
+          {file ? (
+            <span className="flex min-w-0 items-center gap-1.5 rounded-full bg-(--dash-tint) py-1 pr-1 pl-3 text-[11px]">
+              <span className="truncate">{file.name}</span>
+              <button
+                type="button"
+                onClick={() => setFile(null)}
+                aria-label={`Remove ${file.name}`}
+                className={`flex size-5 shrink-0 items-center justify-center rounded-full hover:bg-(--dash-line-strong) ${dashFocus}`}
+              >
+                <X className="size-3" aria-hidden />
+              </button>
+            </span>
+          ) : (
+            <p className="truncate text-[11px] text-(--dash-ash)">
+              Reads your rows. It has no write access of any kind.
+            </p>
+          )}
+        </div>
         <button
           type="submit"
-          disabled={ask.isPending || text.trim().length < 3}
+          disabled={busy || text.trim().length < 3}
           className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-full bg-(--dash-fg) px-4 text-[13px] font-semibold tracking-[0.08em] text-(--dash-surface) uppercase transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 ${dashFocus}`}
         >
-          {ask.isPending ? (
+          {busy ? (
             <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden />
           ) : null}
           Ask
@@ -192,7 +280,7 @@ export function AgentsScreen() {
     // phone, where the tab bar is also in the way.
     <div className="flex h-[calc(100svh-19rem)] min-h-96 flex-col lg:h-[calc(100svh-17rem)]">
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {turns.length === 0 && !ask.isPending ? (
+        {turns.length === 0 && !busy ? (
           // Nothing asked yet: an introduction and the questions it can
           // actually answer. The composer does not move to meet them — a
           // reply box that travels is one you have to find twice.
@@ -230,13 +318,21 @@ export function AgentsScreen() {
           <div className={`${COLUMN} grid gap-6 py-6`}>
             {turns.map((turn, index) =>
               turn.from === "you" ? (
-                <p
+                <div
                   // biome-ignore lint/suspicious/noArrayIndexKey: a transcript is append-only
                   key={index}
-                  className="ml-auto max-w-[85%] rounded-(--dash-radius) rounded-br-sm bg-(--dash-fg) px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-line text-(--dash-surface)"
+                  className="ml-auto grid max-w-[85%] justify-items-end gap-1.5"
                 >
-                  {turn.text}
-                </p>
+                  {turn.attached ? (
+                    <span className="flex items-center gap-1.5 rounded-full border border-(--dash-line) px-3 py-1 text-[11px] text-(--dash-ash)">
+                      <Paperclip className="size-3" aria-hidden />
+                      {turn.attached}
+                    </span>
+                  ) : null}
+                  <p className="rounded-(--dash-radius) rounded-br-sm bg-(--dash-fg) px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-line text-(--dash-surface)">
+                    {turn.text}
+                  </p>
+                </div>
               ) : (
                 // biome-ignore lint/suspicious/noArrayIndexKey: a transcript is append-only
                 <div key={index} className="grid gap-3">
@@ -276,7 +372,14 @@ export function AgentsScreen() {
 
       {/* Always here, at the bottom, whether or not anything has been asked. */}
       <div className="shrink-0 border-t border-(--dash-line) pt-3">
-        <div className={COLUMN}>{composer}</div>
+        <div className={COLUMN}>
+          {fileError ? (
+            <p className="mb-2 text-[11px] text-(--dash-err)" role="alert">
+              {fileError}
+            </p>
+          ) : null}
+          {composer}
+        </div>
       </div>
 
       {turns.length > 0 ? (
