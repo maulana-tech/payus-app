@@ -33,7 +33,7 @@ import { ErrorNote } from "./kit";
 type Row = Record<string, string>;
 
 type Turn =
-  | { from: "you"; text: string; attached?: string }
+  | { from: "you"; text: string; attached?: string; at?: string }
   | {
       from: "advisor";
       text: string;
@@ -123,7 +123,7 @@ export function AgentsScreen() {
   // What was asked before, plus what has been asked since this page opened.
   const [fresh, setFresh] = useState<Turn[]>([]);
   const kept: Turn[] = (history.data ?? []).flatMap((turn) => [
-    { from: "you" as const, text: turn.question },
+    { from: "you" as const, text: turn.question, at: turn.at },
     {
       from: "advisor" as const,
       text: turn.answer,
@@ -273,11 +273,11 @@ export function AgentsScreen() {
 
   const composer = (
     <form
-      // No box: the composer sits in the page rather than on it. A border
-      // here drew a second edge inside the one the panel already has, and
-      // the rule above it ran the full width of the screen while the
+      // The box is the field's edge, and it earns its place — without one
+      // there is nothing to say where typing happens. What went was the
+      // rule *above* it, which ran the full width of the panel while the
       // composer stopped well short of both sides.
-      className="pb-1"
+      className="rounded-(--dash-radius) border border-(--dash-line-strong) bg-(--dash-surface) p-2.5 focus-within:border-(--dash-fg)"
       onSubmit={(event) => {
         event.preventDefault();
         send(text);
@@ -435,20 +435,34 @@ export function AgentsScreen() {
           </div>
         ) : (
           <div className={`${COLUMN} grid gap-6 py-6`}>
+            {kept.length > 0 ? (
+              <p className="text-center text-[11px] text-(--dash-ash)">
+                {kept.length / 2} earlier question
+                {kept.length === 2 ? "" : "s"} — the whole transcript is here,
+                oldest first.
+              </p>
+            ) : null}
             {turns.map((turn, index) =>
               turn.from === "you" ? (
                 <div
                   // biome-ignore lint/suspicious/noArrayIndexKey: a transcript is append-only
                   key={index}
-                  className="ml-auto grid max-w-[85%] justify-items-end gap-1.5"
+                  className="grid justify-items-end gap-1.5"
                 >
+                  {dayChanged(turns, index) ? (
+                    <span className="mx-auto -mt-2 mb-1 text-[11px] text-(--dash-ash)">
+                      {dayLabel(turn.at)}
+                    </span>
+                  ) : null}
                   {turn.attached ? (
                     <span className="flex items-center gap-1.5 rounded-full border border-(--dash-line) px-3 py-1 text-[11px] text-(--dash-ash)">
                       <Paperclip className="size-3" aria-hidden />
                       {turn.attached}
                     </span>
                   ) : null}
-                  <p className="rounded-(--dash-radius) rounded-br-sm bg-(--dash-fg) px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-line text-(--dash-surface)">
+                  {/* The wrapper runs the full width so the day marker can
+                      sit in the middle of it; the bubble keeps its measure. */}
+                  <p className="max-w-[85%] rounded-(--dash-radius) rounded-br-sm bg-(--dash-fg) px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-line text-(--dash-surface)">
                     {turn.text}
                   </p>
                 </div>
@@ -559,6 +573,38 @@ function Unchecked({ name }: { name: string }) {
       answer from your ledger. Worth reading against the document itself.
     </p>
   );
+}
+
+/** True when this turn is the first of a day the one before it was not. */
+function dayChanged(turns: Turn[], index: number): boolean {
+  const here = turns[index];
+  if (here.from !== "you" || !here.at) return false;
+  const day = here.at.slice(0, 10);
+  for (let i = index - 1; i >= 0; i--) {
+    const before = turns[i];
+    if (before.from === "you" && before.at)
+      return before.at.slice(0, 10) !== day;
+  }
+  // The first turn of all: worth labelling, since the view opens at the end.
+  return true;
+}
+
+/** "Today", "Yesterday", or the date — whichever a person would say. */
+function dayLabel(at?: string): string {
+  if (!at) return "";
+  const day = at.slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  if (day === today) return "Today";
+  if (day === yesterday) return "Yesterday";
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 /** The line under an answer that opens the detail behind it. */
