@@ -18,7 +18,8 @@
   },
   "pnpm": {
     "overrides": {
-      "viem": "2.52.0"
+      "viem": "2.52.0",
+      "dompurify": ">=3.4.17"
     },
     "packageExtensions": {
       "@hookform/resolvers": {
