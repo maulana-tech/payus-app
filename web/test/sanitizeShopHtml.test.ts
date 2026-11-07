@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
+import { MAX_HTML } from "../src/features/storefront/config";
 import { sanitizeShopHtml } from "../src/server/modules/storefront/sanitize";
 
-// A merchant may write HTML for their shop. These are the cases that decide
-// whether that is safe: everything that could execute, navigate somewhere
-// unexpected, or cover the page has to come out.
+// A merchant may bring their own design. These are the cases that decide
+// whether that is safe.
+//
+// The fence that protects the page is not in this file: the shop's markup
+// renders in an iframe with no `allow-scripts`, so nothing in here runs and
+// its CSS is scoped to that frame's document. What this file holds down is
+// the set of things that sandbox does *not* stop — a request to a third
+// party at render time, an address a browser can be tricked by, and markup
+// that would frame, navigate or ask for input.
+//
+// That is why a `position: fixed` rule is allowed here and a `url(http://…)`
+// is not, which looks backwards until you remember where the page is.
 
 const clean = (html: string) => sanitizeShopHtml(html).clean;
 
@@ -17,70 +27,148 @@ describe("shop html", () => {
     expect(out).toContain("<li>Gayo</li>");
   });
 
-  it("drops anything that runs", () => {
-    expect(clean("<script>alert(1)</script><p>hi</p>")).toBe("<p>hi</p>");
-    expect(clean('<img src="https://x/y.png" onerror="alert(1)">')).not.toMatch(
-      /onerror/,
+  it("takes a whole saved page and keeps its design", () => {
+    // The case this policy exists for: someone exports a page and pastes it.
+    // The wrappers carry nothing, so they go; the stylesheet is the design,
+    // so it stays.
+    const out = clean(
+      `<!doctype html><html><head><meta charset="utf-8"><title>Shop</title>
+       <style>.col{max-width:1152px;margin:0 auto;border-inline:1px solid #e0e2eb}
+       .hatch{height:16px;background:repeating-linear-gradient(-45deg,#e0e2eb 0 1px,transparent 1px 7px)}</style>
+       </head><body><section class="col"><h1>Finetune Library</h1>
+       <div class="hatch"></div><p class="body-lg">Reports and playbooks.</p></section></body></html>`,
     );
-    expect(clean('<p onclick="steal()">hi</p>')).toBe("<p>hi</p>");
-    expect(clean("<svg><script>alert(1)</script></svg>")).not.toMatch(/script/);
+    expect(out).toContain("max-width:1152px");
+    expect(out).toContain("repeating-linear-gradient");
+    expect(out).toContain('class="col"');
+    expect(out).toContain('class="hatch"');
+    expect(out).toContain("<h1>Finetune Library</h1>");
+    // The scaffolding is gone, but nothing it wrapped went with it.
+    expect(out).not.toMatch(/<html|<head|<body|<!doctype|<title|<meta/i);
   });
 
-  it("drops anything that frames or asks for input", () => {
-    for (const html of [
-      '<iframe src="https://evil.test"></iframe>',
-      "<form action=/x><input name=card></form>",
-      '<object data="x.swf"></object>',
-      "<embed src=x>",
-      '<link rel=stylesheet href="https://evil.test/a.css">',
-      "<style>body{display:none}</style>",
-      "<base href='https://evil.test/'>",
-    ])
-      expect(clean(html)).not.toMatch(
-        /iframe|form|input|object|embed|link|style|base/,
-      );
+  it("keeps an author's own classes, ids and inline styles", () => {
+    const out = clean(
+      '<div id="hero" class="bar-in cv white" style="padding:8%;display:flex">x</div>',
+    );
+    expect(out).toContain('id="hero"');
+    expect(out).toContain('class="bar-in cv white"');
+    expect(out).toContain("padding:8%");
+  });
+
+  it("drops anything that runs", () => {
+    expect(clean("<p>ok</p><script>alert(1)</script>")).toBe("<p>ok</p>");
+    expect(clean('<p onclick="x()">ok</p>')).toBe("<p>ok</p>");
+    expect(clean("<style>a{behavior:url(x.htc)}</style><p>ok</p>")).not.toMatch(
+      /behavior/,
+    );
+    expect(
+      clean("<style>a{width:expression(alert(1))}</style><p>ok</p>"),
+    ).not.toMatch(/expression/);
+  });
+
+  it("drops anything that frames, navigates or asks for input", () => {
+    const out = clean(
+      '<iframe src="https://e.com"></iframe><form><input name="card"></form><object></object><embed>',
+    );
+    expect(out).not.toMatch(/iframe|form|input|object|embed/);
   });
 
   it("refuses addresses a browser can be tricked by", () => {
-    expect(clean('<a href="javascript:alert(1)">x</a>')).not.toMatch(
-      /javascript:/,
+    expect(clean('<a href="javascript:alert(1)">x</a>')).not.toContain(
+      "javascript:",
     );
-    expect(clean('<a href="data:text/html,<script>">x</a>')).not.toMatch(
-      /data:/,
+    expect(clean('<img src="data:text/html;base64,PHN2Zz4=">')).not.toContain(
+      "data:",
     );
-    expect(clean('<img src="http://insecure.test/a.png">')).not.toMatch(
-      /http:/,
-    );
-    expect(clean('<a href="//evil.test">x</a>')).not.toMatch(/evil/);
+    expect(clean('<img src="http://e.com/a.png">')).not.toContain("http://");
   });
 
   it("keeps a real link, and makes it a stranger's link", () => {
-    const out = clean('<a href="https://example.com">our beans</a>');
+    const out = clean('<a href="https://example.com">Visit</a>');
     expect(out).toContain('href="https://example.com"');
     expect(out).toContain('rel="noopener noreferrer nofollow ugc"');
     expect(out).toContain('target="_blank"');
   });
 
-  it("refuses inline styles, which could hide or cover the page", () => {
-    expect(clean('<p style="position:fixed;inset:0">x</p>')).toBe("<p>x</p>");
+  // --- what the sandbox cannot stop: a request to a third party ----------
+
+  it("refuses a stylesheet that would call a stranger at render time", () => {
+    const out = sanitizeShopHtml(
+      '<style>@import url("https://tracker.example/a.css");.a{color:red}</style><p>x</p>',
+    );
+    expect(out.clean).not.toContain("tracker.example");
+    // The rest of the stylesheet survives: one bad line is not a reason to
+    // throw away a design.
+    expect(out.clean).toContain("color:red");
+    expect(out.removed.join(" ")).toMatch(/@import/);
   });
 
-  it("allows only the shop's own classes", () => {
-    expect(clean('<p class="shop-lead">x</p>')).toContain('class="shop-lead"');
-    expect(clean('<p class="fixed inset-0 z-50">x</p>')).toBe("<p>x</p>");
+  it("lets a web font through, by either spelling", () => {
+    const viaImport = clean(
+      '<style>@import url("https://fonts.googleapis.com/css2?family=Geist");</style><p>x</p>',
+    );
+    expect(viaImport).toContain("fonts.googleapis.com");
+
+    // A <link> is how a design usually names its typeface, and it means the
+    // same thing, so it is turned into the thing it means.
+    const viaLink = clean(
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist"><p>x</p>',
+    );
+    expect(viaLink).toContain("@import");
+    expect(viaLink).toContain("fonts.googleapis.com");
+  });
+
+  it("refuses a url() that is not https, wherever it is written", () => {
+    const out = sanitizeShopHtml(
+      "<style>.a{background:url(http://e.com/x.png)}.b{background:url(data:image/png;base64,AA)}.c{background:url(https://ok.example/x.png)}</style><p>x</p>",
+    );
+    expect(out.clean).not.toContain("http://e.com");
+    expect(out.clean).not.toContain("data:image");
+    expect(out.clean).toContain("https://ok.example/x.png");
+    expect(out.removed.join(" ")).toMatch(/url\(\) that is not https/);
+  });
+
+  it("allows a layout that could not reach the page around it", () => {
+    // `position: fixed` inside a frame with no scripting is fixed to a box
+    // the height of the prose. It is a design choice, not a way out.
+    const out = clean(
+      "<style>.hero{position:fixed;inset:0;z-index:99}</style><div class='hero'>x</div>",
+    );
+    expect(out).toContain("position:fixed");
+  });
+
+  it("does not leave the page's own title printed across the top", () => {
+    // The allowlist alone would drop the tag and keep the words, so a
+    // pasted export would open with its filename as its first line.
+    const out = sanitizeShopHtml(
+      "<html><head><title>Finetune Library Landing Page</title></head><body><p>Beans</p></body></html>",
+    );
+    expect(out.clean).toBe("<p>Beans</p>");
+    // And the scaffolding is not reported: being told <html> was removed is
+    // not news, and a list of non-news is a list nobody reads.
+    expect(out.removed).toEqual([]);
+  });
+
+  it("says nothing about a <link> that was never going to bring a design", () => {
+    const out = sanitizeShopHtml(
+      '<link rel="preconnect" href="https://fonts.gstatic.com"><p>x</p>',
+    );
+    expect(out.removed).toEqual([]);
   });
 
   it("says what it took out, so the author is not left guessing", () => {
     const result = sanitizeShopHtml(
-      "<p>hi</p><script>x</script><iframe></iframe>",
+      '<script>x</script><iframe></iframe><style>@charset "utf-8";</style><p>ok</p>',
     );
-    expect(result.removed).toEqual(["iframe", "script"]);
-    expect(result.raw).toContain("<script>");
-    expect(result.clean).not.toContain("<script>");
+    expect(result.clean).toBe("<p>ok</p>");
+    expect(result.removed).toContain("iframe");
+    expect(result.removed).toContain("script");
+    expect(result.removed).toContain("@charset");
   });
 
   it("will not take an essay", () => {
-    const long = `<p>${"a".repeat(20_000)}</p>`;
-    expect(sanitizeShopHtml(long).raw.length).toBeLessThanOrEqual(8_000);
+    const long = `<p>${"a".repeat(MAX_HTML * 2)}</p>`;
+    expect(sanitizeShopHtml(long).raw.length).toBeLessThanOrEqual(MAX_HTML);
   });
 });

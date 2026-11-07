@@ -19,8 +19,13 @@ export type Template = (typeof TEMPLATES)[number];
 /** The most of one item a single order may carry, whatever the page says. */
 export const MAX_QUANTITY = 50;
 
-/** The most HTML a shop may carry, before sanitising. */
-export const MAX_HTML = 8_000;
+/**
+ * The most HTML a shop may carry, before sanitising. A whole page with its
+ * own stylesheet is the thing this field is for now, and 8,000 characters
+ * was not enough to hold one — the first design anyone pasted hit the limit
+ * and the ceiling before it hit the policy.
+ */
+export const MAX_HTML = 40_000;
 
 export const THEMES = ["paper", "ink", "sun"] as const;
 export type Theme = (typeof THEMES)[number];

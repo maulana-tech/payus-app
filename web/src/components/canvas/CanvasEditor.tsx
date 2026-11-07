@@ -535,15 +535,22 @@ function HtmlPane({
       <div className="shrink-0 border-t border-(--dash-line-solid) p-3">
         {removed.length > 0 ? (
           <p className="text-[13px] text-(--dash-err)" role="status">
+            {/* A tag is named in brackets; everything else the sanitiser
+                reports is already a sentence and gets left alone. */}
             Taken out by the sanitiser:{" "}
-            {removed.map((t) => `<${t}>`).join(", ")}
+            {removed
+              .map((t) => (/^[a-z][a-z0-9-]*$/.test(t) ? `<${t}>` : t))
+              .join(", ")}
           </p>
         ) : (
           <p className="text-[13px] text-(--dash-ash)">
-            Headings, text, lists, tables, links and images, plus the{" "}
-            <code style={{ color: colours.accent }}>shop-</code> classes above.
-            Scripts, styles, frames and forms are removed on the way in, and
-            what is left is shown in a sandbox that cannot run anything.
+            Write the page however you like: your own{" "}
+            <code style={{ color: colours.accent }}>&lt;style&gt;</code>, your
+            own classes, your own layout. It renders in a frame that cannot run
+            anything and cannot reach the page around it, so what comes out are
+            the things that frame would not stop — scripts, forms, other frames,
+            and any stylesheet or image that would call a stranger. Web fonts
+            from Google Fonts are allowed.
           </p>
         )}
         <p className="mt-1 text-[12px] text-(--dash-ash) tabular-nums">
