@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type Allocation,
   evaluateSplit,
+  previewSplit,
   type SplitRule,
 } from "../src/features/split/evaluate";
 
@@ -138,5 +139,64 @@ describe("split", () => {
     const once = evaluateSplit(10_000n, rules);
     const again = evaluateSplit(10_000n, [...rules].reverse());
     expect(again).toEqual(once);
+  });
+});
+
+describe("the preview the screen shows before a rule is saved", () => {
+  // `previewSplit` is what `ledger.previewSplit` answers with, so it is the
+  // arithmetic an owner sees before committing to a rule. It had no test:
+  // a total that disagreed with its own allocations would have shown a
+  // split that does not add up, in the one place someone checks.
+  it("returns the allocations and a total that is their sum", () => {
+    const rules: SplitRule[] = [
+      {
+        id: "r1",
+        name: "Tax",
+        target: "tax_reserve",
+        kind: "percent",
+        value: 2000n,
+        priority: 1,
+      },
+      {
+        id: "r2",
+        name: "Platform",
+        target: "platform_fee",
+        kind: "fixed",
+        value: 200n,
+        priority: 2,
+      },
+    ];
+    const preview = previewSplit(15000n, rules);
+
+    expect(preview.allocations.map((a) => a.amountMinor)).toEqual([
+      3000n,
+      200n,
+      11800n,
+    ]);
+    // The invariant every other test here checks first, checked again on
+    // the way to the screen.
+    expect(preview.total).toBe(15000n);
+  });
+
+  it("adds up when there are no rules at all", () => {
+    const preview = previewSplit(15000n, []);
+    expect(preview.total).toBe(15000n);
+    expect(preview.allocations).toHaveLength(1);
+    expect(preview.allocations[0]?.ruleId).toBeNull();
+  });
+
+  it("adds up when a rule asks for more than the whole amount", () => {
+    const preview = previewSplit(1000n, [
+      {
+        id: "r1",
+        name: "Greedy",
+        target: "platform_fee",
+        kind: "fixed",
+        value: 5000n,
+        priority: 1,
+      },
+    ]);
+    expect(preview.total).toBe(1000n);
+    expect(preview.allocations[0]?.amountMinor).toBe(1000n);
   });
 });
