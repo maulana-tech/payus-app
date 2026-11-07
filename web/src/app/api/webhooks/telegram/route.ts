@@ -9,10 +9,13 @@ import {
 import {
   approveProposal,
   refuseProposal,
+  waiting,
 } from "@/server/modules/guardian/guardian.service";
 import {
   claimCode,
   ownerForChat,
+  proposalMessage,
+  unlinkTelegram,
 } from "@/server/modules/notifications/telegram.service";
 
 // Telegram's updates. Two things can arrive: a chat proving itself with a
@@ -78,27 +81,109 @@ export async function POST(request: Request) {
   return ok();
 }
 
+/**
+ * What the bot can do, in the order someone needs it. Kept here rather than
+ * only in BotFather's menu: a person who types /help is usually stuck, and
+ * the answer should not depend on a menu they did not notice.
+ */
+const COMMANDS = [
+  ["/status", "What is waiting for you right now"],
+  ["/help", "This list"],
+  ["/unlink", "Stop sending approvals to this chat"],
+] as const;
+
+const helpText = (linked: string | null) =>
+  [
+    linked
+      ? `This chat decides for <b>@${escapeHtml(linked)}</b>.`
+      : "This chat is not linked to a Payus account yet.",
+    "",
+    ...COMMANDS.map(([name, what]) => `<code>${name}</code> — ${what}`),
+    "",
+    linked
+      ? "When the Guardian holds something, it arrives here with Approve and Refuse on it. The buttons do exactly what the ones in the dashboard do."
+      : "Open Payus → Settings → Approvals on Telegram, press <i>Link a chat</i>, and send me the code it gives you.",
+  ].join("\n");
+
 async function onMessage(message: NonNullable<Update["message"]>) {
   const chatId = message.chat?.id;
   if (!chatId) return;
   const chat = String(chatId);
   const text = (message.text ?? "").trim();
+  // Telegram appends @thebot in groups; strip it so commands work there too.
+  const command = text.split(/\s+/)[0]?.split("@")[0]?.toLowerCase() ?? "";
 
-  const code = text.match(/^\/start(?:\s+(\S+))?$/)?.[1];
-  if (!code) {
+  if (command === "/start") {
+    const code = text.match(/^\/start\s+(\S+)$/)?.[1];
+    if (!code) {
+      await sendMessage(chat, helpText(await ownerForChat(chat)));
+      return;
+    }
+    const owner = await claimCode(code, chat);
     await sendMessage(
       chat,
-      "Send me the code from your Payus settings, like <code>/start abc123</code>, and I will bring approvals here.",
+      owner
+        ? `Linked to <b>@${escapeHtml(owner)}</b>. Anything the Guardian holds will arrive here, with the buttons to decide it.\n\nTry <code>/status</code>.`
+        : "That code is not one of ours, or it has been used already. Open Payus → Settings for a fresh one.",
     );
     return;
   }
 
-  const owner = await claimCode(code, chat);
+  if (command === "/help") {
+    await sendMessage(chat, helpText(await ownerForChat(chat)));
+    return;
+  }
+
+  // Everything below acts for an account, so it needs one. The chat id is
+  // never authority on its own — it is only ever looked up.
+  const owner = await ownerForChat(chat);
+
+  if (command === "/unlink") {
+    if (!owner) {
+      await sendMessage(chat, "This chat is not linked to anything.");
+      return;
+    }
+    await unlinkTelegram(owner);
+    await sendMessage(
+      chat,
+      `Unlinked from <b>@${escapeHtml(owner)}</b>. Nothing will arrive here now, and the dashboard still has everything. Settings will give you a fresh code whenever you want it back.`,
+    );
+    return;
+  }
+
+  if (command === "/status") {
+    if (!owner) {
+      await sendMessage(chat, helpText(null));
+      return;
+    }
+    const pending = await waiting(owner);
+    if (pending.length === 0) {
+      await sendMessage(
+        chat,
+        `Nothing is waiting for <b>@${escapeHtml(owner)}</b>. The Guardian only speaks up when something needs you.`,
+      );
+      return;
+    }
+    await sendMessage(
+      chat,
+      `<b>${pending.length}</b> waiting for <b>@${escapeHtml(owner)}</b>:`,
+    );
+    // One message each, because each carries its own two buttons.
+    for (const proposal of pending)
+      await sendMessage(chat, proposalMessage(proposal), [
+        [
+          { text: "Approve", data: `a:${proposal.id}` },
+          { text: "Refuse", data: `r:${proposal.id}` },
+        ],
+      ]);
+    return;
+  }
+
   await sendMessage(
     chat,
     owner
-      ? `Linked to <b>@${escapeHtml(owner)}</b>. Anything the Guardian holds will arrive here, with the buttons to decide it.`
-      : "That code is not one of ours, or it has been used already. Open Payus → Settings for a fresh one.",
+      ? "I only take commands here. Try <code>/status</code>, or <code>/help</code> for the list."
+      : helpText(null),
   );
 }
 

@@ -165,6 +165,18 @@ curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
   -d secret_token="$TELEGRAM_WEBHOOK_SECRET"
 ```
 
+Give the bot its command menu too, so the ⌘ button in Telegram lists them:
+
+```sh
+curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setMyCommands" \
+  -H 'content-type: application/json' \
+  -d '{"commands":[
+        {"command":"status","description":"What is waiting for you right now"},
+        {"command":"help","description":"What this bot can do"},
+        {"command":"unlink","description":"Stop sending approvals to this chat"}
+      ]}'
+```
+
 Then open **Settings → Approvals on Telegram**, press *Link a chat*, and send
 the bot the `/start <code>` it gives you. The code works once and only for
 that account. After that, anything the Guardian holds arrives in the chat

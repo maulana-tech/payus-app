@@ -201,4 +201,51 @@ describe.skipIf(!available)("telegram approvals (Postgres)", () => {
     expect(after?.status).toBe("awaiting");
     expect(sent.answers.at(-1)).toMatch(/not linked/);
   });
+  it("answers an unlinked chat with what it can do and how to link", async () => {
+    sent.messages.length = 0;
+    await startWith(7001, "/help");
+    const [first] = sent.messages;
+    expect(first.html).toContain("not linked");
+    for (const command of ["/status", "/help", "/unlink"])
+      expect(first.html).toContain(command);
+    expect(first.html).toContain("Link a chat");
+  });
+
+  it("tells a linked chat what is waiting, with the buttons on each", async () => {
+    // Chat 100 is already tess's from the linking test above; asking for a
+    // second code would be refused, which is itself the right behaviour.
+    sent.messages.length = 0;
+    await startWith(100, "/status");
+    const before = sent.messages.length;
+
+    const proposal = await propose("tess", "status-check");
+    expect(proposal.status).toBe("awaiting");
+
+    sent.messages.length = 0;
+    await startWith(100, "/status");
+    expect(sent.messages.length).toBeGreaterThan(before);
+    // `some`, not index 0: proposing also notifies the chat, and that side
+    // effect is deliberately not awaited, so it can land in any order.
+    const heading = (m: { html: string }) => m.html.includes("waiting for");
+    const card = (m: { html: string }) => m.html.includes("Waiting for you");
+    expect(sent.messages.some(heading)).toBe(true);
+    // One message per proposal, because each carries its own two buttons.
+    expect(sent.messages.some(card)).toBe(true);
+
+    // Telegram appends @thebot in groups; the command still has to work.
+    sent.messages.length = 0;
+    await startWith(100, "/status@payus1_bot");
+    expect(sent.messages.some(heading)).toBe(true);
+  });
+
+  it("lets a chat detach itself, and then acts for nobody", async () => {
+    const code = await telegram.linkCode("vic");
+    await startWith(7003, `/start ${code}`);
+    expect(await telegram.ownerForChat("7003")).toBe("vic");
+
+    sent.messages.length = 0;
+    await startWith(7003, "/unlink");
+    expect(sent.messages.at(-1)?.html).toContain("Unlinked");
+    expect(await telegram.ownerForChat("7003")).toBeNull();
+  });
 });
