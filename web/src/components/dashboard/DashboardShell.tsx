@@ -102,62 +102,70 @@ function DashboardNavLayout({
     "Overview";
 
   return (
-    <div className="relative flex min-h-svh pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
-      <aside className="hidden w-[5.5rem] shrink-0 lg:block">
-        <div className="sticky top-14 ml-4 flex h-[calc(100svh-4.5rem)] w-14 flex-col items-center rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) py-4">
-          <Link
-            href="/"
-            aria-label="Payus home"
-            className={cn("rounded-(--dash-radius-sm) p-1", dashFocus)}
-          >
-            <LogoMark />
-          </Link>
-          <nav
-            aria-label="Dashboard"
-            className="flex w-full flex-1 flex-col items-center"
-          >
-            <ul className="my-auto grid gap-2">
-              {mainItems.map((item) => (
-                <RailLink key={item.href} item={item} pathname={pathname} />
-              ))}
-            </ul>
-            <ul className="grid gap-2">
-              {footerItems.map((item) => (
-                <RailLink key={item.href} item={item} pathname={pathname} />
-              ))}
-            </ul>
-          </nav>
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <DemoBanner />
-        <header className="flex h-16 items-center justify-between gap-4 px-(--dashboard-gutter) lg:pr-10 lg:pl-6">
-          <div className="flex items-center gap-3">
+    // A column, so the demo band can run the whole width above the rail
+    // rather than starting where the content does. A band that stops short
+    // of the edge reads as part of the page it sits on.
+    <div className="relative flex min-h-svh flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
+      <DemoBanner />
+      <div className="flex min-h-0 flex-1">
+        <aside className="hidden w-[5.5rem] shrink-0 lg:block">
+          <div className="sticky top-14 ml-4 flex h-[calc(100svh-4.5rem)] w-14 flex-col items-center rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) py-4">
             <Link
               href="/"
               aria-label="Payus home"
-              className={cn("rounded-(--dash-radius-sm) lg:hidden", dashFocus)}
+              className={cn("rounded-(--dash-radius-sm) p-1", dashFocus)}
             >
               <LogoMark />
             </Link>
-            <span className="dashboard-tile-title">{current}</span>
+            <nav
+              aria-label="Dashboard"
+              className="flex w-full flex-1 flex-col items-center"
+            >
+              <ul className="my-auto grid gap-2">
+                {mainItems.map((item) => (
+                  <RailLink key={item.href} item={item} pathname={pathname} />
+                ))}
+              </ul>
+              <ul className="grid gap-2">
+                {footerItems.map((item) => (
+                  <RailLink key={item.href} item={item} pathname={pathname} />
+                ))}
+              </ul>
+            </nav>
           </div>
-          <div className="flex items-center gap-2">
-            <ModeToggle />
-            <AccountMenu />
-          </div>
-        </header>
+        </aside>
 
-        <main
-          id="main-content"
-          className={cn(
-            "relative isolate mx-auto w-full max-w-6xl px-(--dashboard-gutter) pt-4 pb-28 lg:pr-10 lg:pb-16 lg:pl-6",
-            contentClassName,
-          )}
-        >
-          {children}
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-16 items-center justify-between gap-4 px-(--dashboard-gutter) lg:pr-10 lg:pl-6">
+            <div className="flex items-center gap-3">
+              <Link
+                href="/"
+                aria-label="Payus home"
+                className={cn(
+                  "rounded-(--dash-radius-sm) lg:hidden",
+                  dashFocus,
+                )}
+              >
+                <LogoMark />
+              </Link>
+              <span className="dashboard-tile-title">{current}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ModeToggle />
+              <AccountMenu />
+            </div>
+          </header>
+
+          <main
+            id="main-content"
+            className={cn(
+              "relative isolate mx-auto w-full max-w-6xl px-(--dashboard-gutter) pt-4 pb-28 lg:pr-10 lg:pb-16 lg:pl-6",
+              contentClassName,
+            )}
+          >
+            {children}
+          </main>
+        </div>
       </div>
 
       <div className="fixed right-[max(0.75rem,env(safe-area-inset-right))] bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] z-40 rounded-(--dash-radius) border border-(--dash-line-solid) bg-(--dash-surface) lg:hidden">

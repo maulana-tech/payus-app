@@ -7,7 +7,10 @@ import {
   telegramSecret,
 } from "@/server/lib/telegram";
 import { runAdvisor } from "@/server/modules/agents/advisor.agent";
-import { recordAdvisorTurn } from "@/server/modules/agents/history.service";
+import {
+  latestChatId,
+  recordAdvisorTurn,
+} from "@/server/modules/agents/history.service";
 import { runReporter } from "@/server/modules/agents/reporter.agent";
 import {
   approveProposal,
@@ -224,8 +227,11 @@ async function onMessage(message: NonNullable<Update["message"]>) {
         ].join("\n"),
       );
       // Same transcript the dashboard reads, with where it came from kept.
+      // It joins the conversation the owner was last in rather than opening
+      // one of its own: asking from the other room is still the same thread.
       await recordAdvisorTurn(
         owner,
+        await latestChatId(owner),
         reply,
         Date.now() - started,
         "telegram",

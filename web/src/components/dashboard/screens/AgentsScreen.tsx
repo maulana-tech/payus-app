@@ -4,9 +4,14 @@ import {
   ArrowRight,
   Check,
   ChevronRight,
+  History,
   Loader2,
   Paperclip,
+  Pin,
+  PinOff,
+  Plus,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -110,19 +115,203 @@ function answered(
   };
 }
 
+/**
+ * The conversations, down the right-hand side.
+ *
+ * A transcript that only ever grows is one you stop reading, so a question
+ * and its follow-ups are a conversation you can reopen, pin to the top, or
+ * throw away on its own. Deleting is two clicks and the second one is
+ * labelled: a bin that acts on the first click is a bin that eventually
+ * takes the wrong row.
+ */
+function Conversations({
+  chats,
+  current,
+  loading,
+  onOpen,
+  onPin,
+  onDelete,
+}: {
+  chats: {
+    id: string;
+    title: string;
+    pinned: boolean;
+    turns: number;
+    at: string;
+  }[];
+  current: string | null;
+  loading: boolean;
+  onOpen: (id: string | null) => void;
+  onPin: (id: string, pinned: boolean) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [arming, setArming] = useState<string | null>(null);
+  const pinned = chats.filter((chat) => chat.pinned);
+  const rest = chats.filter((chat) => !chat.pinned);
+
+  const Group = ({ label, of }: { label: string; of: typeof chats }) =>
+    of.length === 0 ? null : (
+      <div className="grid gap-0.5">
+        <p className="px-2 pt-3 pb-1 text-[10px] font-semibold tracking-[0.14em] text-(--dash-ash) uppercase">
+          {label}
+        </p>
+        {of.map((chat) => {
+          const open = chat.id === current;
+          return (
+            <div
+              key={chat.id}
+              className={`group/row relative rounded-(--dash-radius-sm) ${
+                open ? "bg-(--dash-tint)" : "hover:bg-(--dash-tint)"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => onOpen(chat.id)}
+                aria-current={open ? "true" : undefined}
+                // The padding on the right leaves the two controls room, so
+                // a long title is truncated rather than running under them.
+                className={`w-full rounded-(--dash-radius-sm) py-2 pr-14 pl-2 text-left ${dashFocus}`}
+              >
+                <span
+                  className={`block truncate text-[13px] leading-5 ${
+                    open ? "text-(--dash-fg)" : "text-(--dash-fg)/85"
+                  }`}
+                >
+                  {chat.title}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-(--dash-ash)">
+                  {chat.turns} question{chat.turns === 1 ? "" : "s"} ·{" "}
+                  {dayLabel(chat.at)}
+                </span>
+              </button>
+
+              {arming === chat.id ? (
+                // Armed: the row says what the next click does, in words.
+                <div className="absolute inset-y-0 right-1 flex items-center gap-1 bg-(--dash-surface) pl-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onDelete(chat.id);
+                      setArming(null);
+                    }}
+                    className={`rounded-(--dash-radius-sm) px-2 py-1 text-[11px] font-semibold text-(--dash-err) hover:bg-(--dash-err)/10 ${dashFocus}`}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setArming(null)}
+                    className={`rounded-(--dash-radius-sm) px-2 py-1 text-[11px] text-(--dash-ash) hover:text-(--dash-fg) ${dashFocus}`}
+                  >
+                    Keep
+                  </button>
+                </div>
+              ) : (
+                <div className="absolute top-1.5 right-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100 has-[:focus-visible]:opacity-100">
+                  <button
+                    type="button"
+                    onClick={() => onPin(chat.id, !chat.pinned)}
+                    aria-label={
+                      chat.pinned
+                        ? `Unpin ${chat.title}`
+                        : `Pin ${chat.title} to the top`
+                    }
+                    title={chat.pinned ? "Unpin" : "Pin to the top"}
+                    className={`rounded-(--dash-radius-sm) p-1.5 text-(--dash-ash) hover:text-(--dash-fg) ${dashFocus}`}
+                  >
+                    {chat.pinned ? (
+                      <PinOff className="size-3.5" aria-hidden />
+                    ) : (
+                      <Pin className="size-3.5" aria-hidden />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setArming(chat.id)}
+                    aria-label={`Delete ${chat.title}`}
+                    title="Delete"
+                    className={`rounded-(--dash-radius-sm) p-1.5 text-(--dash-ash) hover:text-(--dash-err) ${dashFocus}`}
+                  >
+                    <Trash2 className="size-3.5" aria-hidden />
+                  </button>
+                </div>
+              )}
+              {/* A pinned row says so even when nothing is hovering it. */}
+              {chat.pinned ? (
+                <Pin
+                  className="pointer-events-none absolute top-3 right-2 size-3 text-(--dash-ash) group-hover/row:opacity-0"
+                  aria-hidden
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    );
+
+  return (
+    <div className="flex h-full flex-col">
+      <button
+        type="button"
+        onClick={() => onOpen(null)}
+        className={`flex w-full items-center gap-2 rounded-(--dash-radius-sm) border border-(--dash-line) px-2.5 py-2 text-[13px] transition-colors hover:border-(--dash-line-strong) hover:bg-(--dash-tint) ${dashFocus}`}
+      >
+        <Plus className="size-3.5 shrink-0 text-(--dash-ash)" aria-hidden />
+        New conversation
+      </button>
+
+      <div className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
+        {loading ? (
+          <p className="px-2 py-4 text-[11px] text-(--dash-ash)">Loading…</p>
+        ) : chats.length === 0 ? (
+          <p className="px-2 py-4 text-[11px] leading-5 text-(--dash-ash)">
+            Nothing yet. Every question you ask is kept here, with the rows it
+            was answered from.
+          </p>
+        ) : (
+          <>
+            <Group label="Pinned" of={pinned} />
+            <Group
+              label={pinned.length > 0 ? "Everything else" : "Recent"}
+              of={rest}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AgentsScreen() {
   const status = trpc.agents.status.useQuery();
+  const utils = trpc.useUtils();
+  const chats = trpc.agents.chats.useQuery();
+  // Two ids, because they answer different questions. `openChat` is what is
+  // *read* from the server; `sendTo` is where the next question goes. They
+  // part company exactly once: the first answer in a new conversation comes
+  // back with an id, and if that id were also fed to the reader the server
+  // would hand back the turn that is already on screen and show it twice.
+  // In both, `undefined` means "not chosen yet" and `null` means "a new
+  // conversation".
+  const [openChat, setOpenChat] = useState<string | null | undefined>();
+  const [sendTo, setSendTo] = useState<string | null | undefined>();
+  const chatId =
+    openChat === undefined ? (chats.data?.latest ?? null) : openChat;
+  const target = sendTo === undefined ? chatId : sendTo;
   // Fetched once and left alone: `fresh` already holds this session's turns,
   // so a refetch would show each of them twice until the page reloads.
-  const history = trpc.agents.advisorHistory.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    staleTime: Number.POSITIVE_INFINITY,
-  });
-  const forget = trpc.agents.forgetAdvisorHistory.useMutation();
+  const history = trpc.agents.chatTurns.useQuery(
+    { chatId: chatId ?? "" },
+    {
+      enabled: Boolean(chatId),
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    },
+  );
   // What was asked before, plus what has been asked since this page opened.
   const [fresh, setFresh] = useState<Turn[]>([]);
-  const kept: Turn[] = (history.data ?? []).flatMap((turn) => [
+  const kept: Turn[] = (chatId ? (history.data ?? []) : []).flatMap((turn) => [
     { from: "you" as const, text: turn.question, at: turn.at },
     {
       from: "advisor" as const,
@@ -157,6 +346,37 @@ export function AgentsScreen() {
   const started = useRef(0);
   // Which run's detail is open, by its index in the transcript.
   const [showing, setShowing] = useState<number | null>(null);
+  // Below `lg` the rail has nowhere to stand, so it becomes a drawer.
+  const [railOpen, setRailOpen] = useState(false);
+
+  // Every answer says which conversation it landed in. The list is
+  // invalidated so a brand-new one appears in the rail the moment it exists.
+  const landed = (chat: string | null | undefined) => {
+    if (chat) setSendTo(chat);
+    void utils.agents.chats.invalidate();
+  };
+  const pin = trpc.agents.pinChat.useMutation({
+    onSuccess: () => void utils.agents.chats.invalidate(),
+  });
+  const remove = trpc.agents.deleteChat.useMutation({
+    onSuccess: () => void utils.agents.chats.invalidate(),
+  });
+  // Opening a conversation replaces what is on screen: this session's turns
+  // belong to the one they were asked in.
+  const openConversation = (id: string | null) => {
+    setOpenChat(id);
+    setSendTo(id);
+    setFresh([]);
+    setShowing(null);
+    setRailOpen(false);
+  };
+
+  // Deleting the conversation you are reading leaves nothing to read, so it
+  // moves you to a new one rather than to an empty page with a title.
+  const deleteConversation = (id: string) => {
+    remove.mutate({ chatId: id });
+    if (id === target || id === chatId) openConversation(null);
+  };
 
   const check = trpc.agents.reconcileTable.useMutation({
     onSuccess: (report) =>
@@ -165,17 +385,26 @@ export function AgentsScreen() {
       setFresh((t) => [...t, { from: "refused", text: error.message }]),
   });
   const onDocument = trpc.agents.askAboutDocument.useMutation({
-    onSuccess: (reply) => setFresh((t) => [...t, answered(reply, started)]),
+    onSuccess: (reply) => {
+      setFresh((t) => [...t, answered(reply, started)]);
+      landed(reply.chatId);
+    },
     onError: (error) =>
       setFresh((t) => [...t, { from: "refused", text: error.message }]),
   });
   const onTable = trpc.agents.askAboutTable.useMutation({
-    onSuccess: (reply) => setFresh((t) => [...t, answered(reply, started)]),
+    onSuccess: (reply) => {
+      setFresh((t) => [...t, answered(reply, started)]);
+      landed(reply.chatId);
+    },
     onError: (error) =>
       setFresh((t) => [...t, { from: "refused", text: error.message }]),
   });
   const ask = trpc.agents.runAdvisor.useMutation({
-    onSuccess: (reply) => setFresh((t) => [...t, answered(reply, started)]),
+    onSuccess: (reply) => {
+      setFresh((t) => [...t, answered(reply, started)]);
+      landed(reply.chatId);
+    },
     // A refusal is an answer too — it belongs in the transcript, in order,
     // not in a box above it that the next question wipes.
     onError: (error) =>
@@ -201,16 +430,26 @@ export function AgentsScreen() {
     setText("");
     started.current = Date.now();
     if (file?.kind === "table") {
-      onTable.mutate({ question: q, name: file.name, csv: file.csv });
+      onTable.mutate({
+        question: q,
+        name: file.name,
+        csv: file.csv,
+        chatId: target,
+      });
       setFile(null);
       return;
     }
     if (file?.kind === "document") {
-      onDocument.mutate({ question: q, name: file.name, text: file.text });
+      onDocument.mutate({
+        question: q,
+        name: file.name,
+        text: file.text,
+        chatId: target,
+      });
       setFile(null);
       return;
     }
-    ask.mutate({ question: q });
+    ask.mutate({ question: q, chatId: target });
   };
 
   const attach = async (picked: File) => {
@@ -396,6 +635,9 @@ export function AgentsScreen() {
   // An empty transcript and an unreadable one look identical, and the
   // difference matters: one means nothing was asked, the other means the
   // record could not be read. Say which.
+  const openTitle =
+    chats.data?.chats.find((chat) => chat.id === target)?.title ??
+    "New conversation";
   const historyNote = history.error ? (
     <ErrorNote>
       Your earlier questions could not be loaded, so only this session is shown.{" "}
@@ -407,151 +649,184 @@ export function AgentsScreen() {
     // Measured against the shell rather than guessed: the page header and
     // the main's own padding take 259px on a desktop and rather more on a
     // phone, where the tab bar is also in the way.
-    <div className="flex h-[calc(100svh-19rem)] min-h-96 flex-col lg:h-[calc(100svh-17rem)]">
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {turns.length === 0 && !busy && !history.isLoading ? (
-          // Nothing asked yet: an introduction and the questions it can
-          // actually answer. The composer does not move to meet them — a
-          // reply box that travels is one you have to find twice.
-          <div className="mx-auto flex h-full w-full max-w-xl flex-col justify-center py-6">
-            <div className="text-center">
-              <Sparkles
-                className="mx-auto size-5 text-(--dash-ash)"
-                aria-hidden
-              />
-              <h2 className="mt-3 text-xl tracking-tight">Ask the Advisor</h2>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-(--dash-ash)">
-                It does not write the query. It picks one of six we wrote, we
-                run it scoped to you, and the rows come back under the answer.
-              </p>
-            </div>
-            <ul className="mt-6 grid gap-2">
-              {EXAMPLES.map((example) => (
-                <li key={example}>
-                  <button
-                    type="button"
-                    onClick={() => send(example)}
-                    className={`group flex w-full items-center gap-3 rounded-(--dash-radius) border border-(--dash-line) px-4 py-3 text-left text-sm transition-colors hover:border-(--dash-line-strong) hover:bg-(--dash-tint) ${dashFocus}`}
-                  >
-                    <span className="flex-1">{example}</span>
-                    <ArrowRight
-                      className="size-4 shrink-0 text-(--dash-ash) transition-colors group-hover:text-(--dash-fg)"
-                      aria-hidden
-                    />
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {historyNote ? <div className="mt-4">{historyNote}</div> : null}
-          </div>
-        ) : (
-          <div className={`${COLUMN} grid gap-6 py-6`}>
-            {historyNote}
-            {kept.length > 0 ? (
-              <p className="text-center text-[11px] text-(--dash-ash)">
-                {kept.length / 2} earlier question
-                {kept.length === 2 ? "" : "s"} — the whole transcript is here,
-                oldest first.
-              </p>
-            ) : null}
-            {turns.map((turn, index) =>
-              turn.from === "you" ? (
-                <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a transcript is append-only
-                  key={index}
-                  className="grid justify-items-end gap-1.5"
-                >
-                  {dayChanged(turns, index) ? (
-                    <span className="mx-auto -mt-2 mb-1 text-[11px] text-(--dash-ash)">
-                      {dayLabel(turn.at)}
-                    </span>
-                  ) : null}
-                  {turn.attached ? (
-                    <span className="flex items-center gap-1.5 rounded-full border border-(--dash-line) px-3 py-1 text-[11px] text-(--dash-ash)">
-                      <Paperclip className="size-3" aria-hidden />
-                      {turn.attached}
-                    </span>
-                  ) : null}
-                  {/* The wrapper runs the full width so the day marker can
-                      sit in the middle of it; the bubble keeps its measure. */}
-                  <p className="max-w-[85%] rounded-(--dash-radius) rounded-br-sm bg-(--dash-fg) px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-line text-(--dash-surface)">
-                    {turn.text}
-                  </p>
-                </div>
-              ) : (
-                // biome-ignore lint/suspicious/noArrayIndexKey: a transcript is append-only
-                <div key={index} className="grid gap-3">
-                  <Who
-                    meta={turn.from === "advisor" ? "answered" : "refused"}
-                  />
-                  {turn.from === "reconciled" ? (
-                    <ReconciledReport report={turn.report} />
-                  ) : turn.from === "refused" ? (
-                    <ErrorNote>{turn.text}</ErrorNote>
-                  ) : (
-                    <>
-                      <p className="text-[15px] leading-relaxed">{turn.text}</p>
-                      {turn.source === "document" ? (
-                        <Unchecked name={turn.caption} />
-                      ) : (
-                        <Rows caption={turn.caption} rows={turn.rows} />
-                      )}
-                      <RunBar
-                        query={turn.query}
-                        rows={turn.rows.length}
-                        seconds={turn.seconds}
-                        onOpen={() => setShowing(index)}
-                      />
-                    </>
-                  )}
-                </div>
-              ),
-            )}
-
-            {ask.isPending ? (
-              <div className="grid gap-3">
-                <Who meta="thinking…" busy />
-                <p className="text-sm text-(--dash-ash)">
-                  Choosing which of the six would answer this.
-                </p>
-              </div>
-            ) : null}
-            <div ref={bottom} />
-          </div>
-        )}
-      </div>
-
-      {/* Always here, at the bottom, whether or not anything has been asked. */}
-      <div className="shrink-0 pt-2">
-        <div className={COLUMN}>
-          {fileError ? (
-            <p className="mb-2 text-[11px] text-(--dash-err)" role="alert">
-              {fileError}
-            </p>
-          ) : null}
-          {composer}
-        </div>
-      </div>
-
-      {turns.length > 0 ? (
-        <div className="shrink-0 pt-2 text-right">
+    <div className="flex h-[calc(100svh-19rem)] min-h-96 gap-5 lg:h-[calc(100svh-17rem)]">
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Below `lg` the rail is a drawer, so the way to it has to be on the
+          page. It sits above the transcript rather than in the composer:
+          the composer is for asking, and this is not asking. */}
+        <div className="flex shrink-0 items-center justify-between gap-3 pb-1 lg:hidden">
+          <p className="min-w-0 truncate text-[11px] text-(--dash-ash)">
+            {openTitle}
+          </p>
           <button
             type="button"
-            disabled={forget.isPending}
-            onClick={() => {
-              forget.mutate(undefined, {
-                onSuccess: () => {
-                  setFresh([]);
-                  void history.refetch();
-                },
-              });
-            }}
-            className={`text-[11px] text-(--dash-ash) underline-offset-2 hover:underline disabled:opacity-40 ${dashFocus}`}
+            onClick={() => setRailOpen(true)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border border-(--dash-line) px-2.5 py-1 text-[11px] text-(--dash-ash) transition-colors hover:border-(--dash-line-strong) hover:text-(--dash-fg) ${dashFocus}`}
           >
-            {forget.isPending ? "Clearing…" : "Clear this transcript"}
+            <History className="size-3.5" aria-hidden />
+            History
+            {chats.data?.chats.length ? ` (${chats.data.chats.length})` : ""}
           </button>
         </div>
-      ) : null}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {turns.length === 0 && !busy && !history.isLoading ? (
+            // Nothing asked yet: an introduction and the questions it can
+            // actually answer. The composer does not move to meet them — a
+            // reply box that travels is one you have to find twice.
+            <div className="mx-auto flex h-full w-full max-w-xl flex-col justify-center py-6">
+              <div className="text-center">
+                <Sparkles
+                  className="mx-auto size-5 text-(--dash-ash)"
+                  aria-hidden
+                />
+                <h2 className="mt-3 text-xl tracking-tight">Ask the Advisor</h2>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-(--dash-ash)">
+                  It does not write the query. It picks one of six we wrote, we
+                  run it scoped to you, and the rows come back under the answer.
+                </p>
+              </div>
+              <ul className="mt-6 grid gap-2">
+                {EXAMPLES.map((example) => (
+                  <li key={example}>
+                    <button
+                      type="button"
+                      onClick={() => send(example)}
+                      className={`group flex w-full items-center gap-3 rounded-(--dash-radius) border border-(--dash-line) px-4 py-3 text-left text-sm transition-colors hover:border-(--dash-line-strong) hover:bg-(--dash-tint) ${dashFocus}`}
+                    >
+                      <span className="flex-1">{example}</span>
+                      <ArrowRight
+                        className="size-4 shrink-0 text-(--dash-ash) transition-colors group-hover:text-(--dash-fg)"
+                        aria-hidden
+                      />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {historyNote ? <div className="mt-4">{historyNote}</div> : null}
+            </div>
+          ) : (
+            <div className={`${COLUMN} grid gap-6 py-6`}>
+              {historyNote}
+              {kept.length > 0 ? (
+                <p className="text-center text-[11px] text-(--dash-ash)">
+                  {kept.length / 2} earlier question
+                  {kept.length === 2 ? "" : "s"} — the whole transcript is here,
+                  oldest first.
+                </p>
+              ) : null}
+              {turns.map((turn, index) =>
+                turn.from === "you" ? (
+                  <div
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a transcript is append-only
+                    key={index}
+                    className="grid justify-items-end gap-1.5"
+                  >
+                    {dayChanged(turns, index) ? (
+                      <span className="mx-auto -mt-2 mb-1 text-[11px] text-(--dash-ash)">
+                        {dayLabel(turn.at)}
+                      </span>
+                    ) : null}
+                    {turn.attached ? (
+                      <span className="flex items-center gap-1.5 rounded-full border border-(--dash-line) px-3 py-1 text-[11px] text-(--dash-ash)">
+                        <Paperclip className="size-3" aria-hidden />
+                        {turn.attached}
+                      </span>
+                    ) : null}
+                    {/* The wrapper runs the full width so the day marker can
+                      sit in the middle of it; the bubble keeps its measure. */}
+                    <p className="max-w-[85%] rounded-(--dash-radius) rounded-br-sm bg-(--dash-fg) px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-line text-(--dash-surface)">
+                      {turn.text}
+                    </p>
+                  </div>
+                ) : (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a transcript is append-only
+                  <div key={index} className="grid gap-3">
+                    <Who
+                      meta={turn.from === "advisor" ? "answered" : "refused"}
+                    />
+                    {turn.from === "reconciled" ? (
+                      <ReconciledReport report={turn.report} />
+                    ) : turn.from === "refused" ? (
+                      <ErrorNote>{turn.text}</ErrorNote>
+                    ) : (
+                      <>
+                        <p className="text-[15px] leading-relaxed">
+                          {turn.text}
+                        </p>
+                        {turn.source === "document" ? (
+                          <Unchecked name={turn.caption} />
+                        ) : (
+                          <Rows caption={turn.caption} rows={turn.rows} />
+                        )}
+                        <RunBar
+                          query={turn.query}
+                          rows={turn.rows.length}
+                          seconds={turn.seconds}
+                          onOpen={() => setShowing(index)}
+                        />
+                      </>
+                    )}
+                  </div>
+                ),
+              )}
+
+              {ask.isPending ? (
+                <div className="grid gap-3">
+                  <Who meta="thinking…" busy />
+                  <p className="text-sm text-(--dash-ash)">
+                    Choosing which of the six would answer this.
+                  </p>
+                </div>
+              ) : null}
+              <div ref={bottom} />
+            </div>
+          )}
+        </div>
+
+        {/* Always here, at the bottom, whether or not anything has been asked. */}
+        <div className="shrink-0 pt-2">
+          <div className={COLUMN}>
+            {fileError ? (
+              <p className="mb-2 text-[11px] text-(--dash-err)" role="alert">
+                {fileError}
+              </p>
+            ) : null}
+            {composer}
+          </div>
+        </div>
+      </div>
+
+      {/* The rail, where there is room for it. */}
+      <aside
+        aria-label="Conversations"
+        className="hidden w-60 shrink-0 border-l border-(--dash-line) pl-4 lg:block"
+      >
+        <Conversations
+          chats={chats.data?.chats ?? []}
+          current={target}
+          loading={chats.isLoading}
+          onOpen={openConversation}
+          onPin={(id, pinned) => pin.mutate({ chatId: id, pinned })}
+          onDelete={deleteConversation}
+        />
+      </aside>
+
+      {/* And the same list as a drawer, for the widths that have no room. */}
+      <RunPanel
+        open={railOpen}
+        onClose={() => setRailOpen(false)}
+        title="Conversations"
+        subtitle="Every question you have asked, kept with its rows"
+      >
+        <Conversations
+          chats={chats.data?.chats ?? []}
+          current={target}
+          loading={chats.isLoading}
+          onOpen={openConversation}
+          onPin={(id, pinned) => pin.mutate({ chatId: id, pinned })}
+          onDelete={deleteConversation}
+        />
+      </RunPanel>
 
       <RunPanel
         open={open?.from === "advisor"}

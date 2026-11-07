@@ -39,9 +39,14 @@ import {
   runCollector,
 } from "./collector.agent";
 import {
-  advisorHistory,
+  chatTurns,
+  deleteChat,
   forgetAdvisorHistory,
+  latestChatId,
+  listChats,
   recordAdvisorTurn,
+  renameChat,
+  setChatPinned,
 } from "./history.service";
 import { runPayer } from "./payer.agent";
 import { runReporter } from "./reporter.agent";
@@ -151,19 +156,34 @@ export const agentsRouter = createTRPCRouter({
 
   /** Asks the Advisor a question; it picks one of our queries to answer it. */
   runAdvisor: protectedProcedure
-    .input(z.object({ question: z.string().trim().min(3).max(300) }).strict())
+    .input(
+      z
+        .object({
+          question: z.string().trim().min(3).max(300),
+          chatId: z.string().min(1).max(64).nullish(),
+        })
+        .strict(),
+    )
     .mutation(async ({ ctx, input }) => {
       const owner = await requireUsername(ctx.privyUserId);
       const started = Date.now();
       const answer = await runAdvisor(owner, input.question).catch(mapError);
       // Recorded by the service that ran it, not by the seat itself. A
       // failure to keep the transcript must not lose the answer.
-      await recordAdvisorTurn(owner, answer, Date.now() - started, "app").catch(
-        (error: unknown) => {
-          console.error("[advisor] could not keep the turn:", error);
-        },
-      );
-      return answer;
+      // The chat the turn landed in goes back with the answer, so the next
+      // question stays in the same conversation. A failure to keep the
+      // transcript must not lose the answer, so a null chat is survivable.
+      const chatId = await recordAdvisorTurn(
+        owner,
+        input.chatId ?? null,
+        answer,
+        Date.now() - started,
+        "app",
+      ).catch((error: unknown) => {
+        console.error("[advisor] could not keep the turn:", error);
+        return null;
+      });
+      return { ...answer, chatId };
     }),
 
   /**
@@ -178,6 +198,7 @@ export const agentsRouter = createTRPCRouter({
           question: z.string().trim().min(3).max(300),
           name: z.string().trim().min(1).max(120),
           csv: z.string().min(1).max(MAX_UPLOAD_CHARS),
+          chatId: z.string().min(1).max(64).nullish(),
         })
         .strict(),
     )
@@ -200,12 +221,20 @@ export const agentsRouter = createTRPCRouter({
         name: input.name,
         rows: table.rows,
       }).catch(mapError);
-      await recordAdvisorTurn(owner, answer, Date.now() - started, "app").catch(
-        (error: unknown) => {
-          console.error("[advisor] could not keep the turn:", error);
-        },
-      );
-      return answer;
+      // The chat the turn landed in goes back with the answer, so the next
+      // question stays in the same conversation. A failure to keep the
+      // transcript must not lose the answer, so a null chat is survivable.
+      const chatId = await recordAdvisorTurn(
+        owner,
+        input.chatId ?? null,
+        answer,
+        Date.now() - started,
+        "app",
+      ).catch((error: unknown) => {
+        console.error("[advisor] could not keep the turn:", error);
+        return null;
+      });
+      return { ...answer, chatId };
     }),
 
   /**
@@ -220,6 +249,7 @@ export const agentsRouter = createTRPCRouter({
           question: z.string().trim().min(3).max(300),
           name: z.string().trim().min(1).max(120),
           text: z.string().trim().min(1).max(MAX_TEXT_CHARS),
+          chatId: z.string().min(1).max(64).nullish(),
         })
         .strict(),
     )
@@ -230,12 +260,20 @@ export const agentsRouter = createTRPCRouter({
         name: input.name,
         text: input.text,
       }).catch(mapError);
-      await recordAdvisorTurn(owner, answer, Date.now() - started, "app").catch(
-        (error: unknown) => {
-          console.error("[advisor] could not keep the turn:", error);
-        },
-      );
-      return answer;
+      // The chat the turn landed in goes back with the answer, so the next
+      // question stays in the same conversation. A failure to keep the
+      // transcript must not lose the answer, so a null chat is survivable.
+      const chatId = await recordAdvisorTurn(
+        owner,
+        input.chatId ?? null,
+        answer,
+        Date.now() - started,
+        "app",
+      ).catch((error: unknown) => {
+        console.error("[advisor] could not keep the turn:", error);
+        return null;
+      });
+      return { ...answer, chatId };
     }),
 
   /**
@@ -293,10 +331,52 @@ export const agentsRouter = createTRPCRouter({
       };
     }),
 
-  /** The transcript, so a refresh does not throw the conversation away. */
-  advisorHistory: protectedProcedure.query(async ({ ctx }) =>
-    advisorHistory(await requireUsername(ctx.privyUserId)),
-  ),
+  /** The conversations, pinned first. */
+  chats: protectedProcedure.query(async ({ ctx }) => {
+    const owner = await requireUsername(ctx.privyUserId);
+    return { chats: await listChats(owner), latest: await latestChatId(owner) };
+  }),
+
+  /** One conversation, so a refresh does not throw it away. */
+  chatTurns: protectedProcedure
+    .input(z.object({ chatId: z.string().min(1).max(64) }).strict())
+    .query(async ({ ctx, input }) =>
+      chatTurns(await requireUsername(ctx.privyUserId), input.chatId),
+    ),
+
+  pinChat: protectedProcedure
+    .input(z.object({ chatId: z.string().min(1).max(64), pinned: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await setChatPinned(
+        await requireUsername(ctx.privyUserId),
+        input.chatId,
+        input.pinned,
+      );
+      return { ok: true };
+    }),
+
+  renameChat: protectedProcedure
+    .input(
+      z.object({
+        chatId: z.string().min(1).max(64),
+        title: z.string().trim().min(1).max(120),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await renameChat(
+        await requireUsername(ctx.privyUserId),
+        input.chatId,
+        input.title,
+      );
+      return { ok: true };
+    }),
+
+  deleteChat: protectedProcedure
+    .input(z.object({ chatId: z.string().min(1).max(64) }).strict())
+    .mutation(async ({ ctx, input }) => {
+      await deleteChat(await requireUsername(ctx.privyUserId), input.chatId);
+      return { ok: true };
+    }),
 
   forgetAdvisorHistory: protectedProcedure.mutation(async ({ ctx }) => {
     await forgetAdvisorHistory(await requireUsername(ctx.privyUserId));

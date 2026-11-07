@@ -1,6 +1,6 @@
 "use client";
 
-import { demoUser, publicDemo } from "@/lib/demo";
+import { demoUser, isDemoOwner } from "@/lib/demo";
 import { useSession } from "../SessionProvider";
 
 // Says what this is, on every screen.
@@ -13,7 +13,10 @@ import { useSession } from "../SessionProvider";
 
 export function DemoBanner() {
   const { username } = useSession();
-  if (!publicDemo() && !demoUser()) return null;
+  // `publicDemo()` says the deployment offers sandboxes; it does not say
+  // this visitor is in one. Telling a real owner their money is made-up is
+  // the same mistake as not telling a visitor, pointed the other way.
+  if (!demoUser() && !(username && isDemoOwner(username))) return null;
   return (
     <p className="border-b border-(--dash-line) bg-(--dash-tint) px-4 py-1.5 text-center text-[11px] text-(--dash-ash)">
       <span className="font-semibold tracking-[0.1em] text-(--dash-fg) uppercase">

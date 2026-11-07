@@ -642,11 +642,39 @@ export type StorefrontRow = typeof storefronts.$inferSelect;
  * by the sender. Keeping the rows beside the answer is the point: an answer
  * whose rows you can no longer see is back to being a claim.
  */
+/**
+ * One conversation. A transcript that only ever grows is a transcript you
+ * stop reading, so the turns are grouped into sessions the owner can open,
+ * pin and throw away one at a time.
+ *
+ * The title is the first question, trimmed — not something a model wrote.
+ * Naming the conversation is a second place a model could put words on the
+ * screen, and it would buy nothing a prefix does not already give.
+ */
+export const advisorChats = pgTable(
+  "advisor_chats",
+  {
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(),
+    title: text("title").notNull(),
+    pinned: boolean("pinned").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("advisor_chats_by_owner").on(t.owner, t.updatedAt)],
+);
+
+export type AdvisorChatRow = typeof advisorChats.$inferSelect;
+
 export const advisorTurns = pgTable(
   "advisor_turns",
   {
     id: text("id").primaryKey(),
     owner: text("owner").notNull(),
+    /** The conversation this turn belongs to. */
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => advisorChats.id, { onDelete: "cascade" }),
     question: text("question").notNull(),
     /** One of the six query names; never anything the model composed. */
     query: text("query").notNull(),
@@ -666,7 +694,10 @@ export const advisorTurns = pgTable(
     askedVia: text("asked_via").$type<"app" | "telegram">().notNull(),
     createdAt: createdAt(),
   },
-  (t) => [index("advisor_turns_by_owner").on(t.owner, t.createdAt)],
+  (t) => [
+    index("advisor_turns_by_owner").on(t.owner, t.createdAt),
+    index("advisor_turns_by_chat").on(t.chatId, t.createdAt),
+  ],
 );
 
 export type AdvisorTurnRow = typeof advisorTurns.$inferSelect;
