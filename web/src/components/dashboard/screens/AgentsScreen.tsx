@@ -221,7 +221,11 @@ export function AgentsScreen() {
 
   const composer = (
     <form
-      className="rounded-(--dash-radius) border border-(--dash-line-strong) bg-(--dash-surface) p-2.5 focus-within:border-(--dash-fg)"
+      // No box: the composer sits in the page rather than on it. A border
+      // here drew a second edge inside the one the panel already has, and
+      // the rule above it ran the full width of the screen while the
+      // composer stopped well short of both sides.
+      className="pb-1"
       onSubmit={(event) => {
         event.preventDefault();
         send(text);
@@ -402,14 +406,14 @@ export function AgentsScreen() {
                     <ErrorNote>{turn.text}</ErrorNote>
                   ) : (
                     <>
+                      <p className="text-[15px] leading-relaxed">{turn.text}</p>
+                      <Rows caption={turn.caption} rows={turn.rows} />
                       <RunBar
                         query={turn.query}
                         rows={turn.rows.length}
                         seconds={turn.seconds}
                         onOpen={() => setShowing(index)}
                       />
-                      <p className="text-[15px] leading-relaxed">{turn.text}</p>
-                      <Rows caption={turn.caption} rows={turn.rows} />
                     </>
                   )}
                 </div>
@@ -430,7 +434,7 @@ export function AgentsScreen() {
       </div>
 
       {/* Always here, at the bottom, whether or not anything has been asked. */}
-      <div className="shrink-0 border-t border-(--dash-line) pt-3">
+      <div className="shrink-0 pt-2">
         <div className={COLUMN}>
           {fileError ? (
             <p className="mb-2 text-[11px] text-(--dash-err)" role="alert">
@@ -477,7 +481,7 @@ export function AgentsScreen() {
   );
 }
 
-/** The bar in the transcript that opens the detail. */
+/** The line under an answer that opens the detail behind it. */
 function RunBar({
   query,
   rows,
@@ -493,18 +497,18 @@ function RunBar({
     <button
       type="button"
       onClick={onOpen}
-      className={`group flex w-full items-center justify-between gap-3 rounded-(--dash-radius) border border-(--dash-line) bg-(--dash-tint) px-3.5 py-2.5 text-left text-xs transition-colors hover:border-(--dash-line-strong) ${dashFocus}`}
+      // A line, not a bar. Boxing this put a frame around the quietest part
+      // of the turn and pushed the answer — the thing being read — further
+      // down the page.
+      className={`group -mt-1 flex items-center gap-1.5 self-start text-[11px] text-(--dash-ash) transition-colors hover:text-(--dash-fg) ${dashFocus}`}
     >
-      <span className="flex min-w-0 items-center gap-2">
-        <Check className="size-3.5 shrink-0" aria-hidden />
-        <span className="truncate">
-          Looked at <span className="font-mono">{query}</span> · {rows} row
-          {rows === 1 ? "" : "s"}
-          <span className="text-(--dash-ash)"> · {seconds.toFixed(1)}s</span>
-        </span>
+      <Check className="size-3 shrink-0" aria-hidden />
+      <span>
+        Looked at <span className="font-mono">{query}</span> · {rows} row
+        {rows === 1 ? "" : "s"} · {seconds.toFixed(1)}s
       </span>
       <ChevronRight
-        className="size-4 shrink-0 text-(--dash-ash) transition-transform group-hover:translate-x-0.5"
+        className="size-3 shrink-0 transition-transform group-hover:translate-x-0.5"
         aria-hidden
       />
     </button>
