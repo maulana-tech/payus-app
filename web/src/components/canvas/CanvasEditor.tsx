@@ -553,9 +553,19 @@ function HtmlPane({
             from Google Fonts are allowed.
           </p>
         )}
-        <p className="mt-1 text-[12px] text-(--dash-ash) tabular-nums">
-          {value.length}/{MAX_HTML}
-        </p>
+        {/* The editor cuts anything past the limit, so sitting exactly on
+            it almost always means a paste was cut mid-tag. A bare
+            "40000/40000" reads as "it fits". */}
+        {value.length >= MAX_HTML ? (
+          <p className="mt-1 text-[12px] text-(--dash-err)" role="status">
+            {MAX_HTML.toLocaleString()} characters — the limit. Anything you
+            pasted past this was cut, probably in the middle of a tag.
+          </p>
+        ) : (
+          <p className="mt-1 text-[12px] text-(--dash-ash) tabular-nums">
+            {value.length.toLocaleString()}/{MAX_HTML.toLocaleString()}
+          </p>
+        )}
       </div>
     </div>
   );
