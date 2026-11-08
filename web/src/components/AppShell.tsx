@@ -138,7 +138,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           <DashboardShell contentClassName="flex min-h-svh max-w-3xl flex-col">
             <header className="grid min-w-0 grid-cols-[1fr_auto_1fr] items-center">
               <BackLink className="justify-self-start" />
-              <Link href="/" aria-label="Payus home">
+              {/* col-start-2 explicitly: `BackLink` renders nothing when
+                  there is no history to go back to, which is every payer
+                  opening this from an email — and without a first child the
+                  mark fell into column one and sat off to the left. */}
+              <Link href="/" aria-label="Payus home" className="col-start-2">
                 <Image
                   src="/assets/payus-white.svg"
                   alt="Payus"

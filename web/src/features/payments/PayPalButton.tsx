@@ -156,8 +156,13 @@ export function PayPalButton({
     );
 
   return (
-    <div className="grid gap-2">
-      <div ref={container} />
+    <div className="grid gap-3">
+      {/* PayPal renders its buttons on white and we cannot change that, so
+          the white is made deliberate: rounded to the card's own radius and
+          inset, rather than a square slab bleeding to the edges. */}
+      <div className="overflow-hidden rounded-(--dash-radius) bg-white p-2">
+        <div ref={container} />
+      </div>
       {working ? (
         <p className="text-sm" role="status">
           Recording the payment…

@@ -1,6 +1,7 @@
 "use client";
 
 import { postToParent } from "@/features/embed/bridge";
+import { formatMinor, toMinor } from "@/features/invoices/money";
 import { PayPalButton, post } from "@/features/payments/PayPalButton";
 import { cn } from "@/lib/utils";
 import { trpc } from "../../trpc/react";
@@ -35,12 +36,14 @@ export function InvoicePanel({
     <Card className={cn("grid gap-4 p-6", embed && "shadow-none")}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <p className="text-xs uppercase tracking-wide text-(--dash-ash)">
+          <p className="text-[11px] font-semibold tracking-[0.16em] text-(--dash-ash) uppercase">
             Invoice {inv.number}
           </p>
-          <h1 className="text-2xl">{inv.totalFormatted}</h1>
+          <h1 className="mt-1 text-4xl leading-none tracking-tight tabular-nums">
+            {inv.totalFormatted}
+          </h1>
         </div>
-        <span className="rounded-full bg-(--dash-tint) px-3 py-1 text-xs uppercase tracking-wide">
+        <span className="rounded-full border border-(--dash-line) px-3 py-1 text-[11px] font-semibold tracking-[0.14em] uppercase">
           {inv.status}
         </span>
       </div>
@@ -58,7 +61,16 @@ export function InvoicePanel({
             <span className="min-w-0 truncate text-(--dash-ash)">
               {item.quantity} × {item.description}
             </span>
-            <span className="tabular-nums">{item.unitPrice}</span>
+            {/* The line's total, formatted like the headline: a bare
+                `1000.00` beside a `$1,000.00` reads as a different kind of
+                number, and with a quantity above one it was a different
+                number — the unit price, against a total. */}
+            <span className="shrink-0 tabular-nums">
+              {formatMinor(
+                toMinor(item.unitPrice) * BigInt(item.quantity),
+                inv.currency,
+              )}
+            </span>
           </li>
         ))}
       </ul>
@@ -80,12 +92,17 @@ export function InvoicePanel({
           }}
         />
       ) : (
-        <p className="rounded-lg bg-(--dash-tint) p-4 text-sm text-(--dash-ash)">
+        <p className="rounded-(--dash-radius) bg-(--dash-tint) p-4 text-sm text-(--dash-ash)">
           {inv.status === "paid"
             ? "Paid in full. Thank you."
             : "This invoice was cancelled."}
         </p>
       )}
+      {inv.status === "pending" ? (
+        <p className="text-center text-[11px] tracking-[0.1em] text-(--dash-ash) uppercase">
+          Paid securely with PayPal · Payus never sees your card
+        </p>
+      ) : null}
     </Card>
   );
 }
