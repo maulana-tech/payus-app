@@ -157,10 +157,21 @@ export function PayPalButton({
 
   return (
     <div className="grid gap-3">
-      {/* PayPal renders its buttons on white and we cannot change that, so
-          the white is made deliberate: rounded to the card's own radius and
-          inset, rather than a square slab bleeding to the edges. */}
-      <div className="overflow-hidden rounded-(--dash-radius) bg-white p-2">
+      {/* No background of our own. PayPal's buttons arrive transparent and
+          sit straight on the card — a white panel behind them was ours, and
+          it read as a slab pasted onto a dark page.
+          
+          What stays white is the "Powered by PayPal" strip inside their
+          cross-origin frame — and below about 480px they paint the whole
+          block white, because their buttons switch layout there. That is
+          their chrome and their required attribution for the card button,
+          so it is not ours to remove or restyle; rounding the corners is
+          all we can do, so that whatever they paint matches the card.
+
+          `rounded-xl` as a literal, not `--dash-radius`: that token is the
+          dashboard's and is deliberately 0 there ("panels stay square"), so
+          using it here silently rounded nothing. */}
+      <div className="overflow-hidden rounded-xl">
         <div ref={container} />
       </div>
       {working ? (
