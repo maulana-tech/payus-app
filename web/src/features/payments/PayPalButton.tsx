@@ -101,7 +101,23 @@ export function PayPalButton({
         if (cancelled) return;
         return paypal
           .Buttons({
-            style: { layout: "vertical", shape: "pill", label: "pay" },
+            // `borderRadius` rather than `shape: "pill"`: the SDK says it
+            // takes priority over `shape`, and 12 is the card's own corner,
+            // so the buttons read as part of this page instead of as
+            // PayPal's default lozenge dropped into it.
+            //
+            // `height` fixes both buttons to one size — the SDK's own cap
+            // is 55, and it must not be combined with `disableMaxHeight`.
+            //
+            // What is *not* here: `tagline: false`. It only applies to
+            // `layout: "horizontal"`, and the "Powered by PayPal" line in a
+            // vertical stack is required attribution for the card button.
+            style: {
+              layout: "vertical",
+              label: "pay",
+              borderRadius: 12,
+              height: 48,
+            },
             createOrder: async () => {
               setError("");
               if (blocked.current)
