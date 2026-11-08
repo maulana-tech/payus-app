@@ -80,6 +80,8 @@ export function InvoicePanel({
       {inv.status === "pending" ? (
         <PayPalButton
           currency={inv.currency}
+          // Our own button, so it can say what it will take.
+          label={`Pay ${inv.totalFormatted}`}
           createOrder={async () =>
             (await post("/api/payments/paypal/orders", { token }))
               .orderId as string
@@ -98,11 +100,6 @@ export function InvoicePanel({
             : "This invoice was cancelled."}
         </p>
       )}
-      {inv.status === "pending" ? (
-        <p className="text-center text-[11px] tracking-[0.1em] text-(--dash-ash) uppercase">
-          Paid securely with PayPal · Payus never sees your card
-        </p>
-      ) : null}
     </Card>
   );
 }

@@ -2,46 +2,76 @@
 
 import { useEffect, useRef, useState } from "react";
 import { env } from "@/env";
+import { cn } from "@/lib/utils";
 
-// The payer's half of the money path: PayPal's buttons create an order
-// through our API and capture it through our API. The browser never names
+// The payer's half of the money path: our own button opens PayPal, PayPal
+// returns an approval, and our server captures it. The browser never names
 // an amount — the server reads what the invoice still owes.
+//
+// This is PayPal's v6 Web SDK, which exists so a site can keep its own
+// button. v5 rendered PayPal's buttons into a cross-origin iframe, which
+// brought a white panel, a "Powered by PayPal" strip we were not allowed to
+// remove, and a layout that changed under 480px. None of that is here: the
+// button below is ours, and PayPal appears only as the popup it opens.
+//
+// A bare client id is enough. The set-up page contradicts itself about this
+// — its examples mint a client token — so it was checked against the live
+// sandbox SDK before this was written: `createInstance({ clientId })`
+// resolves and hands back `createPayPalOneTimePaymentSession`.
 
-type PaypalNamespace = {
-  Buttons: (options: Record<string, unknown>) => {
-    render: (container: HTMLElement) => Promise<void>;
-    close?: () => void;
-  };
+type Session = {
+  start: (
+    options: { presentationMode?: "auto" | "popup" | "modal" | "redirect" },
+    order: Promise<{ orderId: string }>,
+  ) => Promise<void>;
+  destroy?: () => void;
+};
+
+type SdkInstance = {
+  createPayPalOneTimePaymentSession: (handlers: {
+    onApprove: (data: { orderId: string }) => void | Promise<void>;
+    onCancel?: (data?: { orderId?: string }) => void;
+    onError?: (cause: { code?: string; message?: string }) => void;
+  }) => Session;
 };
 
 declare global {
   interface Window {
-    paypal?: PaypalNamespace;
+    paypal?: { createInstance?: (o: unknown) => Promise<SdkInstance> };
   }
 }
 
-let loading: Promise<PaypalNamespace> | null = null;
+/** Sandbox unless this deployment says otherwise. */
+const sdkUrl = () =>
+  env.NEXT_PUBLIC_PAYPAL_ENV?.trim().toLowerCase() === "live"
+    ? "https://www.paypal.com/web-sdk/v6/core"
+    : "https://www.sandbox.paypal.com/web-sdk/v6/core";
 
-function loadSdk(clientId: string, currency: string) {
-  if (window.paypal) return Promise.resolve(window.paypal);
-  if (loading) return loading;
-  loading = new Promise<PaypalNamespace>((resolve, reject) => {
+let ready: Promise<SdkInstance> | null = null;
+
+/** Loads the SDK and creates the instance once per page. */
+function sdk(clientId: string): Promise<SdkInstance> {
+  if (ready) return ready;
+  ready = new Promise<void>((resolve, reject) => {
+    if (window.paypal?.createInstance) return resolve();
     const script = document.createElement("script");
-    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(
-      clientId,
-    )}&currency=${encodeURIComponent(currency)}&intent=capture&components=buttons`;
+    script.src = sdkUrl();
     script.async = true;
-    script.onload = () =>
-      window.paypal
-        ? resolve(window.paypal)
-        : reject(new Error("PayPal SDK loaded without a namespace"));
-    script.onerror = () => {
-      loading = null;
-      reject(new Error("PayPal could not be reached"));
-    };
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("PayPal could not be reached."));
     document.head.append(script);
-  });
-  return loading;
+  })
+    .then(() => {
+      const create = window.paypal?.createInstance;
+      if (!create) throw new Error("PayPal loaded without an SDK.");
+      return create({ clientId, components: ["paypal-payments"] });
+    })
+    .catch((cause: unknown) => {
+      // Let the next attempt try again rather than caching the failure.
+      ready = null;
+      throw cause;
+    });
+  return ready;
 }
 
 export async function post(url: string, body?: unknown) {
@@ -65,8 +95,9 @@ export async function post(url: string, body?: unknown) {
 
 export function PayPalButton({
   createOrder,
-  currency = "USD",
+  currency: _currency = "USD",
   disabled = false,
+  label = "Pay with PayPal",
   onPaid,
 }: {
   /** Opens the order on our server and returns PayPal's order id. */
@@ -74,77 +105,61 @@ export function PayPalButton({
   currency?: string;
   /** Refuses to start, e.g. while the payer has not named an amount. */
   disabled?: boolean;
+  /** What the button says. Give it the amount where there is one. */
+  label?: string;
   onPaid: () => void;
 }) {
-  const container = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const session = useRef<Session | null>(null);
   const clientId = env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-  // The callbacks below outlive this render; keep them reading fresh values.
+
+  // The handlers outlive this render; keep them reading fresh values.
   const paid = useRef(onPaid);
   paid.current = onPaid;
-  const start = useRef(createOrder);
-  start.current = createOrder;
+  const open = useRef(createOrder);
+  open.current = createOrder;
   const blocked = useRef(disabled);
   blocked.current = disabled;
 
   useEffect(() => {
-    // Read straight from the build's env: both linters treat an imported
-    // value as stable, so neither argues about the dependency list.
     const id = env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-    if (!id || !container.current) return;
-    let cancelled = false;
-    const mount = container.current;
+    if (!id) return;
+    let live = true;
 
-    loadSdk(id, currency)
-      .then((paypal) => {
-        if (cancelled) return;
-        return paypal
-          .Buttons({
-            // `borderRadius` rather than `shape: "pill"`: the SDK says it
-            // takes priority over `shape`, and 12 is the card's own corner,
-            // so the buttons read as part of this page instead of as
-            // PayPal's default lozenge dropped into it.
-            //
-            // `height` fixes both buttons to one size — the SDK's own cap
-            // is 55, and it must not be combined with `disableMaxHeight`.
-            //
-            // What is *not* here: `tagline: false`. It only applies to
-            // `layout: "horizontal"`, and the "Powered by PayPal" line in a
-            // vertical stack is required attribution for the card button.
-            style: {
-              layout: "vertical",
-              label: "pay",
-              borderRadius: 12,
-              height: 48,
-            },
-            createOrder: async () => {
-              setError("");
-              if (blocked.current)
-                throw new Error("Choose an amount before paying.");
-              return start.current();
-            },
-            onApprove: async (data: { orderID: string }) => {
-              setWorking(true);
-              try {
-                await post(
-                  `/api/payments/paypal/orders/${encodeURIComponent(
-                    data.orderID,
-                  )}/capture`,
-                );
-                paid.current();
-              } finally {
-                setWorking(false);
-              }
-            },
-            onError: (cause: unknown) =>
+    sdk(id)
+      .then((instance) => {
+        if (!live) return;
+        session.current = instance.createPayPalOneTimePaymentSession({
+          onApprove: async (data) => {
+            setWorking(true);
+            try {
+              await post(
+                `/api/payments/paypal/orders/${encodeURIComponent(
+                  data.orderId,
+                )}/capture`,
+              );
+              paid.current();
+            } catch (cause: unknown) {
               setError(
                 cause instanceof Error
                   ? cause.message
-                  : "PayPal stopped before the payment went through.",
-              ),
-          })
-          .render(mount);
+                  : "The payment went through but we could not record it.",
+              );
+            } finally {
+              setWorking(false);
+            }
+          },
+          // Closing PayPal is not a failure, and must not read as one.
+          onCancel: () => setWorking(false),
+          onError: (cause) =>
+            setError(
+              cause?.message ||
+                "PayPal stopped before the payment went through.",
+            ),
+        });
+        setLoaded(true);
       })
       .catch((cause: unknown) =>
         setError(
@@ -153,12 +168,37 @@ export function PayPalButton({
       );
 
     return () => {
-      cancelled = true;
-      mount.replaceChildren();
+      live = false;
+      session.current?.destroy?.();
+      session.current = null;
     };
-    // The buttons are mounted once: their callbacks read the refs above, so
-    // a re-render never tears PayPal's iframe down mid-payment.
-  }, [currency]);
+    // One session per mount. Its handlers read the refs above, so a
+    // re-render never tears it down in the middle of a payment.
+  }, []);
+
+  // Everything here is synchronous up to `start`, and the order promise is
+  // created before it: a popup opened later than the click is a popup the
+  // browser blocks.
+  const pay = () => {
+    if (!session.current || blocked.current || working) return;
+    setError("");
+    const order = open
+      .current()
+      .then((orderId) => ({ orderId }))
+      .catch((cause: unknown) => {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "That order could not start.",
+        );
+        throw cause;
+      });
+    // `auto` opens a popup and falls back to a modal where popups are
+    // blocked, which is PayPal's own advice.
+    void session.current
+      .start({ presentationMode: "auto" }, order)
+      .catch(() => {});
+  };
 
   if (!clientId)
     return (
@@ -171,30 +211,31 @@ export function PayPalButton({
       </p>
     );
 
+  const busy = working || !loaded;
   return (
     <div className="grid gap-3">
-      {/* No background of our own. PayPal's buttons arrive transparent and
-          sit straight on the card — a white panel behind them was ours, and
-          it read as a slab pasted onto a dark page.
-          
-          What stays white is the "Powered by PayPal" strip inside their
-          cross-origin frame — and below about 480px they paint the whole
-          block white, because their buttons switch layout there. That is
-          their chrome and their required attribution for the card button,
-          so it is not ours to remove or restyle; rounding the corners is
-          all we can do, so that whatever they paint matches the card.
-
-          `rounded-xl` as a literal, not `--dash-radius`: that token is the
-          dashboard's and is deliberately 0 there ("panels stay square"), so
-          using it here silently rounded nothing. */}
-      <div className="overflow-hidden rounded-xl">
-        <div ref={container} />
-      </div>
-      {working ? (
-        <p className="text-sm" role="status">
-          Recording the payment…
-        </p>
-      ) : null}
+      <button
+        type="button"
+        onClick={pay}
+        disabled={disabled || busy}
+        aria-busy={working}
+        className={cn(
+          "flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5",
+          "text-[15px] font-medium transition-colors",
+          "bg-foreground text-background hover:bg-foreground/90",
+          "focus-visible:ring-2 focus-visible:ring-current/40 focus-visible:outline-none",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+        )}
+      >
+        {working ? "Recording the payment…" : label}
+      </button>
+      {/* The button is ours, so it does not say PayPal — and a payer who
+          presses it should not be surprised by what opens. One line, here
+          rather than on each page, so every surface that takes a payment
+          says the same thing. */}
+      <p className="text-center text-[11px] tracking-[0.1em] uppercase opacity-60">
+        Opens PayPal · Payus never sees your card
+      </p>
       {error ? (
         <p className="text-sm font-medium" role="alert">
           {error}

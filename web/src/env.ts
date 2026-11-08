@@ -17,6 +17,13 @@ export const publicEnvSchema = z.object({
   // PayPal SDK with it. Absent means this deployment cannot take payments.
   NEXT_PUBLIC_PAYPAL_CLIENT_ID: optionalString,
   /**
+   * Which PayPal to talk to from the browser. v6 of their SDK has a
+   * different host per environment — v5 worked it out from the client id —
+   * so the browser has to be told. Unset means sandbox, which is the safe
+   * way round: a deployment that forgets this cannot take real money.
+   */
+  NEXT_PUBLIC_PAYPAL_ENV: optionalString,
+  /**
    * Development only: act as this username without signing in, so the
    * dashboard screens can be looked at. Ignored outside `NODE_ENV`
    * development — see `lib/demo.ts`.
@@ -39,6 +46,7 @@ export function getPublicEnv() {
     NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
     NEXT_PUBLIC_PAYPAL_CLIENT_ID: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID,
+    NEXT_PUBLIC_PAYPAL_ENV: process.env.NEXT_PUBLIC_PAYPAL_ENV,
     NEXT_PUBLIC_DEMO_USER: process.env.NEXT_PUBLIC_DEMO_USER,
     NEXT_PUBLIC_PUBLIC_DEMO: process.env.NEXT_PUBLIC_PUBLIC_DEMO,
   });
