@@ -28,7 +28,20 @@ export function ShopHtml({
 
   const document = `<!doctype html><html><head><meta charset="utf-8">
 <style>
-  :root { color-scheme: ${palette.scheme}; }
+  /* The shop's own palette, as variables, so an author's CSS can follow the
+     theme the owner picked instead of hard-coding a colour that fights it
+     the moment they switch. Concrete values are still interpolated below,
+     so a page that uses none of these is unaffected. */
+  :root {
+    color-scheme: ${palette.scheme};
+    --shop-page: ${palette.page};
+    --shop-surface: ${palette.surface};
+    --shop-fg: ${palette.text};
+    --shop-muted: ${palette.muted};
+    --shop-line: ${palette.line};
+    --shop-accent: ${palette.accent};
+    --shop-accent-text: ${palette.accentText};
+  }
   body {
     margin: 0;
     font: 400 16px/1.65 var(--shop-font, ui-sans-serif, system-ui, sans-serif);
