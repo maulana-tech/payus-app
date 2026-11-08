@@ -262,33 +262,33 @@ const NAME: Record<BlockKind, string> = {
   html: "Your own markup",
 } as Record<BlockKind, string>;
 
+/**
+ * The list, controlled.
+ *
+ * The blocks live in the canvas rather than here, because the page on the
+ * right edits them too: a click in the preview opens a row in this panel,
+ * and typing there writes back to the same list. Two copies of it would be
+ * two answers to "what is on the page".
+ */
 export function BlockEditor({
-  html,
-  onChange,
+  blocks,
+  onBlocks,
+  open,
+  onOpen,
 }: {
-  html: string;
-  onChange: (html: string) => void;
+  blocks: Block[];
+  onBlocks: (next: Block[]) => void;
+  /** The row whose fields are showing, by block id. */
+  open: string | null;
+  onOpen: (id: string | null) => void;
 }) {
-  // Read once per mount. Re-reading on every keystroke would renumber ids
-  // and take the cursor out of whatever field is being typed in.
-  //
-  // One read, not two: ids are minted per read, so a second `toBlocks(html)`
-  // for the open row produced an id that matched no block and nothing ever
-  // opened.
-  const [first] = useState<Block[]>(() => toBlocks(html));
-  const [blocks, setBlocks] = useState<Block[]>(first);
-  const [open, setOpen] = useState<string | null>(first[0]?.id ?? null);
   const [adding, setAdding] = useState(false);
-
-  const commit = (next: Block[]) => {
-    setBlocks(next);
-    onChange(toHtml(next));
-  };
+  const commit = onBlocks;
 
   const add = (kind: BlockKind) => {
     const block = blankBlock(kind);
     commit(insertBlock(blocks, blocks.length, block));
-    setOpen(block.id);
+    onOpen(block.id);
     setAdding(false);
   };
 
@@ -312,12 +312,17 @@ export function BlockEditor({
           return (
             <li
               key={block.id}
+              ref={(node) => {
+                // Selected from the page on the right: bring the row to
+                // where the person is already looking.
+                if (shown && node) node.scrollIntoView({ block: "nearest" });
+              }}
               className="min-w-0 rounded-(--dash-radius-sm) border border-(--dash-line-strong) bg-(--dash-surface)"
             >
               <div className="flex min-w-0 items-center gap-1 p-2">
                 <button
                   type="button"
-                  onClick={() => setOpen(shown ? null : block.id)}
+                  onClick={() => onOpen(shown ? null : block.id)}
                   aria-expanded={shown}
                   className={cn(
                     "flex min-w-0 flex-1 items-center gap-2 rounded-(--dash-radius-sm) px-1 py-1 text-left",

@@ -1,8 +1,14 @@
 // @vitest-environment happy-dom
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { useState } from "react";
+import { describe, expect, it } from "vitest";
 import { BlockEditor } from "../src/components/canvas/BlockEditor";
+import {
+  type Block,
+  toBlocks,
+  toHtml,
+} from "../src/features/storefront/blocks";
 
 // Editing the page without typing a tag.
 //
@@ -10,12 +16,32 @@ import { BlockEditor } from "../src/components/canvas/BlockEditor";
 // thing stored — a block editor that looks right and writes the wrong page
 // is worse than no block editor.
 
+/**
+ * The editor is controlled, so the test holds the list the way the canvas
+ * does — and asserts the page that list would write, because that is the
+ * one thing stored.
+ */
 function open(html = "") {
-  const onChange = vi.fn();
-  render(<BlockEditor html={html} onChange={onChange} />);
-  /** The latest page it wrote. */
-  const page = () => String(onChange.mock.calls.at(-1)?.[0] ?? "");
-  return { onChange, page };
+  const start = toBlocks(html);
+  let latest = start;
+
+  function Host() {
+    const [blocks, setBlocks] = useState<Block[]>(start);
+    const [showing, setShowing] = useState<string | null>(start[0]?.id ?? null);
+    latest = blocks;
+    return (
+      <BlockEditor
+        blocks={blocks}
+        onBlocks={setBlocks}
+        open={showing}
+        onOpen={setShowing}
+      />
+    );
+  }
+
+  render(<Host />);
+  const page = () => toHtml(latest);
+  return { page };
 }
 
 describe("the block editor", () => {

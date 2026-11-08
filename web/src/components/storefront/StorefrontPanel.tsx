@@ -9,7 +9,7 @@ import type {
 } from "@/features/storefront/config";
 import { palette, paletteVars } from "@/features/storefront/theme";
 import { trpc } from "@/trpc/react";
-import { ShopHtml } from "./ShopHtml";
+import { ShopHtml, type ShopHtmlEdit } from "./ShopHtml";
 
 // A storefront as its visitors see it: the merchant's page, in the colours
 // they chose, built only from stored values. There is no field anywhere in
@@ -49,9 +49,12 @@ export function StorefrontPanel({ slug }: { slug: string }) {
 export function StorefrontPage({
   shop: store,
   preview = false,
+  edit,
 }: {
   shop: PublicStorefrontView;
   preview?: boolean;
+  /** Only the canvas passes this; the public page never does. */
+  edit?: ShopHtmlEdit;
 }) {
   const layout = store.template;
   const variant =
@@ -80,6 +83,7 @@ export function StorefrontPage({
             <ShopHtml
               html={store.htmlClean}
               palette={palette(store.theme, store.accent)}
+              edit={edit}
             />
           </div>
         ) : null}

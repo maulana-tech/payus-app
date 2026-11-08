@@ -318,6 +318,21 @@ export function toBlocks(html: string): Block[] {
   return out;
 }
 
+/**
+ * True for a block that renders nothing a person could point at.
+ *
+ * A `<style>` or a font `<link>` is part of the page and must be kept, but
+ * it draws nothing — so it is not a position in the page you can click, and
+ * it must not be counted as one. The sanitiser also lifts every `<style>`
+ * into a single block at the front, so counting raw elements against
+ * rendered ones without this gets different answers and the editor refuses
+ * to work at all.
+ */
+export const rendersNothing = (block: Block): boolean =>
+  block.kind === "html" &&
+  /^\s*<(style|link)\b[\s\S]*$/i.test(block.html) &&
+  !/<(?!\/?(style|link)\b)[a-z]/i.test(block.html);
+
 // ------------------------------------------------------------- arranging
 
 export const moveBlock = (

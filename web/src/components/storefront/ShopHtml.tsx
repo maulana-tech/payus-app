@@ -15,16 +15,55 @@ import type { Palette } from "@/features/storefront/theme";
 // and size the frame to it. Without `allow-scripts` it grants no ability to
 // run anything; the pair together is the combination to avoid, not this one.
 
+/**
+ * What the canvas asks for when the page should be editable on the right.
+ *
+ * `index` is the position of a top-level element in the frame, which is
+ * also the position of its block — `toBlocks` reads one block per top-level
+ * element, so the two lists line up. The canvas only turns this on when it
+ * has checked that they are the same length.
+ */
+export type ShopHtmlEdit = {
+  onSelect: (index: number) => void;
+  onEdit: (index: number, outerHtml: string) => void;
+};
+
+/**
+ * The element's markup as its author would recognise it.
+ *
+ * `contenteditable` and `data-edit` are this editor's own, put on to make
+ * the page clickable; reading `outerHTML` straight off the live node wrote
+ * them back into the page and they turned up in the author's own markup
+ * field. The sanitiser would have dropped them on the way out, which is
+ * exactly why this had to be caught here instead.
+ */
+function written(node: HTMLElement): string {
+  const copy = node.cloneNode(true) as HTMLElement;
+  for (const el of [copy, ...copy.querySelectorAll("*")]) {
+    el.removeAttribute("contenteditable");
+    el.removeAttribute("data-edit");
+  }
+  return copy.outerHTML;
+}
+
 export function ShopHtml({
   html,
   palette,
+  edit,
 }: {
   /** Already sanitised on the server. Never raw author input. */
   html: string;
   palette: Palette;
+  /** The editor's hooks. Absent on every page the public is served. */
+  edit?: ShopHtmlEdit;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(0);
+  // `srcDoc` loads asynchronously, so an effect that runs on mount finds an
+  // empty document. The measuring pass already waited for this through
+  // `onLoad`; the editing pass has to wait for it too, and a counter rather
+  // than a boolean so a second document re-runs it.
+  const [loads, setLoads] = useState(0);
 
   const document = `<!doctype html><html><head><meta charset="utf-8">
 <style>
@@ -135,6 +174,64 @@ export function ShopHtml({
     // the editor replaces this frame's contents on every keystroke.
   }, [html]);
 
+  // Editing happens from *this* document, not from inside the frame.
+  // `allow-same-origin` lets the parent reach in; the frame still has no
+  // `allow-scripts`, so nothing the author wrote can run. That is the whole
+  // reason this is safe, and it is why the sandbox did not have to change.
+  //
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `html` and
+  // `loads` are not read here — they are the reasons to re-run. A new
+  // document, however it arrived, is new elements to make editable.
+  useEffect(() => {
+    if (!edit) return;
+    const doc = frame.current?.contentDocument;
+    const body = doc?.body;
+    if (!doc || !body) return;
+
+    const style = doc.createElement("style");
+    style.textContent = `
+      [data-edit] { outline: 1px dashed transparent; outline-offset: 4px;
+                    border-radius: 4px; transition: outline-color .12s; }
+      [data-edit]:hover { outline-color: ${palette.accent}; cursor: text; }
+      [data-edit]:focus { outline: 2px solid ${palette.accent};
+                          outline-offset: 4px; }
+    `;
+    doc.head.append(style);
+
+    // Positions are counted over what is drawn. A `<style>` is in the
+    // document and renders nothing, so it is not somewhere a cursor can
+    // go — and counting it would shift every position after it.
+    const nodes = ([...body.children] as HTMLElement[]).filter(
+      (node) => !["STYLE", "LINK", "SCRIPT"].includes(node.tagName),
+    );
+    const timers = new Map<number, ReturnType<typeof setTimeout>>();
+
+    nodes.forEach((node, index) => {
+      node.setAttribute("data-edit", "");
+      // `plaintext-only`: a person editing their page should not be able to
+      // paste markup into it by accident, and the sanitiser should not be
+      // the thing that discovers they did.
+      node.setAttribute("contenteditable", "plaintext-only");
+      node.addEventListener("focus", () => edit.onSelect(index));
+      node.addEventListener("input", () => {
+        clearTimeout(timers.get(index));
+        timers.set(
+          index,
+          setTimeout(() => edit.onEdit(index, written(node)), 400),
+        );
+      });
+    });
+
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+      style.remove();
+      for (const node of nodes) {
+        node.removeAttribute("data-edit");
+        node.removeAttribute("contenteditable");
+      }
+    };
+  }, [edit, html, loads, palette.accent]);
+
   if (!html.trim()) return null;
 
   return (
@@ -156,6 +253,7 @@ export function ShopHtml({
       onLoad={() => {
         const body = frame.current?.contentDocument?.body;
         if (body) setHeight(Math.ceil(body.getBoundingClientRect().height));
+        setLoads((n) => n + 1);
       }}
       // The frame is sized to its content, so its own scrollbar would only
       // ever be a second one inside the page's.

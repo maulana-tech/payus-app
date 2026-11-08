@@ -8,6 +8,7 @@ import {
   insertBlock,
   moveBlock,
   removeBlock,
+  rendersNothing,
   toBlocks,
   toHtml,
 } from "../src/features/storefront/blocks";
@@ -97,6 +98,26 @@ describe("blocks", () => {
       products: [{ name: "Beans", description: "", price: "18.00" }],
     });
     expect(parsed.success).toBe(true);
+  });
+
+  it("knows which blocks draw nothing", () => {
+    // A stylesheet is part of the page and must be kept, but it is not a
+    // place a cursor can go — and the canvas counts positions over what is
+    // drawn, so getting this wrong turns in-place editing off entirely.
+    const style = toBlocks("<style>.a{color:red}</style>")[0] as Block;
+    const link = toBlocks(
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist">',
+    )[0] as Block;
+    expect(rendersNothing(style)).toBe(true);
+    expect(rendersNothing(link)).toBe(true);
+
+    // Markup that happens to contain a style still draws.
+    const page = toBlocks(
+      "<div><style>.a{color:red}</style><p>Hi</p></div>",
+    )[0] as Block;
+    expect(rendersNothing(page)).toBe(false);
+    expect(rendersNothing(blankBlock("text"))).toBe(false);
+    expect(rendersNothing(blankBlock("divider"))).toBe(false);
   });
 
   it("moves, inserts, removes and duplicates", () => {

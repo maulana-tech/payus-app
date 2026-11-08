@@ -23,8 +23,15 @@ import {
   dashIconButton,
 } from "@/components/dashboard/styles";
 import { useSession } from "@/components/SessionProvider";
+import type { ShopHtmlEdit } from "@/components/storefront/ShopHtml";
 import { StorefrontPage } from "@/components/storefront/StorefrontPanel";
 import { Input } from "@/components/ui/input";
+import {
+  type Block,
+  rendersNothing,
+  toBlocks,
+  toHtml,
+} from "@/features/storefront/blocks";
 import {
   ACCENTS,
   MAX_HTML,
@@ -128,6 +135,54 @@ export function CanvasEditor({ id }: { id: string }) {
   // one only fills the draft; from then on it is an ordinary draft.
   const [picking, setPicking] = useState(isNew);
   const [highlight, setHighlight] = useState(0);
+  // The page as blocks, held here because both panes edit it: the list on
+  // the left and the page on the right. Seeded from the draft once the
+  // shop arrives, then owned here.
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [openBlock, setOpenBlock] = useState<string | null>(null);
+
+  const writeBlocks = (next: Block[]) => {
+    setBlocks(next);
+    patch({ html: toHtml(next) });
+  };
+
+  /**
+   * The page on the right, edited in place.
+   *
+   * `index` is a position in the frame, which the canvas has already
+   * checked lines up with a position in this list. The element's new
+   * markup is read back through the same reader the HTML tab uses, so a
+   * heading stays a heading and a block the editor never understood stays
+   * exactly what it was.
+   */
+  // Positions on the page, as the frame counts them: blocks that draw
+  // something, in order. A stylesheet is in the list and on the page, and
+  // is in neither of these.
+  const drawn = useMemo(
+    () =>
+      blocks.flatMap((block, index) => (rendersNothing(block) ? [] : [index])),
+    [blocks],
+  );
+
+  const edit = useMemo<ShopHtmlEdit>(
+    () => ({
+      onSelect: (at) =>
+        setOpenBlock((now) => blocks[drawn[at] ?? -1]?.id ?? now),
+      onEdit: (at, outerHtml) => {
+        const index = drawn[at];
+        const old = index === undefined ? undefined : blocks[index];
+        const read = toBlocks(outerHtml)[0];
+        if (!old || !read) return;
+        writeBlocks(
+          blocks.map((block, where) =>
+            where === index ? { ...read, id: old.id } : block,
+          ),
+        );
+      },
+    }),
+    // `writeBlocks` closes over `blocks`, so this is the whole dependency.
+    [blocks, drawn],
+  );
 
   // Seeded once the shop arrives, and never again: re-seeding would throw
   // away what is being typed every time the list refetches.
@@ -138,7 +193,26 @@ export function CanvasEditor({ id }: { id: string }) {
     const next = draftFrom(store);
     setDraft(next);
     setSaved(JSON.stringify(next));
+    const read = toBlocks(next.html);
+    setBlocks(read);
+    setOpenBlock(read[0]?.id ?? null);
   }, [isNew, store]);
+
+  // The HTML tab writes the same field. Re-read when what it holds is no
+  // longer what these blocks would write — on a tab change rather than on
+  // every keystroke, because re-reading mints new ids and would take the
+  // cursor out of whatever is being typed.
+  //
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `blocks` is
+  // read to compare, not to depend on; listing it would re-run this on
+  // every edit the block editor itself makes.
+  useEffect(() => {
+    if (tab !== "blocks" || !draft) return;
+    if (toHtml(blocks) === draft.html) return;
+    const read = toBlocks(draft.html);
+    setBlocks(read);
+    setOpenBlock((now) => (read.some((b) => b.id === now) ? now : null));
+  }, [tab, draft?.html]);
 
   const create = trpc.storefront.create.useMutation({
     onSuccess: (made) => {
@@ -338,13 +412,11 @@ export function CanvasEditor({ id }: { id: string }) {
                   ) : tab === "items" ? (
                     <ItemFields draft={draft} setDraft={setDraft} />
                   ) : tab === "blocks" ? (
-                    // Keyed on the shop, not on the html: remounting when
-                    // the html changes would re-read the blocks on every
-                    // keystroke and take the cursor out of the field.
                     <BlockEditor
-                      key={id}
-                      html={draft.html}
-                      onChange={(html) => patch({ html })}
+                      blocks={blocks}
+                      onBlocks={writeBlocks}
+                      open={openBlock}
+                      onOpen={setOpenBlock}
                     />
                   ) : (
                     <LookFields draft={draft} patch={patch} />
@@ -384,7 +456,13 @@ export function CanvasEditor({ id }: { id: string }) {
             </div>
           </div>
 
-          <Canvas draft={shown} owner={username ?? "you"} device={device} />
+          <Canvas
+            draft={shown}
+            owner={username ?? "you"}
+            device={device}
+            drawn={drawn.length}
+            edit={edit}
+          />
         </section>
       </div>
     </div>
@@ -494,10 +572,16 @@ function Canvas({
   draft,
   owner,
   device,
+  drawn,
+  edit,
 }: {
   draft: Draft;
   owner: string;
   device: Device;
+  /** How many blocks on the left draw something, so the two counts can be
+      checked against each other before anything here is made editable. */
+  drawn: number;
+  edit?: ShopHtmlEdit;
 }) {
   const { clean } = useSanitised(draft.html);
   const shop = useMemo(
@@ -506,14 +590,33 @@ function Canvas({
   );
   const width = WIDTH[device];
 
+  // Editing on the page addresses a block by position, so the positions
+  // have to agree. They can disagree — the sanitiser may drop an element
+  // the author wrote — and editing the wrong block is worse than not being
+  // able to edit here at all. So: count both, and only offer it when they
+  // match. The "taken out" line on the HTML tab already says why.
+  const aligned = useMemo(
+    () =>
+      clean.trim()
+        ? toBlocks(clean).filter((b) => !rendersNothing(b)).length === drawn
+        : false,
+    [clean, drawn],
+  );
+
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4">
       <div
         style={width ? { width, maxWidth: "100%" } : undefined}
         className="mx-auto overflow-hidden rounded-(--dash-radius) border border-(--dash-line-solid) shadow-sm"
       >
-        <StorefrontPage shop={shop} preview />
+        <StorefrontPage shop={shop} preview edit={aligned ? edit : undefined} />
       </div>
+      {edit && clean.trim() && !aligned ? (
+        <p className="mx-auto mt-3 max-w-md text-center text-[12px] text-(--dash-ash)">
+          The sanitiser changed this page, so editing it here would land on the
+          wrong block. Edit it on the left; the HTML tab says what it took out.
+        </p>
+      ) : null}
     </div>
   );
 }
