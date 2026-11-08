@@ -80,9 +80,35 @@ function open() {
     getQueryKey(trpc.storefront.mine, undefined, "query"),
     [shop],
   );
-  queryClient.setQueryData(
-    getQueryKey(trpc.storefront.previewHtml, { html: RAW }, "query"),
-    { raw: RAW, clean: CLEAN, removed: ["script"] },
+  // `previewHtml` is a mutation — a query's input would ride in the URL,
+  // and its input is a whole page — so it is answered over fetch rather
+  // than seeded into the query cache. What the test asserts is unchanged:
+  // the frame shows what came back, never the editor's buffer.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(
+        typeof input === "string" || input instanceof URL
+          ? input
+          : (input as Request).url,
+      );
+      if (!url.includes("storefront.previewHtml"))
+        throw new Error(`unexpected request: ${url}`);
+      // Both readers of the sanitiser — the preview pane and the editor's
+      // "taken out" line — are batched into one request, so the answer
+      // needs one result per call or the second reader gets nothing.
+      const calls = (url.split("?")[0]?.split("/").pop() ?? "").split(
+        ",",
+      ).length;
+      return new Response(
+        JSON.stringify(
+          Array.from({ length: calls }, () => ({
+            result: { data: { raw: RAW, clean: CLEAN, removed: ["script"] } },
+          })),
+        ),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }),
   );
   queryClient.setQueryData(
     getQueryKey(trpc.agents.status, undefined, "query"),
@@ -92,6 +118,8 @@ function open() {
 }
 
 describe("storefront canvas", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it("renders the real page from the draft, with the pay button inert", async () => {
     open();
 

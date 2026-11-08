@@ -75,6 +75,10 @@ export function ShopHtml({
   // line reflows when it does. So: measure on load, again when the fonts
   // report ready, and then keep watching, because a grid that rewraps at a
   // container query is a height change nobody fired an event for.
+  //
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `html` is not
+  // read inside the effect — it is the reason to re-run it. A new document
+  // is a new body, and the observer must be pointed at that one.
   useEffect(() => {
     let alive = true;
     const measure = () => {

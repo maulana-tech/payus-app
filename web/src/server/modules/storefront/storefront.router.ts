@@ -64,9 +64,24 @@ export const storefrontRouter = createTRPCRouter({
    * the author sees the sanitised copy, not their draft — there is one
    * sanitiser and it lives on the server.
    */
+  /**
+   * The sanitiser, run for the editor so the preview is the server's answer
+   * and not the browser's guess.
+   *
+   * A mutation, although it changes nothing. tRPC sends a query as GET with
+   * its input encoded into the URL, and this input is a whole page: a
+   * 38,000-character design became a 58,000-character URL and came back
+   * **431 Request Header Fields Too Large**, so the preview silently
+   * stopped updating. A mutation travels in the body, where a document
+   * belongs.
+   *
+   * The alternative was `allowMethodOverride` on the server, which lets any
+   * query arrive as POST. One procedure is not worth widening what this API
+   * accepts for all of them.
+   */
   previewHtml: protectedProcedure
     .input(z.object({ html: z.string().max(MAX_HTML) }).strict())
-    .query(({ input }) => sanitizeShopHtml(input.html)),
+    .mutation(({ input }) => sanitizeShopHtml(input.html)),
 
   /** The public page, which only ever resolves a published storefront. */
   public: publicProcedure

@@ -65,6 +65,41 @@ const HtmlEditor = dynamic(() => import("./HtmlEditor"), {
 type Tab = "page" | "items" | "html" | "look";
 type Device = "phone" | "tablet" | "wide";
 
+/**
+ * The server's sanitiser, run on what is being typed.
+ *
+ * `previewHtml` is a mutation rather than a query — a query's input rides
+ * in the URL, and this input is a whole page — so the debounce and the
+ * firing live here instead of in React Query's `enabled`.
+ *
+ * The last good answer is kept while the next one is in flight: a preview
+ * that blanks between keystrokes is a preview nobody can work against.
+ */
+function useSanitised(html: string): { clean: string; removed: string[] } {
+  const [result, setResult] = useState<{ clean: string; removed: string[] }>({
+    clean: "",
+    removed: [],
+  });
+  const run = trpc.storefront.previewHtml.useMutation({
+    onSuccess: (data) =>
+      setResult({ clean: data.clean, removed: data.removed }),
+  });
+  // The mutation object is new on every render; the call is not.
+  const fire = useRef(run.mutate);
+  fire.current = run.mutate;
+
+  useEffect(() => {
+    if (!html.trim()) {
+      setResult({ clean: "", removed: [] });
+      return;
+    }
+    const timer = setTimeout(() => fire.current({ html }), 300);
+    return () => clearTimeout(timer);
+  }, [html]);
+
+  return result;
+}
+
 const WIDTH: Record<Device, number | null> = {
   phone: 414,
   tablet: 820,
@@ -451,17 +486,7 @@ function Canvas({
   owner: string;
   device: Device;
 }) {
-  const [debounced, setDebounced] = useState(draft.html);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(draft.html), 300);
-    return () => clearTimeout(timer);
-  }, [draft.html]);
-
-  const preview = trpc.storefront.previewHtml.useQuery(
-    { html: debounced },
-    { enabled: debounced.trim().length > 0, staleTime: 60_000 },
-  );
-  const clean = debounced.trim() ? (preview.data?.clean ?? "") : "";
+  const { clean } = useSanitised(draft.html);
   const shop = useMemo(
     () => toPreview(draft, owner, clean),
     [draft, owner, clean],
@@ -491,17 +516,7 @@ function HtmlPane({
   removedFor: Draft;
 }) {
   const editor = useRef<HtmlEditorHandle | null>(null);
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), 300);
-    return () => clearTimeout(timer);
-  }, [value]);
-
-  const check = trpc.storefront.previewHtml.useQuery(
-    { html: debounced },
-    { enabled: debounced.trim().length > 0, staleTime: 60_000 },
-  );
-  const removed = debounced.trim() ? (check.data?.removed ?? []) : [];
+  const { removed } = useSanitised(value);
   const colours = palette(removedFor.theme, removedFor.accent);
 
   return (
