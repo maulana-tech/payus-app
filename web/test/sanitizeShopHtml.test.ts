@@ -182,4 +182,30 @@ describe("shop html", () => {
     const long = `<p>${"a".repeat(MAX_HTML * 2)}</p>`;
     expect(sanitizeShopHtml(long).raw.length).toBeLessThanOrEqual(MAX_HTML);
   });
+
+  it("holds a whole hand-written page without complaint", () => {
+    // The bound exists to stop unbounded work, not to stop a design. A
+    // page with a stylesheet, an inline SVG and real markup has to fit
+    // with room to spare, or every author meets the ceiling before the
+    // policy and learns the wrong lesson about what is allowed.
+    const page = [
+      "<!doctype html><html><head>",
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist">',
+      `<style>${":root{--a:#eb1f14}\n.col{max-width:1152px}\n".repeat(400)}</style>`,
+      "</head><body>",
+      `${'<section class="sec"><h2>Reports</h2><p class="body">One sector. One read.</p></section>'.repeat(200)}`,
+      '<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>',
+      "</body></html>",
+    ].join("");
+
+    expect(page.length).toBeGreaterThan(30_000);
+    expect(page.length).toBeLessThan(MAX_HTML);
+
+    const out = sanitizeShopHtml(page);
+    expect(out.raw.length).toBe(page.length);
+    expect(out.clean).toContain("max-width:1152px");
+    expect(out.clean).toContain("fonts.googleapis.com");
+    expect(out.clean).toContain("<svg");
+    expect(out.removed).toEqual([]);
+  });
 });

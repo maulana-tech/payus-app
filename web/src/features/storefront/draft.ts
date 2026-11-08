@@ -4,13 +4,12 @@
 // render — so the editor and the page it previews cannot drift apart.
 
 import { toMinor } from "../invoices/money";
-import {
-  type Accent,
-  MAX_HTML,
-  type PublicStorefrontView,
-  type StorefrontInput,
-  type Template,
-  type Theme,
+import type {
+  Accent,
+  PublicStorefrontView,
+  StorefrontInput,
+  Template,
+  Theme,
 } from "./config";
 
 export type Line = {
@@ -120,7 +119,7 @@ export const toInput = (draft: Draft): StorefrontInput => ({
   template: draft.template,
   theme: draft.theme,
   accent: draft.accent,
-  html: draft.html.slice(0, MAX_HTML),
+  html: draft.html,
   products: draft.lines.map((line) => {
     // A tip jar is priced by the payer, and so is any line left blank.
     const open = draft.template === "tip" || !line.price.trim();

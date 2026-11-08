@@ -20,12 +20,21 @@ export type Template = (typeof TEMPLATES)[number];
 export const MAX_QUANTITY = 50;
 
 /**
- * The most HTML a shop may carry, before sanitising. A whole page with its
- * own stylesheet is the thing this field is for now, and 8,000 characters
- * was not enough to hold one — the first design anyone pasted hit the limit
- * and the ceiling before it hit the policy.
+ * The most HTML a shop may carry, before sanitising.
+ *
+ * The HTML block is the page now, not a note above it, so this has to hold
+ * a whole hand-written design: a stylesheet, a few inline SVGs, and the
+ * markup between them. 150,000 characters is roughly six times the largest
+ * real page anyone has brought here, which is the point — a bound nobody
+ * meets is a bound nobody fights.
+ *
+ * It cannot be removed. Every keystroke in the canvas sends this document
+ * to the server to be sanitised, and the public shop page ships it to every
+ * visitor; unbounded means unbounded work and unbounded page weight, for
+ * anyone who asks. What it must never do is cut silently, and it no longer
+ * does: too much is refused with a sentence, not trimmed to fit.
  */
-export const MAX_HTML = 40_000;
+export const MAX_HTML = 150_000;
 
 export const THEMES = ["paper", "ink", "sun"] as const;
 export type Theme = (typeof THEMES)[number];
@@ -128,7 +137,13 @@ export const storefrontInput = z
      * sanitised on the way in and rendered in a sandbox that cannot run
      * scripts — see `server/modules/storefront/sanitize.ts`.
      */
-    html: z.string().max(MAX_HTML).default(""),
+    html: z
+      .string()
+      .max(
+        MAX_HTML,
+        `That page is longer than ${MAX_HTML.toLocaleString()} characters. Trim it and save again — nothing here has been cut.`,
+      )
+      .default(""),
     accent: z.enum(ACCENTS).default("clay"),
     currency: z.enum(CURRENCIES).default(DEFAULT_CURRENCY),
     products: z.array(productInput).min(1).max(MAX_PRODUCTS),

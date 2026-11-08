@@ -7,7 +7,6 @@ import { createTheme } from "@uiw/codemirror-themes";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { useMemo, useRef } from "react";
 import { useDashMode } from "@/components/dashboard/DashboardBackground";
-import { MAX_HTML } from "@/features/storefront/config";
 
 // A real editor for the one field that holds markup: line numbers, a gutter,
 // highlighting, tags that close themselves. It is loaded only by the canvas
@@ -133,7 +132,10 @@ export default function HtmlEditor({
         closeBrackets: true,
         searchKeymap: false,
       }}
-      onChange={(next) => onChange(next.slice(0, MAX_HTML))}
+      // No slice. Cutting a paste at the limit loses the end of someone's
+      // page without saying so; the editor keeps it all and the panel below
+      // says how far over it is, so the fix is theirs to make.
+      onChange={onChange}
       className="h-full [&_.cm-editor]:h-full [&_.cm-editor]:outline-none"
     />
   );

@@ -553,13 +553,14 @@ function HtmlPane({
             from Google Fonts are allowed.
           </p>
         )}
-        {/* The editor cuts anything past the limit, so sitting exactly on
-            it almost always means a paste was cut mid-tag. A bare
-            "40000/40000" reads as "it fits". */}
-        {value.length >= MAX_HTML ? (
+        {/* Nothing is cut any more, so this says how far over rather than
+            where the knife fell. The save refuses until it is under, and
+            the page in the editor is still whole while you trim it. */}
+        {value.length > MAX_HTML ? (
           <p className="mt-1 text-[12px] text-(--dash-err)" role="status">
-            {MAX_HTML.toLocaleString()} characters — the limit. Anything you
-            pasted past this was cut, probably in the middle of a tag.
+            {(value.length - MAX_HTML).toLocaleString()} characters over the
+            limit of {MAX_HTML.toLocaleString()} — nothing has been cut, but it
+            will not save until it fits.
           </p>
         ) : (
           <p className="mt-1 text-[12px] text-(--dash-ash) tabular-nums">
