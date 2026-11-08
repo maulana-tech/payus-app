@@ -30,6 +30,8 @@ export type Block =
     }
   | { id: string; kind: "image"; src: string; alt: string; caption: string }
   | { id: string; kind: "link"; href: string; text: string }
+  /** A link that looks like an action: another of your pages, or a link to pay. */
+  | { id: string; kind: "cta"; href: string; text: string }
   | { id: string; kind: "divider" }
   /** Anything written by hand that the reader did not recognise. */
   | { id: string; kind: "html"; html: string };
@@ -52,6 +54,7 @@ export const BLOCK_KINDS: { kind: BlockKind; label: string; hint: string }[] = [
   { kind: "quote", label: "Quote", hint: "A pulled quote" },
   { kind: "image", label: "Image", hint: "By https address" },
   { kind: "link", label: "Link", hint: "Opens in a new tab" },
+  { kind: "cta", label: "Pay link", hint: "A button to one of your pay links" },
   { kind: "divider", label: "Divider", hint: "A rule between sections" },
 ];
 
@@ -95,6 +98,8 @@ export function blankBlock(kind: BlockKind): Block {
       };
     case "link":
       return { id, kind, href: "https://example.com", text: "Somewhere else" };
+    case "cta":
+      return { id, kind, href: "https://example.com/pay", text: "Pay here" };
     case "divider":
       return { id, kind };
     default:
@@ -152,6 +157,10 @@ function one(block: Block): string {
     }
     case "link":
       return `<p><a href="${esc(block.href)}">${esc(block.text)}</a></p>`;
+    case "cta":
+      return `<p><a class="shop-cta" href="${esc(block.href)}">${esc(
+        block.text,
+      )}</a></p>`;
     case "divider":
       return "<hr>";
     case "html":
@@ -231,10 +240,12 @@ function read(el: Element): Block {
     case "P": {
       // A paragraph holding only a link is the link block.
       const only = el.children.length === 1 ? el.children[0] : null;
-      if (only?.tagName === "A" && plainText(only))
+      if (only?.tagName === "A" && plainText(only) && el.classList.length === 0)
         return {
           id,
-          kind: "link",
+          // The class is the whole difference between a line of prose with
+          // a link in it and a button.
+          kind: only.classList.contains("shop-cta") ? "cta" : "link",
           href: only.getAttribute("href") ?? "",
           text: text(only),
         };

@@ -78,6 +78,15 @@ export function ShopHtml({
     padding: 1.25rem;
   }
   .shop-card > :last-child { margin-bottom: 0; }
+  /* A link that is an action: the shop's accent, at a size a thumb can
+     hit. It is still a link — nothing in this frame can take a payment. */
+  .shop-cta {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 44px; padding: 0 1.25rem; border-radius: 12px;
+    background: ${palette.accent}; color: ${palette.accentText};
+    font-weight: 500; text-decoration: none;
+  }
+  .shop-cta:hover { filter: brightness(1.06); }
   @media (max-width: 520px) { .shop-cols { grid-template-columns: 1fr; } }
 </style></head><body>${html}</body></html>`;
 
@@ -132,8 +141,17 @@ export function ShopHtml({
     <iframe
       ref={frame}
       title="About this shop"
-      // No allow-scripts: nothing in here runs, whatever it says.
-      sandbox="allow-same-origin"
+      // Still no `allow-scripts`: that is the fence, and it does not move.
+      //
+      // `allow-popups` is here because without it every link a merchant
+      // writes is dead — the sanitiser forces `target="_blank"`, and a
+      // frame that may not open a window swallows the click in silence.
+      // `allow-popups-to-escape-sandbox` so the tab that opens is an
+      // ordinary tab; inheriting this sandbox would break the page it
+      // lands on. Nothing in here can script, so the only thing that can
+      // open a window is a person clicking a link we sanitised to https or
+      // mailto, carrying `rel="noopener noreferrer"`.
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
       srcDoc={document}
       onLoad={() => {
         const body = frame.current?.contentDocument?.body;

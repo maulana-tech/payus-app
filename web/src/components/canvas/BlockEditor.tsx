@@ -213,10 +213,11 @@ function Fields({
         </div>
       );
     case "link":
+    case "cta":
       return (
         <div className="grid gap-3">
           <Text
-            name="Words"
+            name={block.kind === "cta" ? "Button" : "Words"}
             value={block.text}
             onChange={(text) => onChange({ ...block, text })}
           />
@@ -225,6 +226,12 @@ function Fields({
             value={block.href}
             onChange={(href) => onChange({ ...block, href })}
           />
+          {block.kind === "cta" ? (
+            <p className="text-[12px] text-(--dash-ash)">
+              Paste one of your own pay links — the address under Links, or
+              another shop of yours. It opens in a new tab.
+            </p>
+          ) : null}
         </div>
       );
     case "divider":
@@ -454,6 +461,7 @@ function summarise(block: Block): string {
     case "list":
       return block.items.join(", ");
     case "link":
+    case "cta":
       return block.text;
     case "image":
       return block.caption || block.alt || block.src;

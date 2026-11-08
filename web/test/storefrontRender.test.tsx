@@ -82,8 +82,16 @@ describe("storefront page", () => {
 
     const frame = container.querySelector("iframe");
     expect(frame).not.toBeNull();
-    // No allow-scripts: whatever is inside, nothing executes.
-    expect(frame?.getAttribute("sandbox")).toBe("allow-same-origin");
+
+    const sandbox = (frame?.getAttribute("sandbox") ?? "").split(" ");
+    // The fence. Everything else about this frame is a convenience; this
+    // one line is why a hole in the sanitiser still has nothing to run.
+    expect(sandbox).not.toContain("allow-scripts");
+    // And the convenience: without these, the sanitiser's forced
+    // `target="_blank"` meets a frame that may not open a window, and
+    // every link a merchant writes dies in silence.
+    expect(sandbox).toContain("allow-popups");
+    expect(sandbox).toContain("allow-popups-to-escape-sandbox");
     const doc = frame?.getAttribute("srcdoc") ?? "";
     expect(doc).toContain("How we roast");
     // The author's raw copy never reaches the page.
