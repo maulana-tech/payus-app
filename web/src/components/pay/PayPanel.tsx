@@ -95,6 +95,19 @@ export function PayPanel({
           <PayPalButton
             currency={link.data.currency}
             disabled={!payable}
+            // A fixed-price link can name its amount; an open one cannot
+            // until the payer has typed one, and a button that promises a
+            // figure it does not have is worse than a plain one.
+            // A greyed button with no reason beside it, next to a field
+            // showing a placeholder that looks filled, is a dead end. Say
+            // what is missing.
+            label={
+              !payable && openAmount
+                ? "Enter an amount"
+                : fixed
+                  ? `Pay ${fixed}`
+                  : "Pay"
+            }
             createOrder={async () =>
               (
                 await post("/api/payments/paypal/links", {

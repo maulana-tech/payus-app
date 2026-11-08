@@ -95,11 +95,18 @@ export async function post(url: string, body?: unknown) {
 
 export function PayPalButton({
   createOrder,
+  className,
   currency: _currency = "USD",
   disabled = false,
   label = "Pay with PayPal",
   onPaid,
 }: {
+  /**
+   * The button's own colours, where the surface has its own. A storefront
+   * is the merchant's page, not ours, so it passes its `--shop-*` palette
+   * and this button stops being a Payus button on someone else's shop.
+   */
+  className?: string;
   /** Opens the order on our server and returns PayPal's order id. */
   createOrder: () => Promise<string>;
   currency?: string;
@@ -225,6 +232,8 @@ export function PayPalButton({
           "bg-foreground text-background hover:bg-foreground/90",
           "focus-visible:ring-2 focus-visible:ring-current/40 focus-visible:outline-none",
           "disabled:cursor-not-allowed disabled:opacity-50",
+          // Last, so a surface with its own palette wins the merge.
+          className,
         )}
       >
         {working ? "Recording the payment…" : label}

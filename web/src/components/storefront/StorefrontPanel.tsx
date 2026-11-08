@@ -280,6 +280,21 @@ function Item({
                 <PayPalButton
                   currency={currency}
                   disabled={!payable}
+                  // The shop's own colours: this page belongs to the
+                  // merchant, and a Payus-coloured button on it would be
+                  // the one thing on the page that is not theirs.
+                  className="bg-(--shop-accent) text-(--shop-accent-text) hover:opacity-90"
+                  // A greyed button with no reason beside it is a dead
+                  // end; say what is missing instead.
+                  label={
+                    product.soldOut
+                      ? "Sold out"
+                      : !payable && openAmount
+                        ? "Enter an amount"
+                        : total !== null
+                          ? `Pay ${formatMinor(total, currency)}`
+                          : "Pay"
+                  }
                   createOrder={async () =>
                     (
                       await post("/api/payments/paypal/storefront", {
