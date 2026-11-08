@@ -46,6 +46,7 @@ import {
 import { starters } from "@/features/storefront/starters";
 import { palette } from "@/features/storefront/theme";
 import { trpc } from "@/trpc/react";
+import { BlockEditor } from "./BlockEditor";
 import type { HtmlEditorHandle } from "./HtmlEditor";
 import { SNIPPETS } from "./snippets";
 
@@ -62,7 +63,7 @@ const HtmlEditor = dynamic(() => import("./HtmlEditor"), {
   ),
 });
 
-type Tab = "page" | "items" | "html" | "look";
+type Tab = "page" | "items" | "blocks" | "html" | "look";
 type Device = "phone" | "tablet" | "wide";
 
 /**
@@ -118,7 +119,9 @@ export function CanvasEditor({ id }: { id: string }) {
   const [saved, setSaved] = useState<string | null>(
     isNew ? JSON.stringify(blankDraft()) : null,
   );
-  const [tab, setTab] = useState<Tab>(isNew ? "page" : "html");
+  // A new shop starts on Page, because it has no name yet; an existing one
+  // opens on Blocks, which is the editor rather than the escape hatch.
+  const [tab, setTab] = useState<Tab>(isNew ? "page" : "blocks");
   const [device, setDevice] = useState<Device>("wide");
   const [slugEdited, setSlugEdited] = useState(!isNew);
   // A new shop opens on the starters rather than on an empty page. Choosing
@@ -310,6 +313,7 @@ export function CanvasEditor({ id }: { id: string }) {
                   options={[
                     { value: "page", label: "Page" },
                     { value: "items", label: "Items" },
+                    { value: "blocks", label: "Blocks" },
                     { value: "html", label: "HTML" },
                     { value: "look", label: "Look" },
                   ]}
@@ -333,6 +337,15 @@ export function CanvasEditor({ id }: { id: string }) {
                     />
                   ) : tab === "items" ? (
                     <ItemFields draft={draft} setDraft={setDraft} />
+                  ) : tab === "blocks" ? (
+                    // Keyed on the shop, not on the html: remounting when
+                    // the html changes would re-read the blocks on every
+                    // keystroke and take the cursor out of the field.
+                    <BlockEditor
+                      key={id}
+                      html={draft.html}
+                      onChange={(html) => patch({ html })}
+                    />
                   ) : (
                     <LookFields draft={draft} patch={patch} />
                   )}

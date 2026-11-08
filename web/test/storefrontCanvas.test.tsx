@@ -138,6 +138,9 @@ describe("storefront canvas", () => {
 
   it("shows the sanitised copy, never the buffer", async () => {
     const { container } = open();
+    // The canvas opens on Blocks now; the "taken out" line lives beside
+    // the raw markup, so this is the tab that shows it.
+    await userEvent.click(screen.getByRole("button", { name: "HTML" }));
 
     await waitFor(() => {
       const frame = container.querySelector("iframe");
@@ -145,8 +148,11 @@ describe("storefront canvas", () => {
     });
     const srcdoc = container.querySelector("iframe")?.getAttribute("srcdoc");
     expect(srcdoc).not.toContain("<script>alert(1)</script>");
-    // And the author is told what the policy took out.
-    expect(screen.getByRole("status").textContent).toContain("<script>");
+    // And the author is told what the policy took out. That line has its
+    // own debounce and its own round trip, so it arrives after the frame.
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toContain("<script>"),
+    );
   });
 
   it("holds the page to a phone's width when asked", async () => {
@@ -168,6 +174,7 @@ describe("storefront canvas", () => {
     const save = screen.getByRole("button", { name: "Save" });
     expect(save.hasAttribute("disabled")).toBe(true);
 
+    await userEvent.click(screen.getByRole("button", { name: "HTML" }));
     await userEvent.type(screen.getByLabelText("HTML"), "<p>more</p>");
     await waitFor(() => expect(save.hasAttribute("disabled")).toBe(false));
   });
