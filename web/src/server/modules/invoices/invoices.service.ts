@@ -28,13 +28,17 @@ import {
   nextIssueAt,
   type Recurrence,
 } from "../../../features/invoices/recurrence";
-import type { InvoiceView } from "../../../features/invoices/types";
+import type {
+  InvoiceReceipt,
+  InvoiceView,
+} from "../../../features/invoices/types";
 import { newId } from "../../../lib/ids";
 import {
   getDb,
   type InvoiceRow,
   invoices,
   isUniqueViolation,
+  payments,
 } from "../../db/client";
 import {
   emailInvoiceReminder,
@@ -62,6 +66,7 @@ type CreateInput = {
 
 function toView(row: InvoiceRow): InvoiceView {
   return {
+    receipts: [],
     id: row.id,
     token: row.token,
     username: row.owner,
@@ -429,6 +434,44 @@ export async function reportPayment(
   };
 }
 
+/**
+ * What was actually captured against an invoice.
+ *
+ * Read straight from `payments` rather than through the payments service,
+ * which imports this module: the cycle is not worth one `select`.
+ */
+async function receiptsFor(
+  invoiceId: string,
+  currency: string,
+): Promise<InvoiceReceipt[]> {
+  const rows = await getDb()
+    .select({
+      captureId: payments.captureId,
+      capturedMinor: payments.capturedMinor,
+      at: payments.updatedAt,
+    })
+    .from(payments)
+    .where(
+      and(eq(payments.invoiceId, invoiceId), eq(payments.status, "captured")),
+    )
+    .orderBy(desc(payments.updatedAt));
+
+  return rows.flatMap((row) =>
+    row.captureId && row.capturedMinor
+      ? [
+          {
+            reference: row.captureId,
+            amountFormatted: formatMinor(
+              BigInt(row.capturedMinor),
+              currency as Currency,
+            ),
+            at: row.at.toISOString(),
+          },
+        ]
+      : [],
+  );
+}
+
 export async function publicInvoice(
   token: string,
 ): Promise<InvoiceView | null> {
@@ -437,7 +480,12 @@ export async function publicInvoice(
     .from(invoices)
     .where(eq(invoices.token, token))
     .limit(1);
-  return row ? toView(row) : null;
+  if (!row) return null;
+  // The one page a payer sees after paying, so it carries the proof.
+  return {
+    ...toView(row),
+    receipts: await receiptsFor(row.id, row.currency),
+  };
 }
 
 export async function invoiceClientEmail(id: string): Promise<string | null> {
