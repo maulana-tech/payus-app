@@ -107,6 +107,16 @@ const nextConfig = {
   // API answered 500 to every call while every test passed and every local
   // build worked. Left external, the tracer copies the package whole.
   serverExternalPackages: ["pg", "@anthropic-ai/bedrock-sdk", "css-tree"],
+  // Belt and braces for the same bug. `serverExternalPackages` is the fix,
+  // but it was verified against the standalone output and Vercel does not
+  // build that — it traces its own way. Naming the file outright costs
+  // nothing and does not depend on which tracer runs.
+  outputFileTracingIncludes: {
+    "/api/**": [
+      "../node_modules/.pnpm/css-tree@*/node_modules/css-tree/data/**",
+    ],
+    "/**": ["../node_modules/.pnpm/css-tree@*/node_modules/css-tree/data/**"],
+  },
   // Turbopack runs `next dev` (see the dev script) and ignores the webpack
   // block below, so the one alias that matters is repeated here: Privy pulls
   // in a Solana package this app never uses.

@@ -99,6 +99,15 @@ export async function GET(request: Request) {
       loads,
       settings,
       node: process.version,
+      // Which commit is actually answering. Without this, a deployment that
+      // did not pick up a push is indistinguishable from one that did and
+      // still has the bug — and both of those happened here.
+      commit: (
+        process.env.VERCEL_GIT_COMMIT_SHA ??
+        process.env.GIT_COMMIT_SHA ??
+        "unknown"
+      ).slice(0, 7),
+      builtFor: process.env.VERCEL_ENV ?? "local",
     },
     { status: 200 },
   );
