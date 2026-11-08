@@ -5,10 +5,16 @@ import {
   ChevronUp,
   Code2,
   Copy,
+  Link2,
   Plus,
   Trash2,
 } from "lucide-react";
-import { useId, useState } from "react";
+
+/** The shop being edited, as the pay-link menu needs to know it. */
+type Shop = { slug: string; title: string };
+
+import { type ReactNode, useId, useState } from "react";
+import { PayLinkMenu } from "@/components/canvas/PayLinks";
 import { dashFocus } from "@/components/dashboard/styles";
 import {
   BLOCK_KINDS,
@@ -75,13 +81,114 @@ function Text({
   );
 }
 
+/**
+ * The items of a block that holds a list of them.
+ *
+ * One component rather than six, because every one of these blocks wants
+ * the same three things — change an item, add one at the end, take one
+ * out — and six copies of that is six places for "remove" to be wrong.
+ * The last item cannot be removed: a block of nothing is a block that has
+ * vanished from the page without anyone saying so.
+ */
+function Items<T>({
+  items,
+  onItems,
+  blank,
+  name,
+  render,
+}: {
+  items: T[];
+  onItems: (next: T[]) => void;
+  blank: () => T;
+  /** Singular, for the buttons: "question" gives "Add question". */
+  name: string;
+  render: (item: T, set: (next: T) => void) => ReactNode;
+}) {
+  const put = (at: number, next: T) =>
+    onItems(items.map((item, where) => (where === at ? next : item)));
+  return (
+    <div className="grid min-w-0 gap-2">
+      {items.map((item, at) => (
+        <div
+          // These items have no id of their own: they are read back out of
+          // the page's markup, where position is the only thing that
+          // identifies them.
+          // biome-ignore lint/suspicious/noArrayIndexKey: position is the identity here.
+          key={at}
+          className="grid min-w-0 gap-2 rounded-(--dash-radius-sm) border border-(--dash-line) p-2"
+        >
+          {render(item, (next) => put(at, next))}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              disabled={items.length < 2}
+              onClick={() => onItems(items.filter((_, w) => w !== at))}
+              className={cn(
+                "rounded-(--dash-radius-sm) px-2 py-1 text-[12px] text-(--dash-ash) hover:text-(--dash-err) disabled:cursor-not-allowed disabled:opacity-30",
+                dashFocus,
+              )}
+            >
+              Remove this {name}
+            </button>
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onItems([...items, blank()])}
+        className={cn(
+          "flex items-center gap-2 rounded-(--dash-radius-sm) border border-(--dash-line-strong) border-dashed px-2 py-2 text-[12px] text-(--dash-ash) hover:text-(--dash-fg)",
+          dashFocus,
+        )}
+      >
+        <Plus className="size-3.5" aria-hidden />
+        Add {name}
+      </button>
+    </div>
+  );
+}
+
+/** The address field, with the account's own pay links behind a button. */
+function Address({
+  value,
+  onChange,
+  shop,
+  name = "Address (https)",
+}: {
+  value: string;
+  onChange: (href: string) => void;
+  shop?: Shop;
+  name?: string;
+}) {
+  return (
+    <div className="grid min-w-0 gap-1.5">
+      <Text name={name} value={value} onChange={onChange} />
+      <div className="flex justify-end">
+        <PayLinkMenu
+          shop={shop}
+          align="end"
+          onPick={(target) => onChange(target.href)}
+          trigger={
+            <>
+              <Link2 className="size-3.5" aria-hidden />
+              Choose a pay link
+            </>
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
 /** The fields one block has, and nothing else. */
 function Fields({
   block,
   onChange,
+  shop,
 }: {
   block: Block;
   onChange: (next: Block) => void;
+  shop?: Shop;
 }) {
   switch (block.kind) {
     case "heading":
@@ -221,15 +328,15 @@ function Fields({
             value={block.text}
             onChange={(text) => onChange({ ...block, text })}
           />
-          <Text
-            name="Address (https)"
+          <Address
             value={block.href}
             onChange={(href) => onChange({ ...block, href })}
+            shop={shop}
           />
           {block.kind === "cta" ? (
             <p className="text-[12px] text-(--dash-ash)">
-              Paste one of your own pay links — the address under Links, or
-              another shop of yours. It opens in a new tab.
+              Choose one of your own pay links above, or paste any https
+              address. It opens in a new tab.
             </p>
           ) : null}
         </div>
@@ -237,6 +344,185 @@ function Fields({
     case "divider":
       return (
         <p className="text-sm text-(--dash-ash)">A rule across the page.</p>
+      );
+    case "buttons":
+      return (
+        <Items
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
+          blank={() => ({ href: "https://example.com/pay", text: "Buy now" })}
+          name="button"
+          render={(item, set) => (
+            <>
+              <Text
+                name="Words on it"
+                value={item.text}
+                onChange={(text) => set({ ...item, text })}
+              />
+              <Address
+                value={item.href}
+                onChange={(href) => set({ ...item, href })}
+                shop={shop}
+              />
+            </>
+          )}
+        />
+      );
+    case "faq":
+      return (
+        <Items
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
+          blank={() => ({ q: "Another question?", a: "And its answer." })}
+          name="question"
+          render={(item, set) => (
+            <>
+              <Text
+                name="Question"
+                value={item.q}
+                onChange={(q) => set({ ...item, q })}
+              />
+              <Text
+                as="textarea"
+                rows={2}
+                name="Answer"
+                value={item.a}
+                onChange={(a) => set({ ...item, a })}
+              />
+            </>
+          )}
+        />
+      );
+    case "steps":
+      return (
+        <Items
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
+          blank={() => ({ title: "Then this", text: "And what happens." })}
+          name="step"
+          render={(item, set) => (
+            <>
+              <Text
+                name="Step"
+                value={item.title}
+                onChange={(title) => set({ ...item, title })}
+              />
+              <Text
+                as="textarea"
+                rows={2}
+                name="What happens"
+                value={item.text}
+                onChange={(text) => set({ ...item, text })}
+              />
+            </>
+          )}
+        />
+      );
+    case "stats":
+      return (
+        <Items
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
+          blank={() => ({ figure: "0", label: "What it counts" })}
+          name="figure"
+          render={(item, set) => (
+            <>
+              <Text
+                name="Figure"
+                value={item.figure}
+                onChange={(figure) => set({ ...item, figure })}
+              />
+              <Text
+                name="What it counts"
+                value={item.label}
+                onChange={(label) => set({ ...item, label })}
+              />
+            </>
+          )}
+        />
+      );
+    case "gallery":
+      return (
+        <Items
+          items={block.items}
+          onItems={(items) => onChange({ ...block, items })}
+          blank={() => ({ src: "https://example.com/photo.jpg", alt: "" })}
+          name="image"
+          render={(item, set) => (
+            <>
+              <Text
+                name="Address (https)"
+                value={item.src}
+                onChange={(src) => set({ ...item, src })}
+              />
+              <Text
+                name="What it shows"
+                value={item.alt}
+                onChange={(alt) => set({ ...item, alt })}
+              />
+            </>
+          )}
+        />
+      );
+    case "table":
+      return (
+        <div className="grid gap-3">
+          <Text
+            name="Headings, one per line"
+            as="textarea"
+            rows={2}
+            value={block.head.join("\n")}
+            onChange={(value) =>
+              onChange({ ...block, head: value.split("\n") })
+            }
+          />
+          <Text
+            name="Rows — one per line, cells split by |"
+            as="textarea"
+            rows={4}
+            value={block.rows.map((row) => row.join(" | ")).join("\n")}
+            onChange={(value) =>
+              onChange({
+                ...block,
+                rows: value
+                  .split("\n")
+                  .map((row) => row.split("|").map((cell) => cell.trim())),
+              })
+            }
+          />
+          <p className="text-[12px] text-(--dash-ash)">
+            A row with fewer cells than there are headings simply ends early.
+          </p>
+        </div>
+      );
+    case "note":
+      return (
+        <Text
+          as="textarea"
+          name="Note"
+          value={block.text}
+          onChange={(text) => onChange({ ...block, text })}
+        />
+      );
+    case "spacer":
+      return (
+        <label className="grid gap-1">
+          <span className={label}>How much</span>
+          <select
+            value={block.size}
+            onChange={(event) =>
+              onChange({
+                ...block,
+                size: event.target.value as "sm" | "md" | "lg",
+              })
+            }
+            className={field}
+          >
+            <option value="sm">A little</option>
+            <option value="md">Some</option>
+            <option value="lg">A lot</option>
+          </select>
+        </label>
       );
     case "html":
       return (
@@ -302,9 +588,12 @@ export function BlockEditor({
   onBlocks,
   open,
   onOpen,
+  shop,
 }: {
   blocks: Block[];
   onBlocks: (next: Block[]) => void;
+  /** This shop, so a pay-link menu can offer its own address first. */
+  shop?: Shop;
   /** The row whose fields are showing, by block id. */
   open: string | null;
   onOpen: (id: string | null) => void;
@@ -431,6 +720,7 @@ export function BlockEditor({
                 <div className="border-t border-(--dash-line) p-3">
                   <Fields
                     block={block}
+                    shop={shop}
                     onChange={(next) =>
                       commit(blocks.map((b) => (b.id === next.id ? next : b)))
                     }
@@ -529,6 +819,22 @@ function summarise(block: Block): string {
       return block.text;
     case "image":
       return block.caption || block.alt || block.src;
+    case "buttons":
+      return block.items.map((item) => item.text).join(" · ");
+    case "faq":
+      return block.items.map((item) => item.q).join(" · ");
+    case "steps":
+      return block.items.map((item) => item.title).join(" · ");
+    case "stats":
+      return block.items.map((item) => item.figure).join(" · ");
+    case "gallery":
+      return `${block.items.length} images`;
+    case "table":
+      return block.head.join(" · ");
+    case "note":
+      return block.text;
+    case "spacer":
+      return { sm: "A little", md: "Some", lg: "A lot" }[block.size];
     case "divider":
       return "";
     case "html":

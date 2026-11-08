@@ -2,7 +2,9 @@
 
 import {
   ArrowLeft,
+  ChevronDown,
   ExternalLink,
+  Link2 as LinkIcon,
   Plus,
   Smartphone,
   Tablet,
@@ -13,6 +15,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PayLinkMenu } from "@/components/canvas/PayLinks";
 import { Segmented } from "@/components/dashboard/Segmented";
 import { Field } from "@/components/dashboard/screens/InvoicesScreen";
 import { ErrorNote, StatusChip } from "@/components/dashboard/screens/kit";
@@ -25,6 +28,12 @@ import {
 import { useSession } from "@/components/SessionProvider";
 import type { ShopHtmlEdit } from "@/components/storefront/ShopHtml";
 import { StorefrontPage } from "@/components/storefront/StorefrontPanel";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   type Block,
@@ -56,7 +65,7 @@ import { palette } from "@/features/storefront/theme";
 import { trpc } from "@/trpc/react";
 import { BlockEditor } from "./BlockEditor";
 import type { HtmlEditorHandle } from "./HtmlEditor";
-import { SNIPPETS } from "./snippets";
+import { payLinkHtml, SNIPPET_GROUPS } from "./snippets";
 
 // The canvas: the shop's own page at full size on one side, and what makes
 // it on the other. It is a page and not a dialog on purpose — a window you
@@ -219,6 +228,15 @@ export function CanvasEditor({ id }: { id: string }) {
     const read = toBlocks(next.html);
     setBlocks(read);
     setOpenBlock(read[0]?.id ?? null);
+    // Which tab owns this page is a fact about the page, not a setting. A
+    // design someone wrote by hand reads as a handful of elements here —
+    // the block list has nothing to offer it — so open where the work is.
+    const drawnBlocks = read.filter((block) => !rendersNothing(block));
+    if (
+      drawnBlocks.length > 0 &&
+      drawnBlocks.every((block) => block.kind === "html")
+    )
+      setTab("html");
   }, [isNew, store]);
 
   // The HTML tab writes the same field. Re-read when what it holds is no
@@ -436,6 +454,7 @@ export function CanvasEditor({ id }: { id: string }) {
                     <BlockEditor
                       blocks={blocks}
                       onBlocks={writeBlocks}
+                      shop={{ slug: draft.slug, title: draft.title }}
                       open={openBlock}
                       onOpen={setOpenBlock}
                     />
@@ -659,18 +678,54 @@ function HtmlPane({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 flex-wrap gap-1 border-b border-(--dash-line-solid) p-2">
-        {SNIPPETS.map((snippet) => (
-          <button
-            key={snippet.label}
-            type="button"
-            title={snippet.hint}
-            onClick={() => editor.current?.insert(snippet.body)}
-            // min-h-9: these measured 28px, the smallest targets in the app,
-            // and there are eleven of them side by side.
-            className={`min-h-9 rounded-full border border-(--dash-line-strong) px-3 py-1 text-[12px] text-(--dash-fg) transition-colors hover:bg-(--dash-fg) hover:text-(--dash-surface) ${dashFocus}`}
-          >
-            {snippet.label}
-          </button>
+        {/* First, and on its own, because it is the only one of these that
+            knows anything: the rest paste a shape, this one pastes an
+            address that takes money. Typing that by hand is how a shop
+            ends up with a button that goes nowhere. */}
+        <PayLinkMenu
+          shop={{ slug: removedFor.slug, title: removedFor.title }}
+          onPick={(target) =>
+            editor.current?.insert(payLinkHtml(target.href, target.label))
+          }
+          trigger={
+            <>
+              <LinkIcon className="size-3.5" aria-hidden />
+              Pay link
+            </>
+          }
+        />
+        <span
+          aria-hidden
+          className="mx-1 my-auto h-5 w-px bg-(--dash-line-strong)"
+        />
+        {/* On shelves rather than in one row: twenty pills side by side
+            is a wall to read, and the toolbar wrapped to three lines on a
+            laptop. Same four groups as the block menu, so someone who
+            learns one tab knows the other. */}
+        {SNIPPET_GROUPS.map(({ group, items }) => (
+          <DropdownMenu key={group}>
+            <DropdownMenuTrigger
+              // min-h-9: these measured 28px, the smallest targets in the app.
+              className={`flex min-h-9 items-center gap-1 rounded-full border border-(--dash-line-strong) px-3 py-1 text-[12px] text-(--dash-fg) transition-colors hover:bg-(--dash-fg) hover:text-(--dash-surface) ${dashFocus}`}
+            >
+              {group}
+              <ChevronDown className="size-3" aria-hidden />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-64">
+              {items.map((snippet) => (
+                <DropdownMenuItem
+                  key={snippet.label}
+                  onClick={() => editor.current?.insert(snippet.body)}
+                  className="grid gap-0.5"
+                >
+                  <span className="text-sm">{snippet.label}</span>
+                  <span className="text-[12px] text-(--dash-ash)">
+                    {snippet.hint}
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         ))}
       </div>
 

@@ -32,30 +32,192 @@ export type Block =
   | { id: string; kind: "link"; href: string; text: string }
   /** A link that looks like an action: another of your pages, or a link to pay. */
   | { id: string; kind: "cta"; href: string; text: string }
+  /** Two or three of those side by side. */
+  | { id: string; kind: "buttons"; items: { href: string; text: string }[] }
+  /** Questions that open, which is the one interactive thing a frame with
+      no scripts can still do: `<details>` is the browser's own. */
+  | { id: string; kind: "faq"; items: { q: string; a: string }[] }
+  | { id: string; kind: "steps"; items: { title: string; text: string }[] }
+  | { id: string; kind: "stats"; items: { figure: string; label: string }[] }
+  | { id: string; kind: "gallery"; items: { src: string; alt: string }[] }
+  | { id: string; kind: "table"; head: string[]; rows: string[][] }
+  | { id: string; kind: "note"; text: string }
+  | { id: string; kind: "spacer"; size: "sm" | "md" | "lg" }
   | { id: string; kind: "divider" }
   /** Anything written by hand that the reader did not recognise. */
   | { id: string; kind: "html"; html: string };
 
 export type BlockKind = Block["kind"];
 
-/** What the "add" menu offers, in the order it offers them. */
-export const BLOCK_KINDS: { kind: BlockKind; label: string; hint: string }[] = [
-  { kind: "heading", label: "Heading", hint: "A section heading" },
-  { kind: "text", label: "Text", hint: "A paragraph" },
-  { kind: "lead", label: "Lead", hint: "A larger opening line" },
-  { kind: "quiet", label: "Quiet", hint: "A smaller, softer line" },
-  { kind: "list", label: "List", hint: "Bulleted or numbered" },
-  { kind: "card", label: "Card", hint: "A panel in the shop's colours" },
+/** The four shelves the "add" menu is arranged on. */
+export type BlockGroup = "Writing" | "Showing" | "Doing" | "Spacing";
+
+/**
+ * What the "add" menu offers.
+ *
+ * Grouped, because twenty things in one column is a list you read rather
+ * than a menu you choose from, and `words` so the menu can be searched by
+ * what someone would call the thing rather than by what we called it.
+ */
+export const BLOCK_KINDS: {
+  kind: BlockKind;
+  label: string;
+  hint: string;
+  group: BlockGroup;
+  words?: string;
+}[] = [
+  // Writing
+  {
+    kind: "heading",
+    label: "Heading",
+    hint: "A section heading",
+    group: "Writing",
+    words: "title h2 h3",
+  },
+  {
+    kind: "text",
+    label: "Text",
+    hint: "A paragraph",
+    group: "Writing",
+    words: "paragraph prose body",
+  },
+  {
+    kind: "lead",
+    label: "Lead",
+    hint: "A larger opening line",
+    group: "Writing",
+    words: "intro subtitle",
+  },
+  {
+    kind: "quiet",
+    label: "Quiet",
+    hint: "A smaller, softer line",
+    group: "Writing",
+    words: "caption small note",
+  },
+  {
+    kind: "list",
+    label: "List",
+    hint: "Bulleted or numbered",
+    group: "Writing",
+    words: "bullets points",
+  },
+  {
+    kind: "quote",
+    label: "Quote",
+    hint: "A pulled quote",
+    group: "Writing",
+    words: "testimonial review",
+  },
+  {
+    kind: "note",
+    label: "Note",
+    hint: "One line, set apart",
+    group: "Writing",
+    words: "callout banner notice",
+  },
+  // Showing
+  {
+    kind: "card",
+    label: "Card",
+    hint: "A panel in the shop's colours",
+    group: "Showing",
+    words: "panel box",
+  },
   {
     kind: "columns",
     label: "Two columns",
     hint: "Side by side on a wide screen",
+    group: "Showing",
+    words: "grid two",
   },
-  { kind: "quote", label: "Quote", hint: "A pulled quote" },
-  { kind: "image", label: "Image", hint: "By https address" },
-  { kind: "link", label: "Link", hint: "Opens in a new tab" },
-  { kind: "cta", label: "Pay link", hint: "A button to one of your pay links" },
-  { kind: "divider", label: "Divider", hint: "A rule between sections" },
+  {
+    kind: "image",
+    label: "Image",
+    hint: "By https address",
+    group: "Showing",
+    words: "photo picture",
+  },
+  {
+    kind: "gallery",
+    label: "Gallery",
+    hint: "A few images in a row",
+    group: "Showing",
+    words: "photos pictures grid",
+  },
+  {
+    kind: "stats",
+    label: "Figures",
+    hint: "Numbers with what they mean",
+    group: "Showing",
+    words: "stats numbers metrics",
+  },
+  {
+    kind: "steps",
+    label: "Steps",
+    hint: "How it works, in order",
+    group: "Showing",
+    words: "how it works process numbered",
+  },
+  {
+    kind: "table",
+    label: "Table",
+    hint: "Rows and columns",
+    group: "Showing",
+    words: "prices specs grid",
+  },
+  {
+    kind: "faq",
+    label: "Questions",
+    hint: "Answers that open when tapped",
+    group: "Showing",
+    words: "faq accordion details",
+  },
+  // Doing
+  {
+    kind: "link",
+    label: "Link",
+    hint: "Opens in a new tab",
+    group: "Doing",
+    words: "url anchor",
+  },
+  {
+    kind: "cta",
+    label: "Pay link",
+    hint: "A button to one of your pay links",
+    group: "Doing",
+    words: "button checkout buy pay",
+  },
+  {
+    kind: "buttons",
+    label: "Buttons",
+    hint: "Two or three side by side",
+    group: "Doing",
+    words: "row of buttons actions",
+  },
+  // Spacing
+  {
+    kind: "divider",
+    label: "Divider",
+    hint: "A rule between sections",
+    group: "Spacing",
+    words: "rule line hr separator",
+  },
+  {
+    kind: "spacer",
+    label: "Space",
+    hint: "Room, and nothing in it",
+    group: "Spacing",
+    words: "gap padding blank",
+  },
+];
+
+/** The groups, in the order the menu shows them. */
+export const BLOCK_GROUPS: BlockGroup[] = [
+  "Writing",
+  "Showing",
+  "Doing",
+  "Spacing",
 ];
 
 /** A new block of a kind, with something in it rather than nothing. */
@@ -100,6 +262,77 @@ export function blankBlock(kind: BlockKind): Block {
       return { id, kind, href: "https://example.com", text: "Somewhere else" };
     case "cta":
       return { id, kind, href: "https://example.com/pay", text: "Pay here" };
+    case "buttons":
+      return {
+        id,
+        kind,
+        items: [
+          { href: "https://example.com/pay", text: "Buy now" },
+          { href: "https://example.com", text: "Read more" },
+        ],
+      };
+    case "faq":
+      return {
+        id,
+        kind,
+        items: [
+          {
+            q: "When does it ship?",
+            a: "Within two working days of the payment landing.",
+          },
+          {
+            q: "Can I collect it instead?",
+            a: "Yes — ask and we will keep it.",
+          },
+        ],
+      };
+    case "steps":
+      return {
+        id,
+        kind,
+        items: [
+          { title: "Choose", text: "Pick what you want from the list." },
+          { title: "Pay", text: "Through PayPal, on the same page." },
+          { title: "Collect", text: "We send a receipt the moment it clears." },
+        ],
+      };
+    case "stats":
+      return {
+        id,
+        kind,
+        items: [
+          { figure: "2016", label: "Roasting since" },
+          { figure: "18", label: "Farms we buy from" },
+          { figure: "48h", label: "Bean to doorstep" },
+        ],
+      };
+    case "gallery":
+      return {
+        id,
+        kind,
+        items: [
+          { src: "https://example.com/one.jpg", alt: "" },
+          { src: "https://example.com/two.jpg", alt: "" },
+        ],
+      };
+    case "table":
+      return {
+        id,
+        kind,
+        head: ["What", "How much"],
+        rows: [
+          ["Single origin, 250g", "Rp 120.000"],
+          ["House blend, 1kg", "Rp 380.000"],
+        ],
+      };
+    case "note":
+      return {
+        id,
+        kind,
+        text: "Orders placed after 4pm go out the next morning.",
+      };
+    case "spacer":
+      return { id, kind, size: "md" };
     case "divider":
       return { id, kind };
     default:
@@ -109,7 +342,7 @@ export function blankBlock(kind: BlockKind): Block {
 
 // ---------------------------------------------------------------- writing
 
-const esc = (text: string) =>
+export const esc = (text: string) =>
   text
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -161,6 +394,61 @@ function one(block: Block): string {
       return `<p><a class="shop-cta" href="${esc(block.href)}">${esc(
         block.text,
       )}</a></p>`;
+    case "buttons":
+      return `<div class="shop-row">\n${block.items
+        .map(
+          (item) =>
+            `  <a class="shop-cta" href="${esc(item.href)}">${esc(
+              item.text,
+            )}</a>`,
+        )
+        .join("\n")}\n</div>`;
+    case "faq":
+      return `<div class="shop-faq">\n${block.items
+        .map(
+          (item) =>
+            `  <details>\n    <summary>${esc(
+              item.q,
+            )}</summary>\n    <p>${esc(item.a)}</p>\n  </details>`,
+        )
+        .join("\n")}\n</div>`;
+    case "steps":
+      return `<ol class="shop-steps">\n${block.items
+        .map(
+          (item) =>
+            `  <li>\n    <h3>${esc(item.title)}</h3>\n    <p>${esc(
+              item.text,
+            )}</p>\n  </li>`,
+        )
+        .join("\n")}\n</ol>`;
+    case "stats":
+      return `<div class="shop-stats">\n${block.items
+        .map(
+          (item) =>
+            `  <div>\n    <strong>${esc(
+              item.figure,
+            )}</strong>\n    <span>${esc(item.label)}</span>\n  </div>`,
+        )
+        .join("\n")}\n</div>`;
+    case "gallery":
+      return `<div class="shop-gallery">\n${block.items
+        .map((item) => `  <img src="${esc(item.src)}" alt="${esc(item.alt)}">`)
+        .join("\n")}\n</div>`;
+    case "table": {
+      const cells = (row: string[], tag: "th" | "td") =>
+        row.map((cell) => `<${tag}>${esc(cell)}</${tag}>`).join("");
+      const body = block.rows
+        .map((row) => `    <tr>${cells(row, "td")}</tr>`)
+        .join("\n");
+      return `<table>\n  <thead>\n    <tr>${cells(
+        block.head,
+        "th",
+      )}</tr>\n  </thead>\n  <tbody>\n${body}\n  </tbody>\n</table>`;
+    }
+    case "note":
+      return `<p class="shop-note">${esc(block.text)}</p>`;
+    case "spacer":
+      return `<div class="shop-space shop-space-${block.size}"></div>`;
     case "divider":
       return "<hr>";
     case "html":
@@ -218,6 +506,139 @@ function asCard(el: Element): Block | null {
 /** True when an element carries nothing but its own text. */
 const plainText = (el: Element) => el.children.length === 0;
 
+/** Children that are exactly these tags, in this order, each plain text. */
+const shaped = (el: Element, tags: string[]) =>
+  el.children.length === tags.length &&
+  tags.every(
+    (tag, at) =>
+      el.children[at]?.tagName === tag && plainText(el.children[at] as Element),
+  );
+
+/** A `<div class="shop-row">` of nothing but action links. */
+function asButtons(el: Element): Block | null {
+  if (!el.classList.contains("shop-row")) return null;
+  const kids = [...el.children];
+  if (
+    kids.length === 0 ||
+    !kids.every(
+      (a) =>
+        a.tagName === "A" && a.classList.contains("shop-cta") && plainText(a),
+    )
+  )
+    return null;
+  return {
+    id: newId(10),
+    kind: "buttons",
+    items: kids.map((a) => ({
+      href: a.getAttribute("href") ?? "",
+      text: text(a),
+    })),
+  };
+}
+
+function asFaq(el: Element): Block | null {
+  if (!el.classList.contains("shop-faq")) return null;
+  const kids = [...el.children];
+  if (
+    kids.length === 0 ||
+    !kids.every((d) => d.tagName === "DETAILS" && shaped(d, ["SUMMARY", "P"]))
+  )
+    return null;
+  return {
+    id: newId(10),
+    kind: "faq",
+    items: kids.map((d) => ({
+      q: text(d.children[0]),
+      a: text(d.children[1]),
+    })),
+  };
+}
+
+function asSteps(el: Element): Block | null {
+  if (!el.classList.contains("shop-steps")) return null;
+  const kids = [...el.children];
+  if (
+    kids.length === 0 ||
+    !kids.every((li) => li.tagName === "LI" && shaped(li, ["H3", "P"]))
+  )
+    return null;
+  return {
+    id: newId(10),
+    kind: "steps",
+    items: kids.map((li) => ({
+      title: text(li.children[0]),
+      text: text(li.children[1]),
+    })),
+  };
+}
+
+function asStats(el: Element): Block | null {
+  if (!el.classList.contains("shop-stats")) return null;
+  const kids = [...el.children];
+  if (
+    kids.length === 0 ||
+    !kids.every((d) => d.tagName === "DIV" && shaped(d, ["STRONG", "SPAN"]))
+  )
+    return null;
+  return {
+    id: newId(10),
+    kind: "stats",
+    items: kids.map((d) => ({
+      figure: text(d.children[0]),
+      label: text(d.children[1]),
+    })),
+  };
+}
+
+function asGallery(el: Element): Block | null {
+  if (!el.classList.contains("shop-gallery")) return null;
+  const kids = [...el.children];
+  if (kids.length === 0 || !kids.every((img) => img.tagName === "IMG"))
+    return null;
+  return {
+    id: newId(10),
+    kind: "gallery",
+    items: kids.map((img) => ({
+      src: img.getAttribute("src") ?? "",
+      alt: img.getAttribute("alt") ?? "",
+    })),
+  };
+}
+
+/** `<div class="shop-space shop-space-md">`, and nothing inside it. */
+function asSpacer(el: Element): Block | null {
+  if (!el.classList.contains("shop-space")) return null;
+  if (el.childNodes.length > 0) return null;
+  const size = (["sm", "md", "lg"] as const).find((one) =>
+    el.classList.contains(`shop-space-${one}`),
+  );
+  if (!size || el.classList.length !== 2) return null;
+  return { id: newId(10), kind: "spacer", size };
+}
+
+/** A head row and body rows, all of them plain cells. */
+function asTable(el: Element): Block | null {
+  const kids = [...el.children];
+  const head = kids.find((k) => k.tagName === "THEAD");
+  const body = kids.find((k) => k.tagName === "TBODY");
+  if (!head || !body || kids.length !== 2) return null;
+  const rowOf = (tr: Element, tag: "TH" | "TD") =>
+    [...tr.children].every((c) => c.tagName === tag && plainText(c))
+      ? [...tr.children].map((c) => text(c))
+      : null;
+  if (head.children.length !== 1) return null;
+  const headRow = rowOf(head.children[0] as Element, "TH");
+  if (!headRow) return null;
+  const rows: string[][] = [];
+  for (const tr of [...body.children]) {
+    if (tr.tagName !== "TR") return null;
+    const row = rowOf(tr, "TD");
+    if (!row) return null;
+    rows.push(row);
+  }
+  return { id: newId(10), kind: "table", head: headRow, rows };
+}
+
 function read(el: Element): Block {
   const id = newId(10);
   const kept = (): Block => ({ id, kind: "html", html: el.outerHTML });
@@ -254,12 +675,17 @@ function read(el: Element): Block {
         return { id, kind: "lead", text: text(el) };
       if (el.classList.contains("shop-muted"))
         return { id, kind: "quiet", text: text(el) };
+      if (el.classList.contains("shop-note"))
+        return { id, kind: "note", text: text(el) };
       // A class we do not write is a class we must not drop.
       if (el.classList.length > 0) return kept();
       return { id, kind: "text", text: text(el) };
     }
     case "UL":
     case "OL": {
+      const steps = asSteps(el);
+      if (steps) return steps;
+      if (el.classList.length > 0) return kept();
       const items = [...el.children];
       if (!items.every((li) => li.tagName === "LI" && plainText(li)))
         return kept();
@@ -283,8 +709,19 @@ function read(el: Element): Block {
         caption: text(caption),
       };
     }
+    case "TABLE":
+      return asTable(el) ?? kept();
     case "DIV":
-      return asCard(el) ?? asColumns(el) ?? kept();
+      return (
+        asCard(el) ??
+        asColumns(el) ??
+        asButtons(el) ??
+        asFaq(el) ??
+        asStats(el) ??
+        asGallery(el) ??
+        asSpacer(el) ??
+        kept()
+      );
     default:
       return kept();
   }

@@ -4,12 +4,12 @@ import {
   BLOCK_KINDS,
   type Block,
   blankBlock,
+  drawnPositions,
   duplicateBlock,
+  htmlShape,
   insertBlock,
   moveBlock,
   removeBlock,
-  drawnPositions,
-  htmlShape,
   rendersNothing,
   toBlocks,
   toHtml,
@@ -37,6 +37,18 @@ describe("blocks", () => {
     expect(shape(back)).toEqual(shape(made));
     // And nothing fell through to the escape hatch.
     expect(back.some((b) => b.kind === "html")).toBe(false);
+  });
+
+  it("survives the sanitiser, which is what the page is actually served", () => {
+    // The block list is a reading of the page; the page is the sanitiser's
+    // output. A kind whose markup the sanitiser rewrites would show one
+    // thing on the left and another on the right — and the counts would
+    // disagree, which switches editing on the page off.
+    const made = BLOCK_KINDS.map(({ kind }) => blankBlock(kind));
+    const { clean } = sanitizeShopHtml(toHtml(made));
+    const back = toBlocks(clean);
+    expect(back.map((b) => b.kind)).toEqual(made.map((b) => b.kind));
+    expect(shape(back)).toEqual(shape(made));
   });
 
   it("survives a second trip, so editing is not a slow erosion", () => {

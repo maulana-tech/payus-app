@@ -127,7 +127,82 @@ export function ShopHtml({
     font-weight: 500; text-decoration: none;
   }
   .shop-cta:hover { filter: brightness(1.06); }
-  @media (max-width: 520px) { .shop-cols { grid-template-columns: 1fr; } }
+  /* A row of actions. Wraps rather than shrinks, because a button narrower
+     than its words is worse than a second line. */
+  .shop-row { display: flex; flex-wrap: wrap; gap: 0.625rem; margin: 0 0 1em; }
+  /* The second action onward reads as the quieter one. */
+  .shop-row .shop-cta ~ .shop-cta,
+  .shop-row .shop-cta:not(:first-child) {
+    background: transparent; color: ${palette.text};
+    box-shadow: inset 0 0 0 1px ${palette.line};
+  }
+  /* Questions that open: the <details> element is the one interactive
+     thing a frame with no scripts still has, because the browser does it
+     itself rather than asking anyone's JavaScript. */
+  .shop-faq { border-top: 1px solid ${palette.line}; margin: 0 0 1em; }
+  .shop-faq details { border-bottom: 1px solid ${palette.line}; }
+  .shop-faq summary {
+    cursor: pointer; list-style: none; padding: 0.875rem 0;
+    font-weight: 500; display: flex; justify-content: space-between;
+    align-items: center; gap: 1rem; min-height: 44px;
+  }
+  .shop-faq summary::-webkit-details-marker { display: none; }
+  .shop-faq summary::after {
+    content: ""; flex: none; width: 10px; height: 10px;
+    border-right: 1.5px solid ${palette.accent};
+    border-bottom: 1.5px solid ${palette.accent};
+    transform: rotate(45deg) translate(-2px, -2px);
+    transition: transform .15s;
+  }
+  .shop-faq details[open] summary::after {
+    transform: rotate(225deg) translate(-2px, -2px);
+  }
+  .shop-faq details > p { margin: -0.25rem 0 1rem; color: ${palette.muted}; }
+  /* Numbered, and the number is the counter rather than a typed digit, so
+     inserting a step in the middle cannot leave the list lying. */
+  .shop-steps { list-style: none; counter-reset: shop-step; padding: 0; }
+  .shop-steps > li {
+    counter-increment: shop-step;
+    display: grid; grid-template-columns: 1.75rem 1fr; gap: 0 0.875rem;
+    padding: 0 0 1.125rem;
+  }
+  .shop-steps > li::before {
+    content: counter(shop-step);
+    grid-row: span 2; width: 1.75rem; height: 1.75rem;
+    display: grid; place-items: center; border-radius: 999px;
+    background: ${palette.accent}; color: ${palette.accentText};
+    font-size: 0.8125rem; font-weight: 500;
+  }
+  .shop-steps > li > h3 { margin: 0.1875rem 0 0.25rem; font-size: 1rem; }
+  .shop-steps > li > p { margin: 0; color: ${palette.muted}; }
+  .shop-stats {
+    display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem; margin: 0 0 1em;
+  }
+  .shop-stats > div > strong {
+    display: block; font-size: 1.5rem; font-weight: 400; line-height: 1.1;
+  }
+  .shop-stats > div > span { font-size: 0.875rem; color: ${palette.muted}; }
+  .shop-gallery {
+    display: grid; gap: 0.75rem; margin: 0 0 1em;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+  .shop-gallery img {
+    width: 100%; aspect-ratio: 1; object-fit: cover; display: block;
+  }
+  .shop-note {
+    border-left: 2px solid ${palette.accent};
+    background: ${palette.surface};
+    padding: 0.875rem 1rem; border-radius: 0 12px 12px 0;
+  }
+  /* Room, and nothing in it. A height with no box, so nothing to see. */
+  .shop-space { margin: 0; }
+  .shop-space-sm { height: 1rem; }
+  .shop-space-md { height: 2.5rem; }
+  .shop-space-lg { height: 5rem; }
+  @media (max-width: 520px) {
+    .shop-cols { grid-template-columns: 1fr; }
+    .shop-stats { gap: 1.25rem 1.75rem; }
+  }
 </style></head><body>${html}</body></html>`;
 
   // Measuring the frame is the whole reason `allow-same-origin` is here, and

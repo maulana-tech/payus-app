@@ -1,66 +1,55 @@
-// What the toolbar puts in. Every one of these survives the sanitiser as
-// written — the `shop-` classes are the ones `ShopHtml` styles, and they are
-// the reason the class allowlist exists at all.
+import {
+  BLOCK_GROUPS,
+  BLOCK_KINDS,
+  type BlockGroup,
+  blankBlock,
+  esc,
+  toHtml,
+} from "@/features/storefront/blocks";
 
-export const SNIPPETS: { label: string; hint: string; body: string }[] = [
-  {
-    label: "Heading",
-    hint: "A section heading",
-    body: "<h2>A heading</h2>\n",
-  },
-  {
-    label: "Text",
-    hint: "A paragraph",
-    body: "<p>Something about the shop.</p>\n",
-  },
-  {
-    label: "Lead",
-    hint: "A larger opening line",
-    body: '<p class="shop-lead">The line people read first.</p>\n',
-  },
-  {
-    label: "List",
-    hint: "A bulleted list",
-    body: "<ul>\n  <li>One</li>\n  <li>Two</li>\n</ul>\n",
-  },
-  {
-    label: "Two columns",
-    hint: "Side by side, stacking on a phone",
-    body: '<div class="shop-cols">\n  <div>\n    <h3>This</h3>\n    <p>And what it is.</p>\n  </div>\n  <div>\n    <h3>That</h3>\n    <p>And what it is.</p>\n  </div>\n</div>\n',
-  },
-  {
-    label: "Card",
-    hint: "A panel in the shop's own colours",
-    body: '<div class="shop-card">\n  <h3>Opening hours</h3>\n  <p>Tuesday to Sunday, 8am until the beans run out.</p>\n</div>\n',
-  },
-  {
-    label: "Table",
-    hint: "Rows and columns",
-    body: "<table>\n  <tr><th>Origin</th><th>Process</th></tr>\n  <tr><td>Gayo</td><td>Washed</td></tr>\n</table>\n",
-  },
-  {
-    label: "Quote",
-    hint: "A pulled quote",
-    body: "<blockquote>What someone said about it.</blockquote>\n",
-  },
-  {
-    label: "Link",
-    hint: "An https link, opened in a new tab",
-    body: '<p><a href="https://example.com">Somewhere else</a></p>\n',
-  },
-  {
-    label: "Image",
-    hint: "An image by https address",
-    body: '<figure>\n  <img src="https://example.com/photo.jpg" alt="">\n  <figcaption>What it shows.</figcaption>\n</figure>\n',
-  },
-  {
-    label: "Divider",
-    hint: "A rule between sections",
-    body: "<hr>\n",
-  },
-  {
-    label: "Quiet",
-    hint: "Muted small print",
-    body: '<p class="shop-muted">The small print.</p>\n',
-  },
-];
+// The HTML tab's toolbar.
+//
+// **Derived from the blocks, not written out again.** These used to be a
+// second copy of the same markup, which meant the Card the toolbar pasted
+// and the Card the block editor wrote could drift apart — and when they
+// did, a page built in one tab stopped being readable in the other. There
+// is one writer, `toHtml`, and this asks it.
+//
+// So the two tabs are separate places to work and not separate
+// vocabularies: whatever the block menu offers, the toolbar pastes, and
+// what it pastes comes back as that block if you ever switch over.
+
+/**
+ * A pay button, as markup.
+ *
+ * Shared by the HTML toolbar and the block editor's "choose" button, so the
+ * two cannot write a different button for the same link. Escaped the way
+ * everything else is: a shop called `Tom & Jerry's` is a title, not the
+ * start of an entity.
+ */
+export const payLinkHtml = (href: string, label: string) =>
+  `<p><a class="shop-cta" href="${esc(href)}">${esc(label)}</a></p>\n`;
+
+export type Snippet = {
+  label: string;
+  hint: string;
+  body: string;
+  group: BlockGroup;
+};
+
+export const SNIPPETS: Snippet[] = BLOCK_KINDS.map(
+  ({ kind, label, hint, group }) => ({
+    label,
+    hint,
+    group,
+    // A trailing newline so two in a row do not end up on one line.
+    body: `${toHtml([blankBlock(kind)])}\n`,
+  }),
+);
+
+/** The toolbar's shelves, in order, each with what is on it. */
+export const SNIPPET_GROUPS: { group: BlockGroup; items: Snippet[] }[] =
+  BLOCK_GROUPS.map((group) => ({
+    group,
+    items: SNIPPETS.filter((snippet) => snippet.group === group),
+  })).filter((shelf) => shelf.items.length > 0);
