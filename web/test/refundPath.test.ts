@@ -254,6 +254,53 @@ describe.skipIf(!available)("refund path (Postgres)", () => {
     expect(await ledger.trialBalance()).toBe(0n);
   });
 
+  it("does not forget a refund when the invoice is paid again", async () => {
+    // Found by the first real sandbox payment, on an invoice the demo had
+    // already captured and partly refunded: the capture path reported
+    // everything ever taken and dropped what had been given back, so the
+    // invoice read as overpaid. A customer who is refunded and pays again
+    // is the ordinary way to reach this.
+    const { invoice, paymentId } = await paidInvoice(
+      "vera",
+      "INV-RP",
+      "1000.00",
+    );
+
+    await refunds.startRefund("vera", {
+      paymentId,
+      amountMinor: 20000n,
+      intentKey: "rp-1",
+    });
+    const owed = (await invoices.listInvoices("vera")).find(
+      (row) => row.id === invoice.id,
+    );
+    expect(owed?.paidMinor).toBe("80000");
+    expect(owed?.status).toBe("pending");
+
+    // Paid again, for exactly what is still owed.
+    const second = await payments.startPaypalOrder(invoice.token);
+    const captureId = "CAP-INV-RP-2";
+    state.captures.set(captureId, {
+      captureId,
+      orderId: second.orderId,
+      paymentId: null,
+      status: "COMPLETED",
+      grossMinor: 20000n,
+      feeMinor: 50n,
+      currency: "USD",
+    });
+    state.orders.set(second.orderId, captureId);
+    await payments.recordCapture(state.captures.get(captureId) as Capture);
+
+    const after = (await invoices.listInvoices("vera")).find(
+      (row) => row.id === invoice.id,
+    );
+    // 1000 captured, 200 given back, 200 captured again: paid 1000, not
+    // 1200. The figure is absolute, and the refund is still in it.
+    expect(after?.paidMinor).toBe("100000");
+    expect(after?.status).toBe("paid");
+  });
+
   it("records a refund made in PayPal's own dashboard, once", async () => {
     const { captureId } = await paidInvoice("pia", "INV-P1", "20.00");
     const refundId = "REFUND-DASHBOARD";

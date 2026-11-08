@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
   type Currency,
   formatMinor,
@@ -23,6 +23,7 @@ import {
   InvoiceNotPayableError,
   PaymentNotFoundError,
 } from "./payments.errors";
+import { capturedTotal, refundedForInvoice, settledForInvoice } from "./totals";
 
 // A payment lives in three steps: an order the payer approves, a capture
 // PayPal confirms, and a posting that moves the money in our ledger. Only
@@ -311,7 +312,11 @@ export async function recordCapture(capture: paypal.Capture): Promise<{
     });
   }
 
-  const paid = await capturedTotal(row.invoiceId);
+  // Net of refunds, not gross. A capture that followed a refund used to
+  // report everything ever taken and quietly drop what had been given
+  // back, so an invoice that was paid, refunded, then paid again read as
+  // overpaid — and a partly refunded one could reach `paid` early.
+  const paid = await settledForInvoice(row.invoiceId);
   const applied = await applyInvoicePayment(
     row.owner,
     row.invoiceId,
@@ -336,18 +341,7 @@ async function paymentById(id: string | null) {
   return row ?? null;
 }
 
-/** Everything captured against one invoice, as minor units. */
-export async function capturedTotal(invoiceId: string): Promise<bigint> {
-  const [row] = await getDb()
-    .select({
-      total: sql<string>`coalesce(sum(${payments.capturedMinor}), 0)`,
-    })
-    .from(payments)
-    .where(
-      and(eq(payments.invoiceId, invoiceId), eq(payments.status, "captured")),
-    );
-  return BigInt(row?.total ?? "0");
-}
+export { capturedTotal, refundedForInvoice, settledForInvoice };
 
 export type PaymentActivity = {
   id: string;

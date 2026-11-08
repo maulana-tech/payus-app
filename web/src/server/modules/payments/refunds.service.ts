@@ -8,7 +8,7 @@ import * as paypal from "../../lib/paypal";
 import { account } from "../ledger/accounts";
 import { entriesOf, type Posting, post } from "../ledger/ledger.service";
 import { applyInvoicePayment } from "./applyPayment";
-import { capturedTotal } from "./payments.service";
+import { capturedTotal, refundedForInvoice } from "./totals";
 
 // Giving money back. Two things make this safe to run twice: the refund row
 // is keyed by PayPal's refund id, and the ledger transaction derived from it
@@ -72,16 +72,7 @@ export async function refundedTotal(
     .reduce((sum, row) => sum + BigInt(row.amountMinor), 0n);
 }
 
-/** Everything given back against one invoice, across all its captures. */
-export async function refundedForInvoice(invoiceId: string): Promise<bigint> {
-  const rows = await getDb()
-    .select()
-    .from(refunds)
-    .where(
-      and(eq(refunds.invoiceId, invoiceId), eq(refunds.status, "completed")),
-    );
-  return rows.reduce((sum, row) => sum + BigInt(row.amountMinor), 0n);
-}
+export { refundedForInvoice };
 
 /**
  * How a capture was divided, read back from the ledger rather than
