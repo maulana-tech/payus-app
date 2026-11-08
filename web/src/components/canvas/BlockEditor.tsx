@@ -16,11 +16,11 @@ import {
   type BlockKind,
   blankBlock,
   duplicateBlock,
+  htmlShape,
   insertBlock,
   moveBlock,
   removeBlock,
-  toBlocks,
-  toHtml,
+  rendersNothing,
 } from "@/features/storefront/blocks";
 import { cn } from "@/lib/utils";
 
@@ -249,18 +249,45 @@ function Fields({
             onChange={(html) => onChange({ ...block, html })}
           />
           <p className="text-[12px] text-(--dash-ash)">
-            Written by hand, so it is kept exactly as it is. The sanitiser still
-            has the last word on it.
+            {rendersNothing(block)
+              ? why(block.html)
+              : "Written by hand, so it is kept exactly as it is. The sanitiser still has the last word on it."}
           </p>
         </div>
       );
   }
 }
 
+/**
+ * Why a block draws nothing — three different answers, and the author is
+ * owed the right one. A `<style>` is doing its job invisibly; a `<meta>` was
+ * never going to appear; a `<script>` was written to run and will not.
+ */
+function why(html: string): string {
+  if (/^\s*<script\b/i.test(html))
+    return "A script, and nothing in the shop's frame may run — this is dropped before the page is served. The design is safe; the behaviour is not there.";
+  if (/^\s*<(style|link)\b/i.test(html))
+    return "Part of the design rather than part of the page: it styles what is below it and has nothing of its own to show.";
+  return "Document scaffolding. A shop page is served inside Payus, so this is dropped and nothing on the page changes.";
+}
+
 const NAME: Record<BlockKind, string> = {
   ...Object.fromEntries(BLOCK_KINDS.map((k) => [k.kind, k.label])),
   html: "Your own markup",
 } as Record<BlockKind, string>;
+
+/**
+ * What to call one row.
+ *
+ * A pasted page arrives with a `<meta>`, a `<title>`, three `<link>`s and a
+ * `<script>` in front of the design, and every one of them came back as
+ * "Your own markup" — six identical rows naming nothing, for six things
+ * that are not on the page at all. A row has to say which it is.
+ */
+const nameFor = (block: Block): string =>
+  block.kind === "html" && rendersNothing(block)
+    ? "Not on the page"
+    : (NAME[block.kind] ?? block.kind);
 
 /**
  * The list, controlled.
@@ -285,6 +312,14 @@ export function BlockEditor({
   const [adding, setAdding] = useState(false);
   const commit = onBlocks;
 
+  // A page that is all hand-written markup is one this list cannot do much
+  // for: every row is an element, not a heading or a paragraph. Saying so
+  // is better than letting someone conclude the editor is broken — which is
+  // what a column of identical rows looks like.
+  const drawn = blocks.filter((block) => !rendersNothing(block));
+  const handWritten =
+    drawn.length > 0 && drawn.every((block) => block.kind === "html");
+
   const add = (kind: BlockKind) => {
     const block = blankBlock(kind);
     commit(insertBlock(blocks, blocks.length, block));
@@ -306,9 +341,26 @@ export function BlockEditor({
         </p>
       ) : null}
 
+      {handWritten ? (
+        <p className="rounded-(--dash-radius-sm) border border-dashed border-(--dash-line-strong) p-3 text-[12px] text-(--dash-ash)">
+          This page was written by hand, so it arrives here as the few elements
+          it is made of rather than as headings and paragraphs — a design is
+          kept whole instead of being chopped into fields that would lose it. To
+          change the words,{" "}
+          <span className="text-(--dash-fg)">
+            click them on the page to the right and type
+          </span>
+          ; the HTML tab is where the markup itself is edited.
+        </p>
+      ) : null}
+
       <ol className="grid min-w-0 gap-2">
         {blocks.map((block, index) => {
           const shown = open === block.id;
+          // A block that draws nothing is still the author's and still
+          // theirs to move or delete — it just must not read like content.
+          const inert = block.kind === "html" && rendersNothing(block);
+          const name = nameFor(block);
           return (
             <li
               key={block.id}
@@ -335,8 +387,15 @@ export function BlockEditor({
                       aria-hidden
                     />
                   ) : null}
-                  <span className="text-sm font-medium">
-                    {NAME[block.kind] ?? block.kind}
+                  <span
+                    className={cn(
+                      "text-sm",
+                      inert
+                        ? "text-(--dash-ash)"
+                        : "font-medium text-(--dash-fg)",
+                    )}
+                  >
+                    {name}
                   </span>
                   <span className="min-w-0 truncate text-[12px] text-(--dash-ash)">
                     {summarise(block)}
@@ -345,24 +404,24 @@ export function BlockEditor({
 
                 <Control
                   icon={ChevronUp}
-                  name={`Move ${NAME[block.kind]} up`}
+                  name={`Move ${name} up`}
                   disabled={index === 0}
                   onClick={() => commit(moveBlock(blocks, index, index - 1))}
                 />
                 <Control
                   icon={ChevronDown}
-                  name={`Move ${NAME[block.kind]} down`}
+                  name={`Move ${name} down`}
                   disabled={index === blocks.length - 1}
                   onClick={() => commit(moveBlock(blocks, index, index + 1))}
                 />
                 <Control
                   icon={Copy}
-                  name={`Duplicate ${NAME[block.kind]}`}
+                  name={`Duplicate ${name}`}
                   onClick={() => commit(duplicateBlock(blocks, index))}
                 />
                 <Control
                   icon={Trash2}
-                  name={`Delete ${NAME[block.kind]}`}
+                  name={`Delete ${name}`}
                   destructive
                   onClick={() => commit(removeBlock(blocks, index))}
                 />
@@ -473,6 +532,6 @@ function summarise(block: Block): string {
     case "divider":
       return "";
     case "html":
-      return block.html.replace(/\s+/g, " ").slice(0, 60);
+      return htmlShape(block.html);
   }
 }

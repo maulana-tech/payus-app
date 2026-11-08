@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { INERT_TAGS } from "@/features/storefront/blocks";
 import type { Palette } from "@/features/storefront/theme";
 
 // The merchant's own HTML, rendered where it cannot reach the page around
@@ -137,9 +138,11 @@ export function ShopHtml({
   // report ready, and then keep watching, because a grid that rewraps at a
   // container query is a height change nobody fired an event for.
   //
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `html` is not
-  // read inside the effect — it is the reason to re-run it. A new document
-  // is a new body, and the observer must be pointed at that one.
+  // The dependency is `loads`, not `html`: a new `html` only matters here
+  // because it replaces the frame's document, and `loads` is when that has
+  // actually happened. Watching `html` ran this against the *old* body —
+  // on first render, against the empty one that `srcDoc` then replaces.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `loads` is a trigger, not something the effect reads.
   useEffect(() => {
     let alive = true;
     const measure = () => {
@@ -170,18 +173,16 @@ export function ShopHtml({
       window.removeEventListener("resize", measure);
       observer?.disconnect();
     };
-    // `html` is a dependency because a new document is a new body to watch:
-    // the editor replaces this frame's contents on every keystroke.
-  }, [html]);
+  }, [loads]);
 
   // Editing happens from *this* document, not from inside the frame.
   // `allow-same-origin` lets the parent reach in; the frame still has no
   // `allow-scripts`, so nothing the author wrote can run. That is the whole
   // reason this is safe, and it is why the sandbox did not have to change.
   //
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `html` and
-  // `loads` are not read here — they are the reasons to re-run. A new
-  // document, however it arrived, is new elements to make editable.
+  // `loads` is the dependency for the same reason as above: a document that
+  // has just loaded is new elements to make editable.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `loads` is a trigger, not something the effect reads.
   useEffect(() => {
     if (!edit) return;
     const doc = frame.current?.contentDocument;
@@ -202,7 +203,7 @@ export function ShopHtml({
     // document and renders nothing, so it is not somewhere a cursor can
     // go — and counting it would shift every position after it.
     const nodes = ([...body.children] as HTMLElement[]).filter(
-      (node) => !["STYLE", "LINK", "SCRIPT"].includes(node.tagName),
+      (node) => !INERT_TAGS.includes(node.tagName),
     );
     const timers = new Map<number, ReturnType<typeof setTimeout>>();
 
@@ -230,7 +231,7 @@ export function ShopHtml({
         node.removeAttribute("contenteditable");
       }
     };
-  }, [edit, html, loads, palette.accent]);
+  }, [edit, loads, palette.accent]);
 
   if (!html.trim()) return null;
 

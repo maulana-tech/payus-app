@@ -13,7 +13,8 @@
       "!**/coverage",
       "!**/.next",
       "!**/*.tsbuildinfo",
-      "!public"
+      "!public",
+      "!drizzle/meta"
     ]
   },
   "formatter": {

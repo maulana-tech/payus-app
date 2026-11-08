@@ -28,6 +28,7 @@ import { StorefrontPage } from "@/components/storefront/StorefrontPanel";
 import { Input } from "@/components/ui/input";
 import {
   type Block,
+  drawnPositions,
   rendersNothing,
   toBlocks,
   toHtml,
@@ -141,47 +142,69 @@ export function CanvasEditor({ id }: { id: string }) {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [openBlock, setOpenBlock] = useState<string | null>(null);
 
-  const writeBlocks = (next: Block[]) => {
-    setBlocks(next);
-    patch({ html: toHtml(next) });
-  };
+  const patch = useCallback(
+    (next: Partial<Draft>) =>
+      setDraft((current) => (current ? { ...current, ...next } : current)),
+    [],
+  );
+
+  const writeBlocks = useCallback(
+    (next: Block[]) => {
+      setBlocks(next);
+      patch({ html: toHtml(next) });
+    },
+    [patch],
+  );
+
+  // The latest blocks, for the handlers the frame holds.
+  //
+  // `edit` is handed to `ShopHtml`, which uses it to attach itself to every
+  // element in the frame. If that object changed on each keystroke, the
+  // attaching would be torn down and redone while someone was typing. So
+  // the handlers are built once and read the current list through a ref
+  // instead of closing over it.
+  const latest = useRef<{ blocks: Block[]; write: (next: Block[]) => void }>({
+    blocks,
+    write: writeBlocks,
+  });
+  latest.current = { blocks, write: writeBlocks };
+
+  // Positions on the page, as the frame counts them. A stylesheet is in the
+  // list and on the page, and is a position in neither.
+  const drawn = useMemo(() => drawnPositions(blocks), [blocks]);
 
   /**
    * The page on the right, edited in place.
    *
-   * `index` is a position in the frame, which the canvas has already
-   * checked lines up with a position in this list. The element's new
-   * markup is read back through the same reader the HTML tab uses, so a
-   * heading stays a heading and a block the editor never understood stays
-   * exactly what it was.
+   * `at` is a position in the frame, which the canvas has already checked
+   * lines up with a position in this list. The element's new markup is read
+   * back through the same reader the HTML tab uses, so a heading stays a
+   * heading and a block the editor never understood stays exactly what it
+   * was.
    */
-  // Positions on the page, as the frame counts them: blocks that draw
-  // something, in order. A stylesheet is in the list and on the page, and
-  // is in neither of these.
-  const drawn = useMemo(
-    () =>
-      blocks.flatMap((block, index) => (rendersNothing(block) ? [] : [index])),
-    [blocks],
-  );
-
   const edit = useMemo<ShopHtmlEdit>(
     () => ({
-      onSelect: (at) =>
-        setOpenBlock((now) => blocks[drawn[at] ?? -1]?.id ?? now),
+      onSelect: (at) => {
+        const { blocks: now } = latest.current;
+        const index = drawnPositions(now)[at];
+        setOpenBlock((open) =>
+          index === undefined ? open : (now[index]?.id ?? open),
+        );
+      },
       onEdit: (at, outerHtml) => {
-        const index = drawn[at];
-        const old = index === undefined ? undefined : blocks[index];
+        const { blocks: now, write } = latest.current;
+        const index = drawnPositions(now)[at];
+        const old = index === undefined ? undefined : now[index];
         const read = toBlocks(outerHtml)[0];
         if (!old || !read) return;
-        writeBlocks(
-          blocks.map((block, where) =>
+        write(
+          now.map((block, where) =>
             where === index ? { ...read, id: old.id } : block,
           ),
         );
       },
     }),
-    // `writeBlocks` closes over `blocks`, so this is the whole dependency.
-    [blocks, drawn],
+    [],
   );
 
   // Seeded once the shop arrives, and never again: re-seeding would throw
@@ -203,16 +226,17 @@ export function CanvasEditor({ id }: { id: string }) {
   // every keystroke, because re-reading mints new ids and would take the
   // cursor out of whatever is being typed.
   //
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `blocks` is
-  // read to compare, not to depend on; listing it would re-run this on
-  // every edit the block editor itself makes.
+  // The blocks are read to compare, not depended on: a dependency here
+  // would re-run this on every edit the block editor itself makes, minting
+  // new ids each time.
+  const draftHtml = draft?.html;
   useEffect(() => {
-    if (tab !== "blocks" || !draft) return;
-    if (toHtml(blocks) === draft.html) return;
-    const read = toBlocks(draft.html);
+    if (tab !== "blocks" || draftHtml === undefined) return;
+    if (toHtml(latest.current.blocks) === draftHtml) return;
+    const read = toBlocks(draftHtml);
     setBlocks(read);
     setOpenBlock((now) => (read.some((b) => b.id === now) ? now : null));
-  }, [tab, draft?.html]);
+  }, [tab, draftHtml]);
 
   const create = trpc.storefront.create.useMutation({
     onSuccess: (made) => {
@@ -263,9 +287,6 @@ export function CanvasEditor({ id }: { id: string }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
-
-  const patch = (next: Partial<Draft>) =>
-    setDraft((current) => (current ? { ...current, ...next } : current));
 
   if (!draft)
     return (

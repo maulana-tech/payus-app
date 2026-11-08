@@ -8,11 +8,14 @@ import {
   insertBlock,
   moveBlock,
   removeBlock,
+  drawnPositions,
+  htmlShape,
   rendersNothing,
   toBlocks,
   toHtml,
 } from "../src/features/storefront/blocks";
 import { storefrontInput } from "../src/features/storefront/config";
+import { sanitizeShopHtml } from "../src/server/modules/storefront/sanitize";
 
 // Two editors sit on one field: the block list and the HTML tab. That only
 // works if a block survives the trip out to HTML and back, and if a page
@@ -118,6 +121,66 @@ describe("blocks", () => {
     expect(rendersNothing(page)).toBe(false);
     expect(rendersNothing(blankBlock("text"))).toBe(false);
     expect(rendersNothing(blankBlock("divider"))).toBe(false);
+  });
+
+  it("counts document scaffolding and a script as drawing nothing", () => {
+    // A page pasted from a saved document arrives with these in front of
+    // the design. Every one of them used to come back as a block that drew
+    // something, which both filled the list with rows that are not on the
+    // page and shifted every real position after them.
+    for (const markup of [
+      '<meta name="viewport" content="width=device-width">',
+      '<meta charset="utf8">',
+      "<title>Finetune Library</title>",
+      '<base href="https://example.com/">',
+      '<link rel="preconnect" href="https://fonts.gstatic.com">',
+      "<script>const a = 1;</script>",
+      "<!-- a note to self -->",
+    ]) {
+      const block = toBlocks(markup)[0];
+      expect(block, markup).toBeDefined();
+      expect(rendersNothing(block as Block), markup).toBe(true);
+    }
+  });
+
+  it("agrees with the sanitiser about how many positions a pasted page has", () => {
+    // This is the check the canvas makes before it lets anyone edit on the
+    // page: positions in the list have to line up with elements in the
+    // frame. They are two readings of two different strings — what the
+    // author wrote, and what the sanitiser serves — so the only way they
+    // agree is if both sides call the same things inert.
+    const raw = `<style>:root{color-scheme:light}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf8">
+<title>Finetune Library Landing Page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist">
+<style>.bar{position:sticky}.col{max-width:1152px}</style>
+<div class="bar"><div class="bar-in">Lynk.id</div></div>
+<div class="stage"><main class="lp"><h1>Hello</h1></main></div>
+<script>document.body.classList.add("ready");</script>`;
+
+    const { clean } = sanitizeShopHtml(raw);
+    const mine = drawnPositions(toBlocks(raw));
+    const theirs = drawnPositions(toBlocks(clean));
+    expect(mine).toHaveLength(2);
+    expect(theirs).toHaveLength(2);
+    // And the same elements, in the same order.
+    expect(
+      mine.map((at) => htmlShape((toBlocks(raw)[at] as { html: string }).html)),
+    ).toEqual(["div.bar", "div.stage"]);
+  });
+
+  it("names a hand-written block by its shape", () => {
+    // Sixty characters of source read `<div class="stage"><div class=` for a
+    // whole page, which names nothing a person could recognise.
+    expect(htmlShape('<div class="stage"><main>Hi</main></div>')).toBe(
+      "div.stage",
+    );
+    expect(htmlShape("<section><h2>Hi</h2></section>")).toBe("section");
+    expect(htmlShape('<meta charset="utf8">')).toBe("meta");
+    expect(htmlShape("<script>var a=1</script>")).toBe("script");
+    expect(htmlShape("  ")).toBe("text");
   });
 
   it("moves, inserts, removes and duplicates", () => {

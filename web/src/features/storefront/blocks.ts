@@ -312,6 +312,17 @@ export function toBlocks(html: string): Block[] {
       if (loose) out.push({ id: newId(10), kind: "text", text: loose });
       continue;
     }
+    if (node.nodeType === 8) {
+      // A comment between sections is the author's note about their own
+      // page. It draws nothing, but dropping it here would quietly delete
+      // it from the HTML field the moment someone opened this list.
+      out.push({
+        id: newId(10),
+        kind: "html",
+        html: `<!--${(node as Comment).data}-->`,
+      });
+      continue;
+    }
     if (node.nodeType !== 1) continue;
     out.push(read(node as Element));
   }
@@ -319,19 +330,81 @@ export function toBlocks(html: string): Block[] {
 }
 
 /**
+ * Elements that are part of the page and draw none of it.
+ *
+ * Three different reasons, one consequence. A `<style>` or a font `<link>`
+ * is the design but has no box. `<meta>`, `<title>` and `<base>` are
+ * document scaffolding, which the sanitiser strips silently. A `<script>`
+ * is refused outright, because nothing in that frame may run.
+ *
+ * All three are places a cursor cannot go, so none of them is a position on
+ * the page — and counting one as a position shifts every position after it.
+ */
+const INERT =
+  /<(style|script|title|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>|<(?:link|meta|base)\b[^>]*>|<!--[\s\S]*?-->/gi;
+
+/**
  * True for a block that renders nothing a person could point at.
  *
- * A `<style>` or a font `<link>` is part of the page and must be kept, but
- * it draws nothing — so it is not a position in the page you can click, and
- * it must not be counted as one. The sanitiser also lifts every `<style>`
- * into a single block at the front, so counting raw elements against
- * rendered ones without this gets different answers and the editor refuses
- * to work at all.
+ * Measured by taking the inert elements out and seeing whether anything is
+ * left, rather than by matching the tag it starts with: a block the author
+ * typed by hand may hold several, and a block that holds a `<style>` *and*
+ * a `<div>` draws something.
+ *
+ * Why this has to be right: the editor addresses a block on the page by
+ * position, and the two counts — blocks on the left, elements in the frame —
+ * must agree or editing is switched off. A page pasted from a saved
+ * document arrives with six of these in front of the design, so getting the
+ * set wrong is the difference between editing that design and being told
+ * you cannot.
  */
 export const rendersNothing = (block: Block): boolean =>
-  block.kind === "html" &&
-  /^\s*<(style|link)\b[\s\S]*$/i.test(block.html) &&
-  !/<(?!\/?(style|link)\b)[a-z]/i.test(block.html);
+  block.kind === "html" && block.html.replace(INERT, "").trim() === "";
+
+/**
+ * The positions in `blocks` of the blocks that draw something, in order.
+ *
+ * This is the map between the two editors: position *n* in the frame is
+ * `drawnPositions(blocks)[n]` in the list. One function, because a second
+ * copy of this arithmetic is a second answer to "which block did they just
+ * click on", and the wrong answer lands an edit on the wrong block.
+ */
+export const drawnPositions = (blocks: Block[]): number[] =>
+  blocks.flatMap((block, index) => (rendersNothing(block) ? [] : [index]));
+
+/**
+ * The same set, for a live node in the frame.
+ *
+ * `ShopHtml` walks the rendered document and `rendersNothing` reads a
+ * block's source; they are two sides of one count, so the set they skip is
+ * declared once here rather than written out in both places.
+ */
+export const INERT_TAGS = [
+  "STYLE",
+  "LINK",
+  "SCRIPT",
+  "META",
+  "TITLE",
+  "BASE",
+  "NOSCRIPT",
+];
+
+/**
+ * What a hand-written block *is*, in the two or three words a list row has
+ * room for: the tag it opens with and the first class on it. Sixty
+ * characters of source said `<div class="stage"><div class="device"><div`
+ * for a whole page, which names nothing; `div.stage` at least points at it.
+ */
+export function htmlShape(html: string): string {
+  const open = /<([a-z][a-z0-9-]*)\b([^>]*)>/i.exec(html.trim());
+  if (!open) return "text";
+  const tag = (open[1] ?? "").toLowerCase();
+  const cls = /class\s*=\s*"([^"]*)"|class\s*=\s*'([^']*)'/i.exec(
+    open[2] ?? "",
+  );
+  const first = (cls?.[1] ?? cls?.[2] ?? "").trim().split(/\s+/)[0];
+  return first ? `${tag}.${first}` : tag;
+}
 
 // ------------------------------------------------------------- arranging
 
