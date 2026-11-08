@@ -274,15 +274,25 @@ export function RowMenu({
   );
 }
 
+/**
+ * One action in a row's menu.
+ *
+ * The handler is `onClick` because that is what Base UI's `Menu.Item`
+ * declares. It was `onSelect` — Radix's name for the same thing — which
+ * React accepts without complaint on any element, since `onSelect` is a
+ * real DOM event for selecting *text*. So it type-checked, rendered, and
+ * attached a handler to an event a click never fires: every action behind
+ * every row menu in the dashboard did nothing at all.
+ */
 export function RowMenuItem({
   icon: Icon,
-  onSelect,
+  onClick,
   disabled,
   destructive = false,
   children,
 }: {
   icon: LucideIcon;
-  onSelect: () => void;
+  onClick: () => void;
   disabled?: boolean;
   destructive?: boolean;
   children: ReactNode;
@@ -291,7 +301,7 @@ export function RowMenuItem({
     <DropdownMenuItem
       disabled={disabled}
       variant={destructive ? "destructive" : "default"}
-      onSelect={onSelect}
+      onClick={onClick}
     >
       <Icon aria-hidden="true" />
       {children}

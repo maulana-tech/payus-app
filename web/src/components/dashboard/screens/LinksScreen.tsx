@@ -175,7 +175,7 @@ function LinkRow({ link, username }: { link: Link; username: string }) {
             <RowMenu label={`More for ${link.title}`}>
               <RowMenuItem
                 icon={QrCode}
-                onSelect={() => {
+                onClick={() => {
                   qrButton.current?.focus();
                   setShowQr(true);
                 }}
@@ -184,7 +184,7 @@ function LinkRow({ link, username }: { link: Link; username: string }) {
               </RowMenuItem>
               <RowMenuItem
                 icon={ExternalLink}
-                onSelect={() => window.open(path, "_blank", "noreferrer")}
+                onClick={() => window.open(path, "_blank", "noreferrer")}
               >
                 Open the pay page
               </RowMenuItem>
@@ -193,7 +193,7 @@ function LinkRow({ link, username }: { link: Link; username: string }) {
                 icon={archived ? RotateCcw : Archive}
                 destructive={!archived}
                 disabled={setArchived.isPending}
-                onSelect={() =>
+                onClick={() =>
                   setArchived.mutate({ id: link.id, archived: !archived })
                 }
               >

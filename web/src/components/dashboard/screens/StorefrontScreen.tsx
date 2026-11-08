@@ -209,14 +209,14 @@ function StoreRow({ store }: { store: Store }) {
             </Link>
             <RowMenu label={`More for ${store.title}`}>
               {published ? (
-                <RowMenuItem icon={Link2} onSelect={() => void copyLink()}>
+                <RowMenuItem icon={Link2} onClick={() => void copyLink()}>
                   {copied ? "Link copied" : "Copy the shop's address"}
                 </RowMenuItem>
               ) : null}
               {published ? (
                 <RowMenuItem
                   icon={ExternalLink}
-                  onSelect={() => window.open(path, "_blank", "noreferrer")}
+                  onClick={() => window.open(path, "_blank", "noreferrer")}
                 >
                   Open the shop page
                 </RowMenuItem>
@@ -225,7 +225,7 @@ function StoreRow({ store }: { store: Store }) {
               <RowMenuItem
                 icon={published ? EyeOff : Globe}
                 disabled={publish.isPending}
-                onSelect={() =>
+                onClick={() =>
                   publish.mutate({ id: store.id, published: !published })
                 }
               >

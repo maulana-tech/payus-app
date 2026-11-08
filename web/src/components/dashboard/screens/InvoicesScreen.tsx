@@ -245,12 +245,12 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
               </button>
             ) : null}
             <RowMenu label={`More for ${invoice.number}`}>
-              <RowMenuItem icon={Link2} onSelect={() => void copyLink()}>
+              <RowMenuItem icon={Link2} onClick={() => void copyLink()}>
                 {copied ? "Link copied" : "Copy the pay link"}
               </RowMenuItem>
               <RowMenuItem
                 icon={ExternalLink}
-                onSelect={() =>
+                onClick={() =>
                   window.open(`/i/${invoice.token}`, "_blank", "noreferrer")
                 }
               >
@@ -259,7 +259,7 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
               {status === "overdue" ? (
                 <RowMenuItem
                   icon={MessageSquare}
-                  onSelect={() => setChasing(true)}
+                  onClick={() => setChasing(true)}
                 >
                   Ask the Collector to chase
                 </RowMenuItem>
@@ -267,7 +267,7 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
               {paid > 0n ? (
                 <RowMenuItem
                   icon={RotateCcw}
-                  onSelect={() => setRefunding(true)}
+                  onClick={() => setRefunding(true)}
                 >
                   Refund part or all of it
                 </RowMenuItem>
@@ -278,7 +278,7 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
                   <RowMenuItem
                     icon={XCircle}
                     disabled={stopRecurring.isPending}
-                    onSelect={() => stopRecurring.mutate({ id: invoice.id })}
+                    onClick={() => stopRecurring.mutate({ id: invoice.id })}
                   >
                     Stop issuing this {invoice.recurrence}
                   </RowMenuItem>
@@ -291,7 +291,7 @@ function InvoiceRow({ invoice }: { invoice: InvoiceView }) {
                     icon={Trash2}
                     destructive
                     disabled={voidInvoice.isPending}
-                    onSelect={() => voidInvoice.mutate({ id: invoice.id })}
+                    onClick={() => voidInvoice.mutate({ id: invoice.id })}
                   >
                     Void {invoice.number}
                   </RowMenuItem>
