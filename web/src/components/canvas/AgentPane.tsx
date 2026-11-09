@@ -12,7 +12,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { ErrorNote } from "@/components/dashboard/screens/kit";
 import { dashFocus } from "@/components/dashboard/styles";
-import type { Block } from "@/features/storefront/blocks";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/trpc/react";
 
