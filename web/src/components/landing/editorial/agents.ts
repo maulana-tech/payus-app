@@ -195,6 +195,10 @@ export const TABLE: Seat[] = [
     facts: [
       { label: "Writes", code: "storefront_config (validated)" },
       {
+        label: "Keeps",
+        text: "The thread, refusals included, next to the page it is about.",
+      },
+      {
         label: "Limit",
         text: "It proposes; the page is yours to apply and yours to publish.",
       },

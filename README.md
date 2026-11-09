@@ -76,12 +76,29 @@
   Ask it to change the page and it answers in the same canvas: the page on
   the right **becomes** its answer until you apply or discard it, follow-ups
   carry on from what you are looking at, and a block of your own hand-written
-  markup is never touched. Ask it to fix something and it is only ever handed
-  a check this app computed — a button that goes nowhere, a page that says
-  nothing — because a model asked what is wrong with a page will always find
-  something. Each finding says whether it is the Builder's to fix or yours:
-  it writes the page, so it can add a button; it cannot change what
+  markup is never touched. The thread is kept, so closing the tab does not
+  lose the answer you were about to apply — and a refusal is kept with it,
+  because a conversation that shows only what worked cannot explain why you
+  asked the same thing twice. Ask it to fix something and it is only ever
+  handed a check this app computed — a button that goes nowhere, a page that
+  says nothing — because a model asked what is wrong with a page will always
+  find something. Each finding says whether it is the Builder's to fix or
+  yours: it writes the page, so it can add a button; it cannot change what
   something costs.
+
+- **A page editor that is a page.** `/canvas/[id]` is the whole window: the
+  controls on the left, the shop's real page on the right at a phone's, a
+  tablet's or the full width — the same component the public is served, so
+  there is no sketch that can flatter the real thing. The page is edited as
+  **blocks** (twenty kinds: prose, cards, columns, steps, questions that
+  open, figures, tables, galleries, pay buttons) which you reorder by
+  dragging or by the move buttons beside each one, as **HTML** with a
+  toolbar of the same vocabulary, or **on the page itself** — click the
+  words in the preview and type. All three are one stored field: the blocks
+  are a reading of the HTML and the HTML is what the blocks write, so the
+  tabs cannot drift and a design pasted from somewhere else is kept whole
+  rather than chopped into fields that would lose it. Anywhere an address is
+  wanted, your own pay links are offered by name; nothing is typed.
   Everything a payer sends is checked against the stored item — the page is
   never the authority on what something costs.
 
