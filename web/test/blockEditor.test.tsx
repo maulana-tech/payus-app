@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { createEvent, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
@@ -41,10 +41,74 @@ function open(html = "") {
 
   render(<Host />);
   const page = () => toHtml(latest);
-  return { page };
+  const rows = () =>
+    [...document.querySelectorAll("li")].filter((li) =>
+      li.querySelector("[title='Drag to reorder']"),
+    );
+  return { page, rows };
+}
+
+/**
+ * One row dragged onto another, by its handle.
+ *
+ * happy-dom measures every box as zero, and which half you released over is
+ * the whole of what `dropIndex` is told — so each row is given a box a
+ * hundred pixels tall at the position it would really have.
+ */
+function drag(rows: HTMLElement[], from: number, onto: number, after: boolean) {
+  rows.forEach((row, at) => {
+    row.getBoundingClientRect = () =>
+      ({ top: at * 100, bottom: at * 100 + 100, height: 100 }) as DOMRect;
+  });
+
+  const handle = rows[from]?.querySelector(
+    "[title='Drag to reorder']",
+  ) as HTMLElement;
+  const y = onto * 100 + (after ? 80 : 20);
+
+  fireEvent.pointerDown(handle, { pointerId: 1 });
+  fireEvent.pointerMove(handle, { pointerId: 1, clientY: y });
+  fireEvent.pointerUp(handle, { pointerId: 1 });
 }
 
 describe("the block editor", () => {
+  it("reorders by dragging a row onto another", async () => {
+    const { page, rows } = open(
+      "<h2>One</h2>\n<p>Two</p>\n<blockquote>Three</blockquote>",
+    );
+    drag(rows(), 0, 2, true);
+    expect(page()).toBe(
+      "<p>Two</p>\n<blockquote>Three</blockquote>\n<h2>One</h2>",
+    );
+  });
+
+  it("lands above the row when you release on its top half", async () => {
+    const { page, rows } = open(
+      "<h2>One</h2>\n<p>Two</p>\n<blockquote>Three</blockquote>",
+    );
+    drag(rows(), 2, 0, false);
+    expect(page()).toBe(
+      "<blockquote>Three</blockquote>\n<h2>One</h2>\n<p>Two</p>",
+    );
+  });
+
+  it("leaves the page alone when a row is put back where it was", async () => {
+    // A click on the handle is a drag of no distance. It must not count as
+    // a move, or every mis-click would mark the page unsaved.
+    const { page, rows } = open("<h2>One</h2>\n<p>Two</p>");
+    const before = page();
+    drag(rows(), 1, 1, false);
+    expect(page()).toBe(before);
+  });
+
+  it("still moves with the buttons, which is what a keyboard has", async () => {
+    // Drag needs a pointer. A list that can only be reordered by dragging
+    // is a list someone on a keyboard cannot reorder at all.
+    const { page } = open("<h2>One</h2>\n<p>Two</p>");
+    await userEvent.click(screen.getByRole("button", { name: /Move Text up/ }));
+    expect(page()).toBe("<p>Two</p>\n<h2>One</h2>");
+  });
+
   it("says so when the page is empty, and adds the first block", async () => {
     const { page } = open();
     expect(screen.getByText(/Nothing on the page yet/)).toBeTruthy();

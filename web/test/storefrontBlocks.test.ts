@@ -5,6 +5,7 @@ import {
   type Block,
   blankBlock,
   drawnPositions,
+  dropIndex,
   duplicateBlock,
   htmlShape,
   insertBlock,
@@ -193,6 +194,33 @@ describe("blocks", () => {
     expect(htmlShape('<meta charset="utf8">')).toBe("meta");
     expect(htmlShape("<script>var a=1</script>")).toBe("script");
     expect(htmlShape("  ")).toBe("text");
+  });
+
+  it("lands a dragged row in the gap you aimed at", () => {
+    // Two off-by-ones: the gap is above the row you released over unless
+    // you crossed its middle, and `moveBlock` takes the row out before
+    // putting it back, so every index past the one you lifted has shifted.
+    const list = ["a", "b", "c", "d"];
+    const drag = (from: number, over: number, after: boolean) => {
+      const next = [...list];
+      const [held] = next.splice(from, 1);
+      next.splice(dropIndex(from, over, after), 0, held as string);
+      return next.join("");
+    };
+
+    // Downwards: dropping "a" below "c" puts it between c and d.
+    expect(drag(0, 2, true)).toBe("bcad");
+    // Dropping "a" above "c" puts it between b and c.
+    expect(drag(0, 2, false)).toBe("bacd");
+    // Upwards: dropping "d" above "b".
+    expect(drag(3, 1, false)).toBe("adbc");
+    // And below "b".
+    expect(drag(3, 1, true)).toBe("abdc");
+    // To the very end, which a bare index cannot express.
+    expect(drag(0, 3, true)).toBe("bcda");
+    // Onto itself, either half, changes nothing.
+    expect(drag(1, 1, false)).toBe("abcd");
+    expect(drag(1, 1, true)).toBe("abcd");
   });
 
   it("moves, inserts, removes and duplicates", () => {

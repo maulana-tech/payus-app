@@ -5,6 +5,7 @@ import {
   ChevronUp,
   Code2,
   Copy,
+  GripVertical,
   Link2,
   Plus,
   Trash2,
@@ -13,7 +14,7 @@ import {
 /** The shop being edited, as the pay-link menu needs to know it. */
 type Shop = { slug: string; title: string };
 
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useId, useRef, useState } from "react";
 import { PayLinkMenu } from "@/components/canvas/PayLinks";
 import { dashFocus } from "@/components/dashboard/styles";
 import {
@@ -21,6 +22,7 @@ import {
   type Block,
   type BlockKind,
   blankBlock,
+  dropIndex,
   duplicateBlock,
   htmlShape,
   insertBlock,
@@ -601,6 +603,41 @@ export function BlockEditor({
   const [adding, setAdding] = useState(false);
   const commit = onBlocks;
 
+  // Dragging a row.
+  //
+  // **Pointer events, not HTML5 drag-and-drop.** The HTML5 version was
+  // written first and every handler of it worked — but a drag started by a
+  // real mouse cannot be driven through CDP, so there was no way to show
+  // it working in a browser, only to argue that it should. Pointer events
+  // can be driven end to end, and they work on a touchscreen, where HTML5
+  // drag does not work at all.
+  //
+  // The handle starts it and captures the pointer, so every move after
+  // that arrives here whatever it passes over.
+  //
+  // The buttons stay. Drag needs a pointer; a list you can only reorder by
+  // dragging is a list someone on a keyboard cannot reorder at all.
+  const list = useRef<HTMLOListElement>(null);
+  const [from, setFrom] = useState<number | null>(null);
+  const [over, setOver] = useState<{ at: number; after: boolean } | null>(null);
+
+  /** The gap under the pointer: which row, and which side of its middle. */
+  const gapAt = (y: number): { at: number; after: boolean } | null => {
+    const rows = [...(list.current?.children ?? [])] as HTMLElement[];
+    if (rows.length === 0) return null;
+    for (const [at, row] of rows.entries()) {
+      const box = row.getBoundingClientRect();
+      if (y < box.bottom || at === rows.length - 1)
+        return { at, after: y > box.top + box.height / 2 };
+    }
+    return null;
+  };
+
+  const stopDrag = () => {
+    setFrom(null);
+    setOver(null);
+  };
+
   // A page that is all hand-written markup is one this list cannot do much
   // for: every row is an element, not a heading or a paragraph. Saying so
   // is better than letting someone conclude the editor is broken — which is
@@ -643,7 +680,10 @@ export function BlockEditor({
         </p>
       ) : null}
 
-      <ol className="grid min-w-0 gap-2">
+      <ol
+        ref={list}
+        className={cn("grid min-w-0 gap-2", from !== null ? "select-none" : "")}
+      >
         {blocks.map((block, index) => {
           const shown = open === block.id;
           // A block that draws nothing is still the author's and still
@@ -658,9 +698,56 @@ export function BlockEditor({
                 // where the person is already looking.
                 if (shown && node) node.scrollIntoView({ block: "nearest" });
               }}
-              className="min-w-0 rounded-(--dash-radius-sm) border border-(--dash-line-strong) bg-(--dash-surface)"
+              className={cn(
+                "min-w-0 rounded-(--dash-radius-sm) border bg-(--dash-surface) transition-shadow",
+                from === index
+                  ? "border-(--dash-fg) opacity-40"
+                  : "border-(--dash-line-strong)",
+                // The gap you would land in, drawn on the edge you are
+                // nearest. A line between rows reads as a destination; a
+                // highlighted row reads as a target you would replace.
+                over?.at === index && from !== index
+                  ? over.after
+                    ? "shadow-[0_2px_0_0_var(--dash-fg)]"
+                    : "shadow-[0_-2px_0_0_var(--dash-fg)]"
+                  : "",
+              )}
             >
               <div className="flex min-w-0 items-center gap-1 p-2">
+                <span
+                  // Not a button: there is no keyboard gesture behind it —
+                  // the move controls to its right are that.
+                  onPointerDown={(event) => {
+                    setFrom(index);
+                    setOver({ at: index, after: false });
+                    // Capture, so a move that leaves this little square
+                    // still arrives here. happy-dom has no such method, so
+                    // the test environment is not made to pretend.
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
+                  }}
+                  onPointerMove={(event) => {
+                    if (from === null) return;
+                    const gap = gapAt(event.clientY);
+                    if (gap) setOver(gap);
+                  }}
+                  onPointerUp={() => {
+                    if (from !== null && over)
+                      commit(
+                        moveBlock(
+                          blocks,
+                          from,
+                          dropIndex(from, over.at, over.after),
+                        ),
+                      );
+                    stopDrag();
+                  }}
+                  onPointerCancel={stopDrag}
+                  aria-hidden
+                  title="Drag to reorder"
+                  className="-ml-0.5 shrink-0 cursor-grab touch-none p-1 text-(--dash-ash) active:cursor-grabbing"
+                >
+                  <GripVertical className="size-3.5" />
+                </span>
                 <button
                   type="button"
                   onClick={() => onOpen(shown ? null : block.id)}

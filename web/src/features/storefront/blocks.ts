@@ -866,6 +866,26 @@ export const moveBlock = (
   return next;
 };
 
+/**
+ * Where a row dropped on another row actually lands.
+ *
+ * Two off-by-ones live here and nowhere else. The gap you aimed at is
+ * *above* the row you released over, or below it, which is the `after`
+ * half; and `moveBlock` takes the row out before putting it back, so every
+ * index past the one you lifted has already shifted down by one.
+ *
+ * Pure, so the arithmetic is held by a test rather than by dragging things
+ * around in a browser and squinting.
+ */
+export const dropIndex = (
+  from: number,
+  over: number,
+  after: boolean,
+): number => {
+  const to = over + (after ? 1 : 0);
+  return from < to ? to - 1 : to;
+};
+
 export const insertBlock = (blocks: Block[], at: number, block: Block) => [
   ...blocks.slice(0, at),
   block,
