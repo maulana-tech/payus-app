@@ -228,6 +228,142 @@ describe.skipIf(!available)("storefront (Postgres)", () => {
     ).rejects.toThrow(/a little more/);
   });
 
+  // ----------------------------------------- changing one that exists
+
+  describe("changing a shop that exists", () => {
+    const made = async (over: Record<string, unknown> = {}) =>
+      store.createStorefront("editor", {
+        slug: `e-${Math.random().toString(36).slice(2, 8)}`,
+        title: "Kopi Senja",
+        blurb: "Beans roasted on Fridays",
+        template: "shelf",
+        currency: "USD",
+        html: "<h2>About</h2>\n<p>We roast on Fridays.</p>",
+        products: [{ name: "Beans", description: "250g", price: "1800" }],
+        ...over,
+      });
+
+    const answersWith = (...blocks: Record<string, unknown>[]) =>
+      answering({ blocks });
+
+    it("proposes a page and writes nothing until it is applied", async () => {
+      const shop = await made();
+      const run = await builder.runShopEdit(
+        "editor",
+        shop.id,
+        "Add a question about shipping",
+        answersWith(
+          { kind: "heading", text: "About", big: true },
+          { kind: "text", text: "We roast on Fridays." },
+          {
+            kind: "faq",
+            pairs: [{ a: "When does it ship?", b: "Within two days." }],
+          },
+        ),
+      );
+
+      expect(run.after.map((b) => b.kind)).toEqual(["heading", "text", "faq"]);
+      expect(run.html).toContain("When does it ship?");
+      // The shop itself is untouched: a proposal is not a save.
+      const [stored] = (await store.listStorefronts("editor")).filter(
+        (one) => one.id === shop.id,
+      );
+      expect(stored?.htmlClean).not.toContain("When does it ship?");
+
+      // Applying it is the owner's own act, and it goes down the one road
+      // a save already takes — there is no second write path for an agent.
+    });
+
+    it("cannot lose the owner's own markup by leaving it out", async () => {
+      // The agent has no block that means "someone's hand-written design",
+      // so an answer that simply omitted it would delete one. The rule is
+      // in code, not in the prompt.
+      const design = '<div class="ft-stage"><h2>A whole design</h2></div>';
+      const shop = await made({ html: design });
+      const run = await builder.runShopEdit(
+        "editor",
+        shop.id,
+        "Add a line about delivery",
+        answersWith({ kind: "text", text: "We deliver on Mondays." }),
+      );
+      expect(run.html).toContain("ft-stage");
+      expect(run.html).toContain("We deliver on Mondays.");
+    });
+
+    it("refuses a button the Builder was not shown an address for", async () => {
+      const shop = await made();
+      await expect(
+        builder.runShopEdit(
+          "editor",
+          shop.id,
+          "Put a buy button on it",
+          answersWith({ kind: "cta", payLink: "link-made-up", label: "Buy" }),
+        ),
+      ).rejects.toThrow(/not one of your addresses/);
+    });
+
+    it("refuses an empty answer rather than wiping the page", async () => {
+      const shop = await made();
+      await expect(
+        builder.runShopEdit(
+          "editor",
+          shop.id,
+          "Tidy it up",
+          answering({ blocks: [] }),
+        ),
+      ).rejects.toThrow(/will not store/);
+    });
+
+    it("will not touch a shop that is not yours", async () => {
+      const shop = await made();
+      await expect(
+        builder.runShopEdit(
+          "someone-else",
+          shop.id,
+          "Change it",
+          answersWith({ kind: "text", text: "Mine now." }),
+        ),
+      ).rejects.toThrow(/not one of yours/);
+    });
+
+    it("finds what is wrong with no model involved at all", async () => {
+      // No `ask` is passed: `reviewShop` never reaches one.
+      const shop = await made({
+        html: '<p><a class="shop-cta" href="https://example.com/pay">Buy</a></p>',
+      });
+      const review = await builder.reviewShop("editor", shop.id);
+      expect(review.findings.map((f) => f.id)).toContain("dead-button");
+    });
+
+    it("fixes only a finding this page is actually flagged for", async () => {
+      const shop = await made();
+      await expect(
+        builder.runShopFix(
+          "editor",
+          shop.id,
+          "no-way-to-pay",
+          answersWith({ kind: "text", text: "x" }),
+        ),
+      ).rejects.toThrow(/not something this page is currently flagged for/);
+    });
+
+    it("says plainly when a finding is the owner's to fix, not the Builder's", async () => {
+      const shop = await made({
+        products: [{ name: "Beans", description: "", price: null }],
+      });
+      const review = await builder.reviewShop("editor", shop.id);
+      expect(review.findings.map((f) => f.id)).toContain("unpriced-item");
+      await expect(
+        builder.runShopFix(
+          "editor",
+          shop.id,
+          "unpriced-item",
+          answersWith({ kind: "text", text: "x" }),
+        ),
+      ).rejects.toThrow(/yours to do, not the Builder's/);
+    });
+  });
+
   it("points at a price far above anything charged before", () => {
     const prior = [1_000n, 2_000n, 3_000n]; // median $20.00
     expect(

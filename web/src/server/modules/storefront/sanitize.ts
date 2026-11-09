@@ -318,8 +318,19 @@ export function sanitizeShopHtml(input: string): Sanitized {
 
   const before = tagsIn(lifted.body);
   const after = tagsIn(body);
+  // An <a> that lost its address is still an <a>, so a tag count says
+  // nothing about it. Every link the policy refused used to disappear in
+  // silence — the author saw a button that did nothing and no reason why.
+  const addresses = (html: string) =>
+    (html.match(/<a\b[^>]*\shref\s*=/gi) ?? []).length;
+  const dropped = addresses(lifted.body) - addresses(body);
   const removed = [
     ...[...before].filter((tag) => !after.has(tag)),
+    ...(dropped > 0
+      ? [
+          `${dropped === 1 ? "a link" : `${dropped} links`} whose address was not https or mailto`,
+        ]
+      : []),
     ...lifted.notes,
     ...sheet.notes,
   ];

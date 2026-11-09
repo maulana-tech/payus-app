@@ -728,19 +728,28 @@ function read(el: Element): Block {
 }
 
 /**
+ * Turns a string of HTML into something with `children` and `classList`.
+ *
+ * Injected rather than assumed, because this reader has two callers in two
+ * runtimes: the canvas, in a browser that has `DOMParser`, and the Builder,
+ * on a server that does not. The alternative was a second parser for the
+ * same markup — and a second parser is a second answer to "what is on this
+ * page", which is exactly what the one-field rule exists to prevent.
+ */
+export type Parse = (html: string) => { body: { childNodes: Iterable<Node> } };
+
+const browserParse: Parse = (html) =>
+  new DOMParser().parseFromString(html, "text/html");
+
+/**
  * The blocks in a page.
  *
- * Needs a DOM, so this runs in the browser — the canvas is a client
- * component and the one place it is called. Everything it cannot name is
- * kept whole as an `html` block, so opening the block editor on a page
- * written by hand never loses a line of it.
+ * Everything it cannot name is kept whole as an `html` block, so opening
+ * the block editor on a page written by hand never loses a line of it.
  */
-export function toBlocks(html: string): Block[] {
+export function toBlocks(html: string, parse: Parse = browserParse): Block[] {
   if (!html.trim()) return [];
-  const doc = new DOMParser().parseFromString(
-    `<body>${html}</body>`,
-    "text/html",
-  );
+  const doc = parse(`<body>${html}</body>`);
   const out: Block[] = [];
   for (const node of [...doc.body.childNodes]) {
     if (node.nodeType === 3) {

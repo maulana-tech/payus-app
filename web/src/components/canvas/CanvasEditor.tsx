@@ -15,6 +15,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AgentPane } from "@/components/canvas/AgentPane";
 import { PayLinkMenu } from "@/components/canvas/PayLinks";
 import { Segmented } from "@/components/dashboard/Segmented";
 import { Field } from "@/components/dashboard/screens/InvoicesScreen";
@@ -80,7 +81,7 @@ const HtmlEditor = dynamic(() => import("./HtmlEditor"), {
   ),
 });
 
-type Tab = "page" | "items" | "blocks" | "html" | "look";
+type Tab = "page" | "items" | "blocks" | "html" | "look" | "agent";
 type Device = "phone" | "tablet" | "wide";
 
 /**
@@ -429,6 +430,7 @@ export function CanvasEditor({ id }: { id: string }) {
                     { value: "blocks", label: "Blocks" },
                     { value: "html", label: "HTML" },
                     { value: "look", label: "Look" },
+                    { value: "agent", label: "Agent" },
                   ]}
                 />
               </div>
@@ -450,6 +452,15 @@ export function CanvasEditor({ id }: { id: string }) {
                     />
                   ) : tab === "items" ? (
                     <ItemFields draft={draft} setDraft={setDraft} />
+                  ) : tab === "agent" ? (
+                    <AgentPane
+                      shopId={isNew ? null : id}
+                      dirty={dirty}
+                      onApply={(html) => {
+                        patch({ html });
+                        setTab("blocks");
+                      }}
+                    />
                   ) : tab === "blocks" ? (
                     <BlockEditor
                       blocks={blocks}

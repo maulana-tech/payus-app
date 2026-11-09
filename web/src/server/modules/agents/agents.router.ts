@@ -32,7 +32,12 @@ import {
   runAdvisorOnTable,
 } from "./advisor.agent";
 import { runAllocator } from "./allocator.agent";
-import { runBuilder } from "./builder.agent";
+import {
+  reviewShop,
+  runBuilder,
+  runShopEdit,
+  runShopFix,
+} from "./builder.agent";
 import {
   chaseable,
   NothingToChaseError,
@@ -392,6 +397,57 @@ export const agentsRouter = createTRPCRouter({
       runBuilder(
         await requireUsername(ctx.privyUserId),
         input.description,
+      ).catch(mapError),
+    ),
+
+  /**
+   * What is wrong with a shop page. No model is called: the checks are a
+   * pure function, and this is a query because asking costs nothing.
+   */
+  reviewShop: protectedProcedure
+    .input(z.object({ shopId: z.string().min(1).max(40) }).strict())
+    .query(async ({ ctx, input }) =>
+      reviewShop(await requireUsername(ctx.privyUserId), input.shopId).catch(
+        mapError,
+      ),
+    ),
+
+  /** Asks the Builder to change a page. It proposes; nothing is written. */
+  editShop: protectedProcedure
+    .input(
+      z
+        .object({
+          shopId: z.string().min(1).max(40),
+          instruction: z.string().trim().min(4).max(600),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) =>
+      runShopEdit(
+        await requireUsername(ctx.privyUserId),
+        input.shopId,
+        input.instruction,
+      ).catch(mapError),
+    ),
+
+  /**
+   * Asks the Builder to put one finding right. The finding is named by id
+   * and looked up in the review — nothing typed here reaches the model.
+   */
+  fixShop: protectedProcedure
+    .input(
+      z
+        .object({
+          shopId: z.string().min(1).max(40),
+          findingId: z.string().min(1).max(40),
+        })
+        .strict(),
+    )
+    .mutation(async ({ ctx, input }) =>
+      runShopFix(
+        await requireUsername(ctx.privyUserId),
+        input.shopId,
+        input.findingId,
       ).catch(mapError),
     ),
 });
