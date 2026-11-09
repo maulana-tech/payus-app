@@ -34,11 +34,17 @@ import {
 } from "./advisor.agent";
 import { runAllocator } from "./allocator.agent";
 import {
+  type PageProposal,
   reviewShop,
   runBuilder,
   runShopEdit,
   runShopFix,
 } from "./builder.agent";
+import {
+  forgetShopThread,
+  recordShopTurn,
+  shopThread,
+} from "./builderHistory.service";
 import {
   chaseable,
   NothingToChaseError,
@@ -80,6 +86,62 @@ function mapError(e: unknown): never {
       message: "Claude declined to answer this one.",
     });
   return mapGuardianError(e);
+}
+
+/**
+ * Runs one turn of the Builder and keeps it, whichever way it goes.
+ *
+ * **A refusal is a record, not an error to swallow** — the Guardian's rule,
+ * and the same reasoning: a thread that shows only the answers that worked
+ * is a thread that cannot explain why you asked the same thing twice.
+ *
+ * Only the page of the newest answer is kept; `recordShopTurn` takes it off
+ * the ones before. The failure is recorded and then re-thrown, so the
+ * screen still meets the error it would have met anyway.
+ */
+async function kept(
+  owner: string,
+  shopId: string,
+  asked: string,
+  run: () => Promise<PageProposal>,
+): Promise<PageProposal> {
+  try {
+    const proposal = await run();
+    await recordShopTurn(owner, shopId, {
+      asked,
+      summary: proposal.summary,
+      model: proposal.model,
+      proposal: {
+        after: proposal.after.map((block) => ({
+          id: block.id,
+          kind: block.kind,
+        })),
+        html: proposal.html,
+        links: proposal.links,
+        skipped: proposal.skipped,
+      },
+    });
+    return proposal;
+  } catch (error) {
+    const shown = asShown(error);
+    await recordShopTurn(owner, shopId, {
+      asked,
+      failed: shown instanceof Error ? shown.message : String(shown),
+    }).catch(() => {
+      // Keeping the record must never be why the owner loses the error.
+    });
+    throw shown;
+  }
+}
+
+/** `mapError` throws rather than returns; this is the same sentence, caught. */
+function asShown(error: unknown): unknown {
+  try {
+    mapError(error);
+  } catch (shown) {
+    return shown;
+  }
+  return error;
 }
 
 export const agentsRouter = createTRPCRouter({
@@ -413,6 +475,27 @@ export const agentsRouter = createTRPCRouter({
       ),
     ),
 
+  /**
+   * What the Builder was asked about this shop, and what it answered.
+   *
+   * A shop is the conversation, so there is no chat to name or pick.
+   */
+  shopThread: protectedProcedure
+    .input(z.object({ shopId: z.string().min(1).max(40) }).strict())
+    .query(async ({ ctx, input }) =>
+      shopThread(await requireUsername(ctx.privyUserId), input.shopId),
+    ),
+
+  forgetShopThread: protectedProcedure
+    .input(z.object({ shopId: z.string().min(1).max(40) }).strict())
+    .mutation(async ({ ctx, input }) => {
+      await forgetShopThread(
+        await requireUsername(ctx.privyUserId),
+        input.shopId,
+      );
+      return { ok: true };
+    }),
+
   /** Asks the Builder to change a page. It proposes; nothing is written. */
   editShop: protectedProcedure
     .input(
@@ -426,14 +509,14 @@ export const agentsRouter = createTRPCRouter({
         })
         .strict(),
     )
-    .mutation(async ({ ctx, input }) =>
-      runShopEdit(
-        await requireUsername(ctx.privyUserId),
-        input.shopId,
-        input.instruction,
-        { from: input.from },
-      ).catch(mapError),
-    ),
+    .mutation(async ({ ctx, input }) => {
+      const owner = await requireUsername(ctx.privyUserId);
+      return kept(owner, input.shopId, input.instruction, () =>
+        runShopEdit(owner, input.shopId, input.instruction, {
+          from: input.from,
+        }),
+      );
+    }),
 
   /**
    * Asks the Builder to put one finding right. The finding is named by id
@@ -448,11 +531,17 @@ export const agentsRouter = createTRPCRouter({
         })
         .strict(),
     )
-    .mutation(async ({ ctx, input }) =>
-      runShopFix(
-        await requireUsername(ctx.privyUserId),
+    .mutation(async ({ ctx, input }) => {
+      const owner = await requireUsername(ctx.privyUserId);
+      const review = await reviewShop(owner, input.shopId).catch(mapError);
+      const finding = review.findings.find((one) => one.id === input.findingId);
+      return kept(
+        owner,
         input.shopId,
-        input.findingId,
-      ).catch(mapError),
-    ),
+        // The finding's own sentence, not its id: the thread has to read
+        // back as what was asked, and "dead-button" is not that.
+        `Fix: ${finding?.what ?? input.findingId}`,
+        () => runShopFix(owner, input.shopId, input.findingId),
+      );
+    }),
 });

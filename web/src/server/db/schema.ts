@@ -701,3 +701,40 @@ export const advisorTurns = pgTable(
 );
 
 export type AdvisorTurnRow = typeof advisorTurns.$inferSelect;
+
+/**
+ * What the Builder was asked about one shop, and what it answered.
+ *
+ * **A shop is the conversation.** There is no separate "chat" row the way
+ * the Advisor has one, because a page is what the thread is about and the
+ * page already has an id — a second one would only be a thing to keep in
+ * step.
+ *
+ * `proposal` is kept on the newest turn alone. An answer you can still
+ * apply is worth a page of HTML; a dozen you cannot are not, and a page is
+ * up to `MAX_HTML`. Older turns keep `summary`, which is the one line the
+ * screen shows them as anyway.
+ */
+export const builderTurns = pgTable(
+  "builder_turns",
+  {
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(),
+    shopId: text("shop_id")
+      .notNull()
+      .references(() => storefronts.id, { onDelete: "cascade" }),
+    /** The owner's words, or the sentence of the finding they asked about. */
+    asked: text("asked").notNull(),
+    /** Why it could not be answered, when it could not. */
+    failed: text("failed"),
+    /** One line of what it would do — "2 new · 1 gone · 6 unchanged". */
+    summary: text("summary"),
+    /** The whole answer, on the newest turn only. */
+    proposal: jsonb("proposal").$type<Record<string, unknown>>(),
+    model: text("model"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("builder_turns_by_shop").on(t.shopId, t.createdAt)],
+);
+
+export type BuilderTurnRow = typeof builderTurns.$inferSelect;

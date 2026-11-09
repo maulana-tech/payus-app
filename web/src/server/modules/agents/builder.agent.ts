@@ -10,7 +10,11 @@ import {
   describePage,
   mergeEdit,
 } from "../../../features/storefront/agentPage";
-import { type Block, toHtml } from "../../../features/storefront/blocks";
+import {
+  type Block,
+  blockDifference,
+  toHtml,
+} from "../../../features/storefront/blocks";
 import {
   type StorefrontView,
   storefrontInput,
@@ -498,6 +502,8 @@ export type PageProposal = {
   html: string;
   /** What was asked for, echoed back onto the proposal. */
   asked: string;
+  /** What it would do, in one line. Computed once, here. */
+  summary: string;
   /** Where this page would send someone, so the chat can show them. */
   links: { href: string; text: string }[];
   /** Blocks the Builder wrote that arrived empty and were left out. */
@@ -589,6 +595,7 @@ async function proposePage(
     after,
     html,
     asked: instruction,
+    summary: blockDifference(before, after),
     // What the Builder wrote and we could not use. Reported rather than
     // swallowed: the owner reads it before applying anything.
     skipped,

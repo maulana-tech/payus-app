@@ -386,6 +386,92 @@ describe.skipIf(!available)("storefront (Postgres)", () => {
       ).rejects.toThrow(/not one of yours/);
     });
 
+    it("keeps the thread, with the page only on the newest answer", async () => {
+      const shop = await made();
+      const history = await import(
+        "../src/server/modules/agents/builderHistory.service"
+      );
+
+      await history.recordShopTurn("editor", shop.id, {
+        asked: "Add a question",
+        summary: "1 new · 2 unchanged",
+        model: "claude-opus-5-5@test",
+        proposal: {
+          after: [{ id: "a", kind: "text" }],
+          html: "<p>First answer.</p>",
+          links: [],
+          skipped: [],
+        },
+      });
+      await history.recordShopTurn("editor", shop.id, {
+        asked: "Shorten it",
+        summary: "1 new · 1 gone · 1 unchanged",
+        model: "claude-opus-5-5@test",
+        proposal: {
+          after: [{ id: "b", kind: "text" }],
+          html: "<p>Second answer.</p>",
+          links: [],
+          skipped: [],
+        },
+      });
+
+      const thread = await history.shopThread("editor", shop.id);
+      expect(thread.map((turn) => turn.asked)).toEqual([
+        "Add a question",
+        "Shorten it",
+      ]);
+      // A page is up to MAX_HTML and only the newest answer can be applied,
+      // so only the newest keeps one. What the older one did is still said.
+      expect(thread[0]?.proposal).toBeNull();
+      expect(thread[0]?.summary).toBe("1 new · 2 unchanged");
+      expect(thread[1]?.proposal?.html).toBe("<p>Second answer.</p>");
+    });
+
+    it("keeps a refusal too, because that is why you asked twice", async () => {
+      const shop = await made();
+      const history = await import(
+        "../src/server/modules/agents/builderHistory.service"
+      );
+      await history.recordShopTurn("editor", shop.id, {
+        asked: "Do something impossible",
+        failed: "The Builder answered with a page this app will not store.",
+      });
+      const [turn] = await history.shopThread("editor", shop.id);
+      expect(turn?.failed).toMatch(/will not store/);
+      expect(turn?.proposal).toBeNull();
+    });
+
+    it("shows a thread to nobody but its owner", async () => {
+      const shop = await made();
+      const history = await import(
+        "../src/server/modules/agents/builderHistory.service"
+      );
+      await history.recordShopTurn("editor", shop.id, { asked: "Mine" });
+      // Same shop id, different account: a guessed id finds nothing rather
+      // than someone else's conversation.
+      expect(await history.shopThread("someone-else", shop.id)).toEqual([]);
+
+      await history.forgetShopThread("someone-else", shop.id);
+      expect(await history.shopThread("editor", shop.id)).toHaveLength(1);
+
+      await history.forgetShopThread("editor", shop.id);
+      expect(await history.shopThread("editor", shop.id)).toEqual([]);
+    });
+
+    it("goes with the shop it is about", async () => {
+      // The thread is kept next to the page, so deleting the page takes it.
+      const shop = await made();
+      const history = await import(
+        "../src/server/modules/agents/builderHistory.service"
+      );
+      await history.recordShopTurn("editor", shop.id, { asked: "Something" });
+      await db
+        .getDb()
+        .delete(db.storefronts)
+        .where(db.eq(db.storefronts.id, shop.id));
+      expect(await history.shopThread("editor", shop.id)).toEqual([]);
+    });
+
     it("finds what is wrong with no model involved at all", async () => {
       // No `ask` is passed: `reviewShop` never reaches one.
       const shop = await made({

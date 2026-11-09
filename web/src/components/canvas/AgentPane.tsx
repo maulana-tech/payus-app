@@ -38,43 +38,28 @@ import { trpc } from "@/trpc/react";
 // list of block names; applying it fills the editor, and the owner presses
 // the same Save they always press.
 
+/**
+ * One answer, as both a live reply and a kept one.
+ *
+ * The kept form holds each block's kind and not the block, because the
+ * screen shows kinds — and a page of 46 000 characters is not worth storing
+ * twenty times for a list of nine words.
+ */
 type Proposal = {
-  before: Block[];
-  after: Block[];
+  after: { id: string; kind: string }[];
   html: string;
   links: { href: string; text: string }[];
   skipped: string[];
-  model: string;
+  /** What it would do, in one line. Written by the server, not here. */
+  summary: string;
+  model: string | null;
 };
 
 /** One thing said, by either side. `Omit<Turn, "id">` over a union
     distributes into something no branch satisfies, so the id is added on
     top rather than removed afterwards. */
-type Said =
-  | { who: "owner"; said: string }
-  | { who: "builder"; proposal: Proposal }
-  | { who: "builder"; failed: string };
-
-type Turn = Said & { id: number };
-
 const pill =
   "flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] transition-colors";
-
-/** What changed, counted over blocks rather than over characters. */
-function difference(before: Block[], after: Block[]) {
-  const was = before.map((block) => JSON.stringify({ ...block, id: 0 }));
-  const now = after.map((block) => JSON.stringify({ ...block, id: 0 }));
-  const kept = new Set(was.filter((one) => now.includes(one)));
-  const added = now.filter((one) => !kept.has(one)).length;
-  const removed = was.filter((one) => !kept.has(one)).length;
-  return [
-    added > 0 ? `${added} new` : null,
-    removed > 0 ? `${removed} gone` : null,
-    `${kept.size} unchanged`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
 
 export function AgentPane({
   shopId,
@@ -90,43 +75,55 @@ export function AgentPane({
   /** The page the canvas should draw instead of the draft, or null. */
   onPreview: (html: string | null) => void;
 }) {
+  const utils = trpc.useUtils();
   const [said, setSaid] = useState("");
-  const [turns, setTurns] = useState<Turn[]>([]);
+  /** What is being asked right now, shown until the answer replaces it. */
+  const [asking, setAsking] = useState<string | null>(null);
+  /** The newest answer the owner has already dealt with, by turn id. */
+  const [done, setDone] = useState<string | null>(null);
   const foot = useRef<HTMLDivElement>(null);
 
-  // The newest answer, which is both what the canvas draws and what the
-  // next instruction starts from.
-  const latest = [...turns]
-    .reverse()
-    .find((turn): turn is Turn & { proposal: Proposal } => "proposal" in turn);
+  // The thread lives on the server, so it survives a reload — and so there
+  // is one answer to "what did I ask", not one per open tab.
+  const thread = trpc.agents.shopThread.useQuery(
+    { shopId: shopId ?? "" },
+    { enabled: Boolean(shopId) },
+  );
+  const turns = thread.data ?? [];
 
   const review = trpc.agents.reviewShop.useQuery(
     { shopId: shopId ?? "" },
     { enabled: Boolean(shopId) && !dirty },
   );
 
-  const add = (turn: Said) =>
-    setTurns((now) => [...now, { ...turn, id: now.length }]);
+  // The newest answer still waiting on the owner: what the canvas draws and
+  // what the next instruction carries on from.
+  const newest = [...turns].reverse().find((turn) => turn.proposal);
+  const live = newest && newest.id !== done ? newest : null;
 
-  const took = {
-    onSuccess: (proposal: Proposal) => add({ who: "builder", proposal }),
-    onError: (error: { message: string }) =>
-      add({ who: "builder", failed: error.message }),
+  const settled = {
+    onSettled: () => {
+      setAsking(null);
+      void utils.agents.shopThread.invalidate();
+    },
   };
-  const edit = trpc.agents.editShop.useMutation(took);
-  const fix = trpc.agents.fixShop.useMutation(took);
+  const edit = trpc.agents.editShop.useMutation(settled);
+  const fix = trpc.agents.fixShop.useMutation(settled);
+  const forget = trpc.agents.forgetShopThread.useMutation({
+    onSuccess: () => void utils.agents.shopThread.invalidate(),
+  });
   const busy = edit.isPending || fix.isPending;
 
-  const live = latest?.proposal.html ?? null;
+  const page = live?.proposal?.html ?? null;
   // The canvas draws the newest answer for as long as one is open. This is
   // the whole point of proposing rather than writing: it is judged as the
   // page it would become, in the shop's own colours, at the width you chose.
   //
   // biome-ignore lint/correctness/useExhaustiveDependencies: `onPreview` is the parent's own setter and is stable; listing it would re-run this on every render of the canvas.
   useEffect(() => {
-    onPreview(live);
+    onPreview(page);
     return () => onPreview(null);
-  }, [live]);
+  }, [page]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the count is the reason to scroll, not something the effect reads.
   useEffect(() => {
@@ -152,12 +149,12 @@ export function AgentPane({
 
   const findings = review.data?.findings ?? [];
   const ask = (instruction: string) => {
-    add({ who: "owner", said: instruction });
+    setAsking(instruction);
     edit.mutate({
       shopId,
       instruction,
       // A follow-up refines what you were just shown.
-      ...(live ? { from: live } : {}),
+      ...(page ? { from: page } : {}),
     });
     setSaid("");
   };
@@ -208,7 +205,7 @@ export function AgentPane({
                     type="button"
                     disabled={busy}
                     onClick={() => {
-                      add({ who: "owner", said: `Fix: ${finding.what}` });
+                      setAsking(`Fix: ${finding.what}`);
                       fix.mutate({ shopId, findingId: finding.id });
                     }}
                     className={cn(
@@ -235,29 +232,60 @@ export function AgentPane({
       ) : null}
 
       {/* ------------------------------------------------------ the thread */}
-      {turns.map((turn) =>
-        turn.who === "owner" ? (
-          <p
-            key={turn.id}
-            className="ml-6 min-w-0 rounded-(--dash-radius-sm) border border-(--dash-line) bg-(--dash-tint) px-3 py-2 text-sm text-(--dash-fg)"
-          >
-            {turn.said}
+      {turns.map((turn) => (
+        <div key={turn.id} className="grid min-w-0 gap-2">
+          <p className="ml-6 min-w-0 rounded-(--dash-radius-sm) border border-(--dash-line) bg-(--dash-tint) px-3 py-2 text-sm text-(--dash-fg)">
+            {turn.asked}
           </p>
-        ) : "failed" in turn ? (
-          <ErrorNote key={turn.id}>{turn.failed}</ErrorNote>
-        ) : (
-          <Answer
-            key={turn.id}
-            proposal={turn.proposal}
-            showing={turn.id === latest?.id}
-            onApply={() => {
-              onApply(turn.proposal.html);
-              setTurns([]);
-            }}
-            onDiscard={() => setTurns([])}
-          />
-        ),
-      )}
+          {turn.failed ? (
+            // A refusal is a record, not an error to swallow: a thread that
+            // shows only what worked cannot explain why you asked twice.
+            <ErrorNote>{turn.failed}</ErrorNote>
+          ) : turn.proposal ? (
+            <Answer
+              proposal={{
+                ...turn.proposal,
+                summary: turn.summary ?? "",
+                model: turn.model,
+              }}
+              showing={turn.id === live?.id}
+              onApply={() => {
+                onApply(turn.proposal?.html ?? "");
+                setDone(turn.id);
+              }}
+              onDiscard={() => setDone(turn.id)}
+            />
+          ) : (
+            // Its page came off when a newer answer arrived. What it did is
+            // still here; it is just no longer the one you can apply.
+            <p className="rounded-(--dash-radius-sm) border border-(--dash-line) p-3 text-[12px] text-(--dash-ash)">
+              {turn.summary ?? "Answered."}
+            </p>
+          )}
+        </div>
+      ))}
+
+      {turns.length > 0 && !busy ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            disabled={forget.isPending}
+            onClick={() => forget.mutate({ shopId })}
+            className={cn(
+              "rounded-(--dash-radius-sm) px-2 py-1 text-[12px] text-(--dash-ash) hover:text-(--dash-fg) disabled:opacity-40",
+              dashFocus,
+            )}
+          >
+            Clear this conversation
+          </button>
+        </div>
+      ) : null}
+
+      {asking ? (
+        <p className="ml-6 min-w-0 rounded-(--dash-radius-sm) border border-(--dash-line) bg-(--dash-tint) px-3 py-2 text-sm text-(--dash-fg)">
+          {asking}
+        </p>
+      ) : null}
 
       {busy ? (
         <p className="flex items-center gap-2 text-sm text-(--dash-ash)">
@@ -281,7 +309,7 @@ export function AgentPane({
             ask(said.trim());
           }}
           placeholder={
-            live
+            page
               ? "Now make the answers shorter"
               : "Add a section answering the three questions people always ask"
           }
@@ -289,7 +317,7 @@ export function AgentPane({
         />
         <div className="flex items-center justify-between gap-2">
           <p className="min-w-0 text-[12px] text-(--dash-ash)">
-            {live
+            {page
               ? "Carries on from the page you are looking at."
               : "It changes what you asked for and leaves the rest word for word."}
           </p>
@@ -339,7 +367,7 @@ function Answer({
           {showing ? "On the page to the right" : "Earlier"}
         </span>
         <span className="ml-auto shrink-0 text-[12px] text-(--dash-ash) tabular-nums">
-          {difference(proposal.before, proposal.after)}
+          {proposal.summary}
         </span>
       </div>
 

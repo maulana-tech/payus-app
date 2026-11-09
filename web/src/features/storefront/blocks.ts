@@ -867,6 +867,31 @@ export const moveBlock = (
 };
 
 /**
+ * What changed between two versions of a page, in one line.
+ *
+ * Counted over blocks rather than characters, because that is the unit the
+ * list is made of. Here rather than in the screen so the sentence stored
+ * with a turn and the sentence shown beside it are the same sentence: two
+ * of these would be two answers to "what did it do".
+ */
+export function blockDifference(before: Block[], after: Block[]): string {
+  const say = (blocks: Block[]) =>
+    blocks.map((block) => JSON.stringify({ ...block, id: 0 }));
+  const was = say(before);
+  const now = say(after);
+  const kept = new Set(was.filter((one) => now.includes(one)));
+  const added = now.filter((one) => !kept.has(one)).length;
+  const gone = was.filter((one) => !kept.has(one)).length;
+  return [
+    added > 0 ? `${added} new` : null,
+    gone > 0 ? `${gone} gone` : null,
+    `${kept.size} unchanged`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
  * Where a row dropped on another row actually lands.
  *
  * Two off-by-ones live here and nowhere else. The gap you aimed at is
