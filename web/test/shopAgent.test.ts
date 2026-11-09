@@ -11,7 +11,9 @@ import {
   mergeEdit,
 } from "../src/features/storefront/agentPage";
 import {
+  BLOCK_KINDS,
   type Block,
+  blankBlock,
   toBlocks,
   toHtml,
 } from "../src/features/storefront/blocks";
@@ -33,7 +35,7 @@ describe("what an agent may write", () => {
     const [block] = agentBlocks(
       page({ kind: "cta", payLink: "link-coffee", label: "Buy a bag" }),
       LINKS,
-    );
+    ).blocks;
     expect(block).toMatchObject({
       kind: "cta",
       href: "https://payus.test/pay/lana/coffee",
@@ -80,7 +82,10 @@ describe("what an agent may write", () => {
     // with no address. The first address this account owns stands in — one
     // we showed it either way — and the answer lists it before anything is
     // applied.
-    const [block] = agentBlocks(page({ kind: "cta", label: "Buy" }), LINKS);
+    const [block] = agentBlocks(
+      page({ kind: "cta", label: "Buy" }),
+      LINKS,
+    ).blocks;
     expect(block).toMatchObject({
       kind: "cta",
       href: "https://payus.test/pay/lana/coffee",
@@ -92,20 +97,65 @@ describe("what an agent may write", () => {
     ).toThrow(/no addresses to send it to/);
   });
 
-  it("refuses a block missing the thing it is made of, rather than dropping it", () => {
-    // Dropping it would lose a paragraph with nothing on screen to say so.
-    expect(() => agentBlocks(page({ kind: "card" }), LINKS)).toThrow(
-      /without its pairs/,
-    );
-    expect(() => agentBlocks(page({ kind: "text" }), LINKS)).toThrow(
-      /without its text/,
-    );
-    expect(() =>
-      agentBlocks(
-        page({ kind: "columns", pairs: [{ a: "One", b: "Only" }] }),
-        LINKS,
+  it("makes the words a field the API itself requires", () => {
+    // Measured, three rounds of it. Left optional, a model reproducing a
+    // heading it meant to keep returned `{kind: "heading"}` with no words —
+    // reliably, on every edit — and the owner's headings came off the page.
+    // Sharper descriptions did not fix it and more thinking did not fix it;
+    // `required` did, because it is the one thing the API enforces. The
+    // same edit then came back "1 new · 9 unchanged".
+    const schema = agentPageSchema(["this-shop"]);
+    const items = (
+      (schema.properties as Record<string, { items: Record<string, unknown> }>)
+        .blocks.items as { required: string[] }
+    ).required;
+    expect(items).toEqual(["kind", "text"]);
+  });
+
+  it("leaves an empty block out and says so, rather than losing the answer", () => {
+    // The schema is one flat object and cannot say "text is required when
+    // kind is heading", so a model will sometimes return a bare
+    // `{kind: "heading"}`. Throwing the whole answer away over that costs
+    // the owner every other block it wrote, and what was dropped was empty.
+    const wrote = agentBlocks(
+      page(
+        { kind: "heading" },
+        { kind: "text", text: "Kept." },
+        { kind: "card" },
       ),
-    ).toThrow(/exactly two sides/);
+      LINKS,
+    );
+    expect(wrote.blocks).toHaveLength(1);
+    expect(wrote.blocks[0]).toMatchObject({ kind: "text", text: "Kept." });
+    expect(wrote.skipped).toEqual([
+      "a heading block arrived without its text",
+      "a card block arrived without its pairs",
+    ]);
+
+    // Nothing usable at all is still a refusal: there is no page to offer.
+    expect(() => agentBlocks(page({ kind: "heading" }), LINKS)).toThrow(
+      /nothing that could go on a page/,
+    );
+    // But answering with no page at all is not a failure — a shop that is a
+    // list of things for sale and nothing else is a real shop.
+    expect(agentBlocks({ blocks: [] }, LINKS)).toEqual({
+      blocks: [],
+      skipped: [],
+    });
+  });
+
+  it("reshapes a block that carries words in the wrong shape", () => {
+    // One pair is not two columns, but it is a title and a body — which is
+    // exactly a card. Dropping it would lose the author's words; this does
+    // not, and invents nothing.
+    const wrote = agentBlocks(
+      page({ kind: "columns", pairs: [{ a: "One", b: "Only" }] }),
+      LINKS,
+    );
+    expect(wrote.skipped).toEqual([]);
+    expect(wrote.blocks).toEqual([
+      expect.objectContaining({ kind: "card", title: "One", text: "Only" }),
+    ]);
   });
 
   it("writes every kind it offers as a block that survives the page", () => {
@@ -140,7 +190,8 @@ describe("what an agent may write", () => {
     });
     expect(made).toHaveLength(AGENT_KINDS.length);
 
-    const blocks = agentBlocks({ blocks: made }, LINKS);
+    const { blocks, skipped } = agentBlocks({ blocks: made }, LINKS);
+    expect(skipped).toEqual([]);
     // Out to the field it is stored in, and back: an agent's page has to be
     // one the owner can then edit row by row like any other.
     const back = toBlocks(toHtml(blocks));
@@ -211,6 +262,60 @@ describe("an edit over someone's own markup", () => {
     // It is told that something of theirs is there, and that it is kept.
     expect(said).toMatch(/a block of the owner's own markup/);
     expect(said).toMatch(/kept exactly as it is/);
+  });
+
+  it("never leaves a separator dangling, for any kind, however empty", () => {
+    // The general form of the bug below. Built from BLOCK_KINDS with every
+    // field blank, because the one that cost 12 000 tokens was a `cta` and
+    // there were nine more lines in that file with the same shape.
+    const blank: Block[] = BLOCK_KINDS.map(({ kind }) => {
+      const base = blankBlock(kind);
+      switch (base.kind) {
+        case "heading":
+        case "text":
+        case "lead":
+        case "quiet":
+        case "quote":
+        case "note":
+          return { ...base, text: "" };
+        case "list":
+          return { ...base, items: ["", ""] };
+        case "card":
+          return { ...base, title: "", text: "" };
+        case "columns":
+          return {
+            ...base,
+            left: { title: "", text: "" },
+            right: { title: "", text: "" },
+          };
+        case "steps":
+          return { ...base, items: [{ title: "", text: "" }] };
+        case "faq":
+          return { ...base, items: [{ q: "", a: "" }] };
+        case "stats":
+          return { ...base, items: [{ figure: "", label: "" }] };
+        case "gallery":
+          return { ...base, items: [{ src: "", alt: "" }] };
+        case "image":
+          return { ...base, src: "", alt: "", caption: "" };
+        case "table":
+          return { ...base, head: [], rows: [] };
+        case "buttons":
+          return { ...base, items: [{ href: "", text: "" }] };
+        case "link":
+        case "cta":
+          return { ...base, href: "", text: "" };
+        default:
+          return base;
+      }
+    });
+
+    for (const line of describePage(blank).split("\n")) {
+      // No line may end in a separator, and none may carry an empty one.
+      expect(line, line).not.toMatch(/[—|;:→,]\s*$/);
+      expect(line, line).not.toMatch(/[—|→]\s*[—|;→]/);
+      expect(line, line).not.toMatch(/:\s*$/);
+    }
   });
 
   it("never leaves a separator dangling, because that is a pattern to continue", () => {

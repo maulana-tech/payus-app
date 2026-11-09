@@ -61,15 +61,27 @@
   own, it may only name a destination you have already paid, and the shape of
   its answer is validated before the Guardian ever sees it.
 
-- **A shop you can describe.** The Builder turns a sentence into a
-  storefront: configuration filling templates we wrote, plus one block of
-  prose that goes through a server-side sanitiser and renders in a sandboxed
-  frame with no scripts. Four layouts, a palette to choose, quantities,
-  sold-out items and bounds on what a payer may name. It writes a draft; you
-  open it on a canvas — the page itself on one side, what makes it on the
-  other — and publish when it reads right. Or start from one of five shops
-  that already work: a coffee bar, a freelance practice, a tip jar, a warung
+- **A shop you can describe, and then argue with.** The Builder turns a
+  sentence into a storefront: configuration filling templates we wrote, and
+  a page written as **blocks** — the same twenty the editor offers — so
+  every line it writes is yours to edit row by row afterwards. It has no
+  field for markup, and it cannot write a web address: it names one of your
+  own pay links and we look it up. Four layouts, a palette to choose,
+  quantities, sold-out items and bounds on what a payer may name. You open
+  it on a canvas — the page itself on one side, what makes it on the other
+  — and publish when it reads right. Or start from one of five shops that
+  already work: a coffee bar, a freelance practice, a tip jar, a warung
   menu, a class.
+
+  Ask it to change the page and it answers in the same canvas: the page on
+  the right **becomes** its answer until you apply or discard it, follow-ups
+  carry on from what you are looking at, and a block of your own hand-written
+  markup is never touched. Ask it to fix something and it is only ever handed
+  a check this app computed — a button that goes nowhere, a page that says
+  nothing — because a model asked what is wrong with a page will always find
+  something. Each finding says whether it is the Builder's to fix or yours:
+  it writes the page, so it can add a button; it cannot change what
+  something costs.
   Everything a payer sends is checked against the stored item — the page is
   never the authority on what something costs.
 

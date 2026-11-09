@@ -189,14 +189,14 @@ export const TABLE: Seat[] = [
     status: "live",
     head: [83.2, 33.6],
     epigram: "Describe the shop; walk into it.",
-    task: "Turns a conversation into a storefront: products, prices, a page at your own address. It fills in a template we wrote, and the one block of HTML it may write is sanitised on the way in and rendered where nothing can run.",
-    when: "When you ask for a shop.",
-    chips: ["Schema only", "Sanitised HTML", "Owner publishes"],
+    task: "Turns a conversation into a storefront: products, prices, a page at your own address. It writes the page as blocks — the same ones you would have used — so every line of it is yours to edit afterwards. It will change a page you already have, and put right the things this app can check; it cannot write markup, and it cannot write an address, only name one of yours.",
+    when: "When you ask for a shop, or ask it to change one.",
+    chips: ["Blocks, not markup", "Your addresses only", "Owner applies"],
     facts: [
       { label: "Writes", code: "storefront_config (validated)" },
       {
         label: "Limit",
-        text: "Prices go past the Guardian like any other move.",
+        text: "It proposes; the page is yours to apply and yours to publish.",
       },
     ],
   },

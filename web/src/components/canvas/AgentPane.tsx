@@ -43,6 +43,7 @@ type Proposal = {
   after: Block[];
   html: string;
   links: { href: string; text: string }[];
+  skipped: string[];
   model: string;
 };
 
@@ -355,6 +356,16 @@ function Answer({
           </li>
         ))}
       </ul>
+
+      {proposal.skipped.length > 0 ? (
+        // Said, not swallowed. What was left out was empty, so nothing is
+        // lost by dropping it — but the owner still gets to know that the
+        // answer is not quite what the Builder set out to write.
+        <p className="border-t border-(--dash-line) pt-2 text-[12px] text-(--dash-ash)">
+          Left out because {proposal.skipped.length === 1 ? "it" : "they"}{" "}
+          arrived empty: {proposal.skipped.join("; ")}.
+        </p>
+      ) : null}
 
       {proposal.links.length > 0 ? (
         <div className="grid min-w-0 gap-1 border-t border-(--dash-line) pt-2">

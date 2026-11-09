@@ -354,7 +354,7 @@ function pageFrom(
   json: unknown,
   targets: { key: string; href: string }[],
   shape: typeof agentPage | typeof agentPageOrNone = agentPage,
-): Block[] {
+): { blocks: Block[]; skipped: string[] } {
   const parsed = shape.safeParse(json);
   if (!parsed.success) {
     // Named, not just described. "expected string to have <=40 characters"
@@ -404,7 +404,7 @@ export async function runBuilder(
   // lifted out before it is parsed: the page schema is strict, and the
   // configuration keys beside it are not its business.
   const answered = (completion.json ?? {}) as Record<string, unknown>;
-  const blocks = pageFrom(
+  const { blocks } = pageFrom(
     { blocks: answered.blocks },
     targets,
     agentPageOrNone,
@@ -500,6 +500,8 @@ export type PageProposal = {
   asked: string;
   /** Where this page would send someone, so the chat can show them. */
   links: { href: string; text: string }[];
+  /** Blocks the Builder wrote that arrived empty and were left out. */
+  skipped: string[];
   model: string;
 };
 
@@ -546,11 +548,11 @@ async function proposePage(
       .filter(Boolean)
       .join("\n"),
     schema: agentPageSchema(targets.map((target) => target.key)),
-    effort: "low",
+    effort: "medium",
     maxTokens: 12_000,
   });
 
-  const written = pageFrom(completion.json, targets);
+  const { blocks: written, skipped } = pageFrom(completion.json, targets);
   // The owner's own markup is put back where it was. The agent cannot
   // express it, so an answer that simply omitted it would delete a design.
   const after = mergeEdit(before, written);
@@ -587,6 +589,9 @@ async function proposePage(
     after,
     html,
     asked: instruction,
+    // What the Builder wrote and we could not use. Reported rather than
+    // swallowed: the owner reads it before applying anything.
+    skipped,
     // Every address this page now sends someone to, so the chat can offer
     // them as links to open rather than as a sentence to be believed.
     links: after.flatMap((block) =>

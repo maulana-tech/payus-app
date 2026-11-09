@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { newId } from "@/lib/ids";
-import { type Block, toHtml } from "./blocks";
+import type { Block } from "./blocks";
 
 // What an agent is allowed to write on a shop page.
 //
@@ -120,7 +120,7 @@ export function agentPageSchema(payLinks: string[]): Record<string, unknown> {
       type: "string",
       maxLength: MAX_TEXT,
       description:
-        "For heading, text, lead, quiet, quote and note. Nothing else uses it.",
+        'The words this block is made of: heading, text, lead, quiet, quote and note are nothing without it. Every other kind carries its words elsewhere, so write "" for list, card, columns, steps, faq, stats, cta, divider and spacer.',
     },
     big: {
       type: "boolean",
@@ -172,7 +172,14 @@ export function agentPageSchema(payLinks: string[]): Record<string, unknown> {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["kind"],
+          // `text` is required, although most kinds have none.
+          //
+          // It is the one thing the API itself can enforce. Left optional,
+          // a model reproducing a heading it meant to keep returned
+          // `{kind: "heading"}` with no words — reliably, on every edit —
+          // and the owner's headings came off the page. Required, it is
+          // always written, and the kinds that have no words write "".
+          required: ["kind", "text"],
           properties,
         },
       },
@@ -187,30 +194,53 @@ export class AgentPageError extends Error {
   }
 }
 
+/**
+ * Raised for a block that arrived with nothing in it. Caught per block
+ * rather than per answer — see `agentBlocks`.
+ */
+class EmptyBlock extends Error {
+  constructor(readonly why: string) {
+    super(why);
+    this.name = "EmptyBlock";
+  }
+}
+
+/** One block that has to come back as several. */
+class Reshape extends Error {
+  constructor(readonly blocks: Block[]) {
+    super("reshaped");
+    this.name = "Reshape";
+  }
+}
+
 const need = <T>(
   value: T | undefined | null,
   kind: string,
   field: string,
 ): T => {
   if (value === undefined || value === null)
-    throw new AgentPageError(`A ${kind} block arrived without its ${field}.`);
+    throw new EmptyBlock(`a ${kind} block arrived without its ${field}`);
   return value;
 };
 
 /**
  * One agent block as a real block.
  *
- * A block missing the field its kind is made of throws rather than being
- * dropped: losing a paragraph quietly is worse than saying the answer was
- * not usable, and the caller turns this into a sentence the owner reads.
+ * Raises `EmptyBlock` when the thing the kind is made of is not there, and
+ * `Reshape` when what arrived carries words but not in the shape asked for.
+ * `agentBlocks` decides what each of those means for the answer.
  */
 function one(block: AgentBlock, links: Map<string, string>): Block {
   const id = newId(10);
-  const text = () => need(block.text, block.kind, "text").trim();
+  const text = () => {
+    const got = need(block.text, block.kind, "text").trim();
+    if (!got) throw new EmptyBlock(`a ${block.kind} block arrived empty`);
+    return got;
+  };
   const pairs = () => {
     const got = need(block.pairs, block.kind, "pairs");
     if (got.length === 0)
-      throw new AgentPageError(`A ${block.kind} block arrived empty.`);
+      throw new EmptyBlock(`a ${block.kind} block arrived empty`);
     return got;
   };
 
@@ -240,8 +270,18 @@ function one(block: AgentBlock, links: Map<string, string>): Block {
     }
     case "columns": {
       const got = pairs();
+      // Wrong arity still carries the author's words, so it is reshaped
+      // rather than thrown away: a pair is exactly what a card holds, and
+      // one card per pair loses nothing and invents nothing.
       if (got.length !== 2)
-        throw new AgentPageError("A columns block needs exactly two sides.");
+        throw new Reshape(
+          got.map((pair) => ({
+            id: newId(10),
+            kind: "card" as const,
+            title: pair.a,
+            text: pair.b,
+          })),
+        );
       return {
         id,
         kind: "columns",
@@ -297,19 +337,51 @@ function one(block: AgentBlock, links: Map<string, string>): Block {
   }
 }
 
-/** The whole answer, as blocks. Throws `AgentPageError` on anything unusable. */
+export type AgentWrote = {
+  blocks: Block[];
+  /** Blocks left out because they arrived with nothing in them. */
+  skipped: string[];
+};
+
+/**
+ * The whole answer, as blocks.
+ *
+ * **An empty block is left out, not fatal.** The schema is one flat object
+ * — it cannot say "text is required when kind is heading" — so a model will
+ * sometimes return `{kind: "heading"}` and nothing else. Throwing the whole
+ * answer away over that costs the owner every other block it wrote, and
+ * what was dropped was empty, so there is nothing to lose in dropping it.
+ *
+ * What is *not* tolerated is an address we did not offer. That stays a
+ * refusal, because acting on it would put a stranger's link on the page.
+ *
+ * `skipped` is reported, never swallowed: the answer says what was left out
+ * before the owner applies any of it.
+ */
 export function agentBlocks(
   answer: { blocks: AgentBlock[] },
   links: Map<string, string>,
-): Block[] {
-  return answer.blocks.map((block) => one(block, links));
+): AgentWrote {
+  const blocks: Block[] = [];
+  const skipped: string[] = [];
+  for (const block of answer.blocks) {
+    try {
+      blocks.push(one(block, links));
+    } catch (error) {
+      if (error instanceof Reshape) blocks.push(...error.blocks);
+      else if (error instanceof EmptyBlock) skipped.push(error.why);
+      else throw error;
+    }
+  }
+  // Only when it *tried* and nothing survived. A new shop is allowed to
+  // have no page at all — a list of things for sale and nothing else is a
+  // real shop, and `agentPageOrNone` is what says so.
+  if (answer.blocks.length > 0 && blocks.length === 0)
+    throw new AgentPageError(
+      "The Builder answered with nothing that could go on a page.",
+    );
+  return { blocks, skipped };
 }
-
-/** The answer as the HTML field stores it. */
-export const agentHtml = (
-  answer: { blocks: AgentBlock[] },
-  links: Map<string, string>,
-): string => toHtml(agentBlocks(answer, links));
 
 /**
  * The page as it stands, for a model that is about to change it.
@@ -334,47 +406,106 @@ export function describePage(blocks: Block[]): string {
   );
 }
 
+/**
+ * Joins only the parts that have something in them.
+ *
+ * Every line below used to be a template with a separator written into it,
+ * and a block with an empty field produced `card: Hours — ` or `text: `.
+ * That is not a cosmetic slip: handed a line ending in a separator, the
+ * model continued the pattern instead of answering, and one such line cost
+ * 12 000 output tokens. A describer may never write a separator with
+ * nothing after it.
+ */
+const say = (parts: (string | null | undefined)[], between = " — ") =>
+  parts
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(between);
+
+/** `kind: what`, or just the kind when there is no what. */
+const named = (kind: string, what: string) =>
+  what.trim() ? `${kind}: ${what.trim()}` : `${kind} (empty)`;
+
 function describeBlock(block: Block): string {
   switch (block.kind) {
     case "heading":
-      return `heading (${block.level === 2 ? "section" : "smaller"}): ${block.text}`;
+      return named(
+        `heading (${block.level === 2 ? "section" : "smaller"})`,
+        block.text,
+      );
     case "text":
     case "lead":
     case "quiet":
     case "quote":
     case "note":
-      return `${block.kind}: ${block.text}`;
+      return named(block.kind, block.text);
     case "list":
-      return `list: ${block.items.join("; ")}`;
+      return named("list", say(block.items, "; "));
     case "card":
-      return `card: ${block.title} — ${block.text}`;
+      return named("card", say([block.title, block.text]));
     case "columns":
-      return `columns: ${block.left.title} — ${block.left.text} | ${block.right.title} — ${block.right.text}`;
+      return named(
+        "columns",
+        say(
+          [
+            say([block.left.title, block.left.text]),
+            say([block.right.title, block.right.text]),
+          ],
+          " | ",
+        ),
+      );
     case "steps":
-      return `steps: ${block.items.map((i) => `${i.title} — ${i.text}`).join("; ")}`;
+      return named(
+        "steps",
+        say(
+          block.items.map((item) => say([item.title, item.text])),
+          "; ",
+        ),
+      );
     case "faq":
-      return `faq: ${block.items.map((i) => `${i.q} — ${i.a}`).join("; ")}`;
+      return named(
+        "faq",
+        say(
+          block.items.map((item) => say([item.q, item.a])),
+          "; ",
+        ),
+      );
     case "stats":
-      return `stats: ${block.items.map((i) => `${i.figure} — ${i.label}`).join("; ")}`;
+      return named(
+        "stats",
+        say(
+          block.items.map((item) => say([item.figure, item.label])),
+          "; ",
+        ),
+      );
     case "gallery":
       return `gallery of ${block.items.length} images`;
     case "image":
-      return `image: ${block.alt || block.caption || block.src}`;
+      return named("image", say([block.alt, block.caption, block.src], " "));
     case "table":
-      return `table with columns ${block.head.join(", ")} and ${block.rows.length} rows`;
+      return named(
+        "table",
+        say([say(block.head, ", "), `${block.rows.length} rows`], " and "),
+      );
     case "buttons":
-      return `buttons: ${block.items.map((i) => i.text).join("; ")}`;
+      return named(
+        "buttons",
+        say(
+          block.items.map((item) => item.text),
+          "; ",
+        ),
+      );
     case "link":
     case "cta":
       // The arrow only when there is something after it. A button whose
       // address the sanitiser stripped left the line ending `→ ` — and a
       // dangling separator is a pattern to continue: asked to edit that
       // page, the model wrote four good blocks and then repeated
-      // "Browse the library →\n\n\n…" until it had spent all 12 000 of its
-      // output tokens. Measured, not supposed.
+      // "Browse the library →" until it had spent all 12 000 of its output
+      // tokens. Measured, not supposed.
       return block.href
-        ? `${block.kind}: ${block.text} → ${block.href}`
-        : `${block.kind}: ${block.text} (no address yet)`;
+        ? named(block.kind, say([block.text, block.href], " → "))
+        : named(block.kind, `${block.text} (no address yet)`);
     case "divider":
       return "divider";
     case "spacer":
@@ -382,10 +513,7 @@ function describeBlock(block: Block): string {
     case "html":
       // Never reached from `describePage`, which leaves these out: telling
       // a model "there is a 46 000-character design here, leave it alone"
-      // is an invitation to try. Asked to shorten a page, it spent all
-      // 32 000 of its output tokens re-expressing that design as blocks and
-      // was cut off mid-answer. It is `mergeEdit` that keeps them, not a
-      // sentence; so the sentence is gone and they are simply not shown.
+      // is an invitation to try. It is `mergeEdit` that keeps them.
       return `a block of the owner's own markup (${block.html.length} characters)`;
   }
 }

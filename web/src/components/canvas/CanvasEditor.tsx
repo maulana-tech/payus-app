@@ -272,6 +272,11 @@ export function CanvasEditor({ id }: { id: string }) {
   const update = trpc.storefront.update.useMutation({
     onSuccess: () => {
       void utils.storefront.mine.invalidate();
+      // The findings are a reading of the *saved* page, and a save is
+      // exactly when they stop being true. Without this they sat on the
+      // cache for thirty seconds and told you about a button you had
+      // already fixed.
+      void utils.agents.reviewShop.invalidate();
       setSaved(JSON.stringify(draft));
     },
   });
