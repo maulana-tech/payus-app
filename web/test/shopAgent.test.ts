@@ -74,6 +74,24 @@ describe("what an agent may write", () => {
     expect(theirs.payLink?.enum).toEqual(["link-coffee"]);
   });
 
+  it("stands an address in when the model names none, rather than losing the page", () => {
+    // The schema cannot say "payLink is required when kind is cta", and the
+    // model leaves it out when the page it is editing already has a button
+    // with no address. The first address this account owns stands in — one
+    // we showed it either way — and the answer lists it before anything is
+    // applied.
+    const [block] = agentBlocks(page({ kind: "cta", label: "Buy" }), LINKS);
+    expect(block).toMatchObject({
+      kind: "cta",
+      href: "https://payus.test/pay/lana/coffee",
+      text: "Buy",
+    });
+    // With nowhere at all to send it, that is a refusal, not a guess.
+    expect(() =>
+      agentBlocks(page({ kind: "cta", label: "Buy" }), new Map()),
+    ).toThrow(/no addresses to send it to/);
+  });
+
   it("refuses a block missing the thing it is made of, rather than dropping it", () => {
     // Dropping it would lose a paragraph with nothing on screen to say so.
     expect(() => agentBlocks(page({ kind: "card" }), LINKS)).toThrow(
@@ -175,13 +193,55 @@ describe("an edit over someone's own markup", () => {
     );
   });
 
-  it("describes markup rather than quoting it", () => {
-    // A 45 000-character design must not become the prompt, and the rule
-    // that protects it is `mergeEdit`, not a sentence the model reads.
+  it("does not show the owner's markup to the model at all", () => {
+    // Measured, not guessed: told a 46 000-character design was there and
+    // to leave it alone, the model spent all 32 000 of its output tokens
+    // re-expressing that design as blocks and was cut off mid-answer. It is
+    // `mergeEdit` that keeps those blocks, so there is nothing a prompt has
+    // to say about them — and the surest way not to be rewritten is not to
+    // be mentioned.
     const big = `<div class="stage">${"x".repeat(40_000)}</div>`;
-    const said = describePage([hand(big)]);
+    const said = describePage([
+      hand(big),
+      { id: "t", kind: "text", text: "Prose." },
+    ]);
     expect(said).not.toContain("xxxx");
-    expect(said).toMatch(/own markup \(40\d{3} characters\)/);
+    expect(said).not.toContain("40");
+    expect(said).toContain("1. text: Prose.");
+    // It is told that something of theirs is there, and that it is kept.
+    expect(said).toMatch(/a block of the owner's own markup/);
+    expect(said).toMatch(/kept exactly as it is/);
+  });
+
+  it("never leaves a separator dangling, because that is a pattern to continue", () => {
+    // Measured. A button whose address the sanitiser had stripped was
+    // described as `cta: Browse the library → ` — arrow, then nothing. Asked
+    // to edit that page the model wrote four good blocks and then repeated
+    // "Browse the library →" until it had spent every one of its 12 000
+    // output tokens and was cut off mid-JSON. With the arrow gone the same
+    // call answered in 287. A prompt is an input like any other.
+    const said = describePage([
+      { id: "a", kind: "cta", href: "", text: "Browse the library" },
+      { id: "b", kind: "link", href: "", text: "Elsewhere" },
+      { id: "c", kind: "image", src: "", alt: "", caption: "" },
+    ]);
+    expect(said).not.toMatch(/→\s*$/m);
+    expect(said).not.toMatch(/→\s*\n/);
+    expect(said).toContain("Browse the library (no address yet)");
+  });
+
+  it("renumbers over the blocks it can actually edit", () => {
+    // "Change the second one" has to mean the second thing the model was
+    // shown, not the second row of a list it cannot see.
+    const said = describePage([
+      hand("<style>.a{color:red}</style>"),
+      { id: "a", kind: "text", text: "First." },
+      hand('<div class="stage">x</div>'),
+      { id: "b", kind: "text", text: "Second." },
+    ]);
+    expect(said).toContain("1. text: First.");
+    expect(said).toContain("2. text: Second.");
+    expect(said).toMatch(/2 blocks of the owner's own markup/);
   });
 });
 

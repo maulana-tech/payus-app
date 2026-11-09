@@ -290,6 +290,66 @@ describe.skipIf(!available)("storefront (Postgres)", () => {
       expect(run.html).toContain("We deliver on Mondays.");
     });
 
+    it("carries on from the page you were shown, not the one on the server", async () => {
+      // The second thing anyone says is "shorter", and that has to mean the
+      // page they were just looking at. Without this a follow-up silently
+      // threw the first answer away and started again from the save.
+      const shop = await made({ html: "<p>What is saved.</p>" });
+      const seen: string[] = [];
+      const watching = {
+        ask: async (input: { prompt: string }) => {
+          seen.push(input.prompt);
+          return {
+            json: { blocks: [{ kind: "text", text: "Shorter." }] },
+            model: "claude-opus-5-5",
+            promptVersion: "test",
+          };
+        },
+      };
+
+      await builder.runShopEdit("editor", shop.id, "Shorten it", watching);
+      expect(seen[0]).toContain("What is saved.");
+
+      await builder.runShopEdit("editor", shop.id, "Shorten it again", {
+        ...watching,
+        from: "<p>What you were just shown.</p>",
+      });
+      expect(seen[1]).toContain("What you were just shown.");
+      expect(seen[1]).not.toContain("What is saved.");
+    });
+
+    it("sanitises the page a follow-up starts from, because it came from a browser", async () => {
+      const shop = await made();
+      const run = await builder.runShopEdit("editor", shop.id, "Keep going", {
+        ...answersWith({ kind: "text", text: "Fine." }),
+        from: "<p>Kept.</p><script>alert(1)</script>",
+      });
+      // The script never becomes a block, so it can never be put back by
+      // the merge and handed to the owner to apply.
+      expect(run.html).not.toContain("<script");
+      expect(run.before.some((b) => b.kind === "html")).toBe(false);
+    });
+
+    it("reports the addresses its page would send people to", async () => {
+      const shop = await made();
+      const run = await builder.runShopEdit(
+        "editor",
+        shop.id,
+        "Add a button",
+        answersWith({
+          kind: "cta",
+          payLink: "this-shop",
+          label: "Browse the shop",
+        }),
+      );
+      expect(run.links).toEqual([
+        {
+          href: expect.stringContaining(`/shop/${shop.slug}`),
+          text: "Browse the shop",
+        },
+      ]);
+    });
+
     it("refuses a button the Builder was not shown an address for", async () => {
       const shop = await made();
       await expect(

@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { linesOf, reconcile } from "@/features/reconcile/match";
+import { MAX_HTML } from "@/features/storefront/config";
 import { MAX_TEXT_CHARS } from "@/features/uploads/extract";
 import {
   MAX_UPLOAD_CHARS,
@@ -419,6 +420,9 @@ export const agentsRouter = createTRPCRouter({
         .object({
           shopId: z.string().min(1).max(40),
           instruction: z.string().trim().min(4).max(600),
+          /** The page a follow-up builds on, so a second ask refines the
+              first rather than starting again from what is saved. */
+          from: z.string().max(MAX_HTML).optional(),
         })
         .strict(),
     )
@@ -427,6 +431,7 @@ export const agentsRouter = createTRPCRouter({
         await requireUsername(ctx.privyUserId),
         input.shopId,
         input.instruction,
+        { from: input.from },
       ).catch(mapError),
     ),
 

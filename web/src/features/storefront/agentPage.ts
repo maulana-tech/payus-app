@@ -55,7 +55,7 @@ const MAX_TEXT = 600;
 const MAX_LINE = 160;
 const MAX_LINES = 12;
 const MAX_PAIRS = 8;
-const MAX_LABEL = 40;
+const MAX_LABEL = 80;
 
 const pair = z
   .object({
@@ -272,7 +272,19 @@ function one(block: AgentBlock, links: Map<string, string>): Block {
     case "spacer":
       return { id, kind: "spacer", size: "md" };
     case "cta": {
-      const slug = need(block.payLink, "cta", "pay link");
+      // A flat object schema cannot say "payLink is required when kind is
+      // cta", and the model will leave it out — faithfully, when the page
+      // it is editing already carries a button whose address the sanitiser
+      // stripped. Refusing the whole page over that is the wrong trade, so
+      // the first address this account owns stands in. That is still an
+      // address we showed it; it is only *we* who chose rather than the
+      // model, and the answer lists every address before the owner applies
+      // anything.
+      const slug = block.payLink ?? [...links.keys()][0];
+      if (!slug)
+        throw new AgentPageError(
+          "A button was asked for and this account has no addresses to send it to.",
+        );
       // The lookup, not the string: whatever the model said, the address
       // comes out of this map or the block is refused.
       const href = links.get(slug);
@@ -307,10 +319,19 @@ export const agentHtml = (
  * the model reads and writes one thing rather than two.
  */
 export function describePage(blocks: Block[]): string {
-  if (blocks.length === 0) return "The page is empty.";
-  return blocks
-    .map((block, at) => `${at + 1}. ${describeBlock(block)}`)
-    .join("\n");
+  const mine = blocks.filter((block) => block.kind !== "html");
+  const theirs = blocks.length - mine.length;
+  const kept =
+    theirs === 0
+      ? ""
+      : `\n\nThe page also carries ${theirs === 1 ? "a block" : `${theirs} blocks`} of the owner's own markup. ${theirs === 1 ? "It is" : "They are"} not shown to you and ${theirs === 1 ? "is" : "are"} not yours to write: ${theirs === 1 ? "it is" : "they are"} kept exactly as ${theirs === 1 ? "it is" : "they are"} and put back around whatever you return.`;
+
+  if (mine.length === 0)
+    return `There is nothing on the page you can edit.${kept}`;
+  return (
+    mine.map((block, at) => `${at + 1}. ${describeBlock(block)}`).join("\n") +
+    kept
+  );
 }
 
 function describeBlock(block: Block): string {
@@ -345,16 +366,27 @@ function describeBlock(block: Block): string {
       return `buttons: ${block.items.map((i) => i.text).join("; ")}`;
     case "link":
     case "cta":
-      return `${block.kind}: ${block.text} → ${block.href}`;
+      // The arrow only when there is something after it. A button whose
+      // address the sanitiser stripped left the line ending `→ ` — and a
+      // dangling separator is a pattern to continue: asked to edit that
+      // page, the model wrote four good blocks and then repeated
+      // "Browse the library →\n\n\n…" until it had spent all 12 000 of its
+      // output tokens. Measured, not supposed.
+      return block.href
+        ? `${block.kind}: ${block.text} → ${block.href}`
+        : `${block.kind}: ${block.text} (no address yet)`;
     case "divider":
       return "divider";
     case "spacer":
       return "space";
     case "html":
-      // Written by hand, and not the agent's to rewrite. It is described
-      // rather than quoted so a 40 000-character design does not become the
-      // prompt, and `editKeeps` is what actually protects it.
-      return `a block of the owner's own markup (${block.html.length} characters) — leave this one exactly as it is`;
+      // Never reached from `describePage`, which leaves these out: telling
+      // a model "there is a 46 000-character design here, leave it alone"
+      // is an invitation to try. Asked to shorten a page, it spent all
+      // 32 000 of its output tokens re-expressing that design as blocks and
+      // was cut off mid-answer. It is `mergeEdit` that keeps them, not a
+      // sentence; so the sentence is gone and they are simply not shown.
+      return `a block of the owner's own markup (${block.html.length} characters)`;
   }
 }
 

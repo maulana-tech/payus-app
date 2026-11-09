@@ -100,11 +100,17 @@ export const claudeConfigured = () => backend() !== null;
  * party, Bedrock Messages, Bedrock InvokeModel) expose wider and slightly
  * different surfaces, so the type says only what is called here.
  */
+// Narrow on purpose: the three clients (direct, Bedrock, Bedrock Mantle)
+// agree on exactly this much, and naming only what is used keeps a provider
+// swap from being a type change across the file.
 type Caller = {
   messages: {
     create(
       params: Anthropic.MessageCreateParamsNonStreaming,
     ): Promise<Anthropic.Message>;
+    stream(params: Anthropic.MessageStreamParams): {
+      finalMessage(): Promise<Anthropic.Message>;
+    };
   };
 };
 
@@ -179,24 +185,42 @@ export async function askForJson(input: {
   schema: Record<string, unknown>;
   /** Simple decisions do not need deep thinking; this is a cost lever. */
   effort?: "low" | "medium" | "high";
+  /** Room for the answer *and* the thinking that precedes it. */
+  maxTokens?: number;
 }): Promise<Completion> {
   const { caller, model, which } = anthropic();
+  const maxTokens = input.maxTokens ?? 4096;
+  // Above a few thousand tokens the SDK refuses a non-streaming request
+  // outright — "Streaming is required for operations that may take longer
+  // than 10 minutes" — because it estimates the wait from the budget you
+  // asked for. The Builder returns a whole page and needs that budget, so
+  // the long requests stream and the short decisions do not. Streaming does
+  // not change the answer: `finalMessage()` is the same `Message` the
+  // non-streaming call returns, which is why both roads join here.
+  const body = {
+    model,
+    // Explicit, because it is not the default everywhere: Opus 5.5 always
+    // thinks and treats this as a no-op, while Sonnet 4.6 does not think
+    // at all unless asked. These are decisions about money; let it think.
+    thinking: { type: "adaptive" as const },
+    // A decision object is a few hundred tokens, and that is what the
+    // default was written for. A page is not: the Builder returns every
+    // block it would leave on the page, and thinking tokens come out of
+    // the same budget — so a caller that writes prose says how much it
+    // needs.
+    max_tokens: maxTokens,
+    system: input.system,
+    output_config: {
+      effort: input.effort ?? ("low" as const),
+      format: { type: "json_schema" as const, schema: input.schema },
+    },
+    messages: [{ role: "user" as const, content: input.prompt }],
+  };
+
   const response = await call(which, model, () =>
-    caller.messages.create({
-      model,
-      // Explicit, because it is not the default everywhere: Opus 5.5 always
-      // thinks and treats this as a no-op, while Sonnet 4.6 does not think
-      // at all unless asked. These are decisions about money; let it think.
-      thinking: { type: "adaptive" },
-      // A decision object is a few hundred tokens; this is a deliberate cap.
-      max_tokens: 4096,
-      system: input.system,
-      output_config: {
-        effort: input.effort ?? "low",
-        format: { type: "json_schema", schema: input.schema },
-      },
-      messages: [{ role: "user", content: input.prompt }],
-    }),
+    maxTokens > 8192
+      ? caller.messages.stream(body).finalMessage()
+      : caller.messages.create(body),
   );
 
   if (response.stop_reason === "refusal")
@@ -206,6 +230,17 @@ export async function askForJson(input: {
     .filter((block) => block.type === "text")
     .map((block) => block.text)
     .join("");
+  // Said before the parse, because a truncated answer *is* invalid JSON and
+  // "the answer was not JSON" sends you looking at the schema when the real
+  // problem is that it ran out of room. Thinking tokens count against
+  // `max_tokens`, so this is the failure a longer answer reaches first.
+  if (response.stop_reason === "max_tokens")
+    throw new ClaudeShapeError(
+      // The numbers are in the sentence because without them the only way
+      // to tell a long answer from a long think is to guess, and the two
+      // want opposite fixes.
+      `The model ran out of room before it finished (${response.usage?.output_tokens ?? "?"} of ${maxTokens} written, ${response.usage?.input_tokens ?? "?"} read). Ask for something shorter.`,
+    );
   if (!text.trim()) throw new ClaudeShapeError("The model answered nothing.");
 
   try {
@@ -215,6 +250,8 @@ export async function askForJson(input: {
       promptVersion: PROMPT_VERSION,
     };
   } catch {
-    throw new ClaudeShapeError("The model's answer was not JSON.");
+    throw new ClaudeShapeError(
+      `The model's answer was not JSON (stopped: ${response.stop_reason ?? "unknown"}).`,
+    );
   }
 }

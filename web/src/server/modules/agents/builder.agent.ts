@@ -194,8 +194,6 @@ the whole page as you would have it afterwards.
   Rewriting a sentence nobody asked you to rewrite is the thing this seat
   must not do: the owner wrote it.
 - Keep the order of everything you are not moving.
-- A block described as the owner's own markup is not yours. Leave it out of
-  your answer entirely; it is put back where it was, untouched.
 - If the instruction asks for something you cannot do with the blocks you
   have, do as much of it as you can and leave the rest alone.
 
@@ -211,8 +209,6 @@ Return the whole page as you would have it afterwards.
 - Address that finding and nothing else. Another sentence you would have
   written differently is not yours to change.
 - Keep every other block word for word, in the same order.
-- A block described as the owner's own markup is not yours. Leave it out of
-  your answer entirely; it is put back where it was, untouched.
 
 ${PAGE_RULES}`;
 
@@ -360,12 +356,17 @@ function pageFrom(
   shape: typeof agentPage | typeof agentPageOrNone = agentPage,
 ): Block[] {
   const parsed = shape.safeParse(json);
-  if (!parsed.success)
+  if (!parsed.success) {
+    // Named, not just described. "expected string to have <=40 characters"
+    // sends you reading the whole schema; "blocks.3.label" is the field.
+    const issue = parsed.error.issues[0];
+    const where = issue?.path.length ? ` (${issue.path.join(".")})` : "";
     throw new ClaudeShapeError(
       `The Builder answered with a page this app will not store: ${
-        parsed.error.issues[0]?.message ?? "unknown"
-      }`,
+        issue?.message ?? "unknown"
+      }${where}`,
     );
+  }
   try {
     return agentBlocks(
       { blocks: parsed.data.blocks ?? [] },
@@ -395,7 +396,8 @@ export async function runBuilder(
     system: SYSTEM,
     prompt: `${builderPrompt(description, facts)}\n\n${describeTargets(targets)}`,
     schema: buildSchema(targets.map((target) => target.key)),
-    effort: "medium",
+    effort: "low",
+    maxTokens: 12_000,
   });
 
   // One answer carries both the configuration and the page, so the page is
@@ -496,6 +498,8 @@ export type PageProposal = {
   html: string;
   /** What was asked for, echoed back onto the proposal. */
   asked: string;
+  /** Where this page would send someone, so the chat can show them. */
+  links: { href: string; text: string }[];
   model: string;
 };
 
@@ -506,9 +510,21 @@ async function proposePage(
   instruction: string,
   system: string,
   ask: Ask,
+  /**
+   * A page to start from instead of the saved one.
+   *
+   * This is what makes a second instruction a conversation rather than a
+   * restart: "now make it shorter" has to mean the page you were just
+   * shown, not the one on the server. It arrives from a browser like any
+   * other string, so it is sanitised before it is read — the same policy
+   * the page itself is served under, and the same one a save goes through.
+   */
+  from?: string,
 ): Promise<PageProposal> {
   const shop = await shopOf(owner, id);
-  const before = readPage(shop.htmlClean);
+  const before = readPage(
+    from === undefined ? shop.htmlClean : sanitizeShopHtml(from).clean,
+  );
   const targets = await payTargets(owner, {
     slug: shop.slug,
     title: shop.title,
@@ -530,7 +546,8 @@ async function proposePage(
       .filter(Boolean)
       .join("\n"),
     schema: agentPageSchema(targets.map((target) => target.key)),
-    effort: "medium",
+    effort: "low",
+    maxTokens: 12_000,
   });
 
   const written = pageFrom(completion.json, targets);
@@ -570,6 +587,15 @@ async function proposePage(
     after,
     html,
     asked: instruction,
+    // Every address this page now sends someone to, so the chat can offer
+    // them as links to open rather than as a sentence to be believed.
+    links: after.flatMap((block) =>
+      block.kind === "cta" || block.kind === "link"
+        ? [{ href: block.href, text: block.text }]
+        : block.kind === "buttons"
+          ? block.items
+          : [],
+    ),
     model: `${completion.model}@${completion.promptVersion}`,
   };
 }
@@ -579,7 +605,7 @@ export async function runShopEdit(
   owner: string,
   id: string,
   instruction: string,
-  options: { ask?: Ask } = {},
+  options: { ask?: Ask; from?: string } = {},
 ): Promise<PageProposal> {
   const ask = options.ask ?? askForJson;
   if (!options.ask && !claudeConfigured()) throw new ClaudeNotConfiguredError();
@@ -591,6 +617,7 @@ export async function runShopEdit(
     `What the owner asks for:\n${instruction.trim()}`,
     EDIT_SYSTEM,
     ask,
+    options.from,
   );
 }
 

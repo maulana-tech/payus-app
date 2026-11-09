@@ -151,6 +151,10 @@ export function CanvasEditor({ id }: { id: string }) {
   // shop arrives, then owned here.
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [openBlock, setOpenBlock] = useState<string | null>(null);
+  // A page the Builder has proposed and the owner has not answered yet. The
+  // canvas draws it instead of the draft, so an answer is judged as the
+  // page it would become rather than as a list of block names.
+  const [proposed, setProposed] = useState<string | null>(null);
 
   const patch = useCallback(
     (next: Partial<Draft>) =>
@@ -321,7 +325,11 @@ export function CanvasEditor({ id }: { id: string }) {
   const published = store?.state === "published";
   // While picking, the canvas shows the starter being considered — the same
   // renderer, so a starter is judged as the page it would become.
-  const shown = picking ? starters[highlight].draft : draft;
+  const shown = picking
+    ? starters[highlight].draft
+    : proposed === null
+      ? draft
+      : { ...draft, html: proposed };
   const path = `/shop/${shown.slug || slugify(shown.title) || "your-shop"}`;
 
   return (
@@ -456,6 +464,7 @@ export function CanvasEditor({ id }: { id: string }) {
                     <AgentPane
                       shopId={isNew ? null : id}
                       dirty={dirty}
+                      onPreview={setProposed}
                       onApply={(html) => {
                         patch({ html });
                         setTab("blocks");
