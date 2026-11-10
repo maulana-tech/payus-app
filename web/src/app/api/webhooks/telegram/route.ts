@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import {
   answerCallback,
   editMessage,
@@ -53,11 +54,21 @@ export async function POST(request: Request) {
   if (!telegramConfigured())
     return Response.json({ error: "telegram_not_configured" }, { status: 503 });
 
+  // A delivery this route cannot authenticate is not Telegram's, and the
+  // only thing that authenticates one is this header. The check used to be
+  // skipped when no secret was set, which left the endpoint open on any
+  // deployment that configured a token and nothing else — and `onCallback`
+  // below approves and executes a Guardian proposal. Two guessed numbers
+  // are not a fence, so a missing secret now closes the door instead of
+  // removing it.
   const secret = telegramSecret();
-  if (
-    secret &&
-    request.headers.get("x-telegram-bot-api-secret-token") !== secret
-  )
+  if (!secret)
+    return Response.json({ error: "telegram_not_configured" }, { status: 503 });
+  const given = Buffer.from(
+    request.headers.get("x-telegram-bot-api-secret-token") ?? "",
+  );
+  const expected = Buffer.from(secret);
+  if (given.length !== expected.length || !timingSafeEqual(given, expected))
     return Response.json({ error: "bad_secret" }, { status: 401 });
 
   let update: Update;

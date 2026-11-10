@@ -43,10 +43,24 @@ const nextConfig = {
       { key: "X-Frame-Options", value: "SAMEORIGIN" },
       { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
     ];
+    // Two that every response wants. `nosniff` because a stored file this
+    // app serves back should never be re-interpreted as script by the
+    // browser's own guess, and a referrer policy because the default sends
+    // the full URL of a page like /pay/<username> to whatever it links out
+    // to. `/i/*` keeps the stricter `no-referrer` it already had, so it is
+    // left out here rather than being given two conflicting values.
+    const everywhere = [{ key: "X-Content-Type-Options", value: "nosniff" }];
     return [
       {
         source: "/((?!embed/|embed.js|sw.js).*)",
         headers: noFraming,
+      },
+      { source: "/:path*", headers: everywhere },
+      {
+        source: "/((?!i/).*)",
+        headers: [
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
       },
       {
         source: "/embed.js",

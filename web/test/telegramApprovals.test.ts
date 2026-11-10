@@ -20,9 +20,14 @@ const sent = vi.hoisted(() => ({
   failNext: false,
 }));
 
+/** What the route reads for its own configuration, so a test can unset it. */
+const config = vi.hoisted(() => ({
+  secret: "shared-secret" as string | undefined,
+}));
+
 vi.mock("../src/server/lib/telegram", () => ({
   telegramConfigured: () => true,
-  telegramSecret: () => "shared-secret",
+  telegramSecret: () => config.secret,
   escapeHtml: (text: string) => text,
   sendMessage: async (chatId: string, html: string) => {
     if (sent.failNext) {
@@ -128,6 +133,23 @@ describe.skipIf(!available)("telegram approvals (Postgres)", () => {
   it("refuses a delivery that is not Telegram's", async () => {
     const response = await post({ message: {} }, "guessed");
     expect(response.status).toBe(401);
+  });
+
+  // The header is the whole of what proves a delivery is Telegram's, and
+  // the callback below it approves a payout. Skipping the check when no
+  // secret is set — which is what it used to do — leaves that open to
+  // anyone who knows the URL and guesses a chat id and a proposal id.
+  it("serves nothing at all when it has no secret to check against", async () => {
+    config.secret = undefined;
+    try {
+      const response = await post({
+        message: { chat: { id: 1 }, text: "/help" },
+      });
+      expect(response.status).toBe(503);
+      expect(sent.messages).toHaveLength(0);
+    } finally {
+      config.secret = "shared-secret";
+    }
   });
 
   // The route's promise is that Telegram never gets a non-2xx, because a
