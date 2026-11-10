@@ -663,6 +663,7 @@ lands, `PAYPAL_PAYOUTS_ENABLED=true` is the whole change.
 | [Setting it up](docs/setup.md) | What to install, which keys to get, how to deploy |
 | [Accepting payments](docs/api.md) | The widget, the checkout API, signed webhooks, `@payus/js` |
 | [The plan](docs/plan.md) | What was built, in what order, and the decisions taken — written as it happened |
+| [The submission](docs/submission.md) | The hackathon write-up: the inspiration, what broke, and what the failures taught |
 | [`CLAUDE.md`](CLAUDE.md) | The map for anyone, or anything, changing this code |
 
 ---

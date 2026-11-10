@@ -11,6 +11,8 @@ These are the working documents:
   webhooks and the `@payus/js` library.
 - **[The plan](plan.md)** — what was built, in what order, and the
   decisions taken along the way. Written as it happened.
+- **[The submission](submission.md)** — the hackathon write-up: why this
+  was built, what broke along the way, and what the failures taught.
 
 The repository's own [README](../README.md) is the short version, and
 `CLAUDE.md` at the root is the map for anyone (or anything) changing the
